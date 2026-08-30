@@ -80,6 +80,14 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 		VideoSegmentFormat: configRepository.GetVideoSegmentFormat(),
 		ForbiddenUsernames: usernameBlocklist,
 		SuggestedUsernames: usernameSuggestions,
+
+		// Compatibility stubs for the legacy admin UI: it destructures
+		// these removed features' config objects and crashes when they are
+		// absent. Dies with the React admin (carve-plan step 7 leftovers).
+		YP:            legacyYPStub{},
+		S3:            legacyS3Stub{},
+		Federation:    legacyFederationStub{BlockedDomains: []string{}},
+		Notifications: legacyNotificationsStub{},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -98,6 +106,10 @@ type serverConfigAdminResponse struct {
 	WebServerIP               string                  `json:"webServerIP"`
 	VideoCodec                string                  `json:"videoCodec"`
 	VideoSegmentFormat        string                  `json:"videoSegmentFormat"`
+	YP                        legacyYPStub            `json:"yp"`
+	S3                        legacyS3Stub            `json:"s3"`
+	Federation                legacyFederationStub    `json:"federation"`
+	Notifications             legacyNotificationsStub `json:"notifications"`
 	VideoServingEndpoint      string                  `json:"videoServingEndpoint"`
 	SupportedCodecs           []string                `json:"supportedCodecs"`
 	ExternalActions           []models.ExternalAction `json:"externalActions"`
@@ -117,6 +129,45 @@ type serverConfigAdminResponse struct {
 	DisableSearchIndexing     bool                    `json:"disableSearchIndexing"`
 	StreamKeyOverridden       bool                    `json:"streamKeyOverridden"`
 	HideViewerCount           bool                    `json:"hideViewerCount"`
+}
+
+type legacyYPStub struct {
+	Enabled     bool   `json:"enabled"`
+	InstanceURL string `json:"instanceUrl"`
+}
+
+type legacyS3Stub struct {
+	Enabled   bool   `json:"enabled"`
+	Endpoint  string `json:"endpoint"`
+	AccessKey string `json:"accessKey"`
+	Secret    string `json:"secret"`
+	Bucket    string `json:"bucket"`
+	Region    string `json:"region"`
+}
+
+type legacyFederationStub struct {
+	Enabled        bool     `json:"enabled"`
+	IsPrivate      bool     `json:"isPrivate"`
+	Username       string   `json:"username"`
+	GoLiveMessage  string   `json:"goLiveMessage"`
+	ShowEngagement bool     `json:"showEngagement"`
+	BlockedDomains []string `json:"blockedDomains"`
+}
+
+type legacyBrowserNotificationStub struct {
+	Enabled   bool   `json:"enabled"`
+	PublicKey string `json:"publicKey"`
+}
+
+type legacyDiscordNotificationStub struct {
+	Enabled       bool   `json:"enabled"`
+	Webhook       string `json:"webhook"`
+	GoLiveMessage string `json:"goLiveMessage"`
+}
+
+type legacyNotificationsStub struct {
+	Browser legacyBrowserNotificationStub `json:"browser"`
+	Discord legacyDiscordNotificationStub `json:"discord"`
 }
 
 type videoSettings struct {
