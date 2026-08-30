@@ -170,13 +170,26 @@ Bugs found and fixed on the way, live-verified:
 - Playlist writes are now atomic (temp + rename) — the in-place truncating
   write inherited from upstream hands torn playlists to polling players.
 
-## Step 7 — Viewer UI rebuild
+## Step 7 — Viewer UI rebuild — **viewer DONE, 2026-08-30**
 
-**In Svelte** (decided 2026-08-30) — the Next.js `web/` app is a donor, not
-a base. Theater-first page, lobby offline state, Sunset Coral theme on CSS
-custom properties, theme picker later. Design samples before building
-(design.md §7). The React app keeps serving until the Svelte one replaces
-it wholesale; per-feature React surgery is not worth doing.
+Four design samples → user chose Velvet Lounge (04) + 03's schedule tray;
+`design-samples/05-velvet-lounge-final.html` is the blueprint. Built as
+`webapp/` (SvelteKit, adapter-static SPA, tokens-only CSS), embedded into
+the binary at `static/webapp`, served for `/` and `/t/*` by
+`ViewerAppHandler` — the legacy bundle still backs `/admin` and its assets.
+
+Working and verified live in-browser: login gate → lobby → automatic flip
+to the theater on stream start → hls.js playback of the gated fMP4 HLS
+(muted-autoplay + tap-for-sound) → chat register/history/round-trip →
+rename through the reservation system → chat hide + fullscreen → back to
+the lobby with "last watched together" when the stream ends.
+
+Still open for later sessions:
+- Admin UI in Svelte (React admin remains the stopgap)
+- Tray schedule cells + lobby countdown light up when the structured
+  metadata channel from Jellystreamerr exists (design.md §3)
+- Theme picker (tokens are ready), mobile layout pass, custom emoji picker
+- Retire the React viewer/`web/` donor once admin is rebuilt
 
 ---
 
