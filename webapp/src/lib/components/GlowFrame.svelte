@@ -30,7 +30,17 @@
 				xhrSetup: (xhr) => {
 					xhr.withCredentials = true;
 				},
-				liveDurationInfinity: true
+				liveDurationInfinity: true,
+				// Cinema trade-off: sit further behind the live edge with a
+				// deep buffer so sender-side splices (overlay applies,
+				// track changes) ride through invisibly. Delay is fine —
+				// this is a broadcast, not a call.
+				liveSyncDurationCount: 5,
+				liveMaxLatencyDurationCount: 12,
+				maxBufferLength: 45,
+				maxMaxBufferLength: 90,
+				backBufferLength: 30,
+				nudgeMaxRetry: 10
 			});
 			hls.loadSource(src());
 			hls.attachMedia(videoEl);
