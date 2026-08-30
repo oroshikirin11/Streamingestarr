@@ -23,3 +23,10 @@ export const status = readable(null, (set) => {
 		clearTimeout(timer);
 	};
 });
+
+// Session role — decides whether admin affordances render.
+export const role = writable('');
+fetch('/api/auth/status')
+	.then((r) => r.json())
+	.then((d) => role.set(d.role || ''))
+	.catch(() => {});
