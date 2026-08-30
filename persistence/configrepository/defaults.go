@@ -3,7 +3,6 @@ package configrepository
 import (
 	"github.com/owncast/owncast/config"
 	"github.com/owncast/owncast/models"
-	log "github.com/sirupsen/logrus"
 )
 
 // PopulateDefaults will set default values in the database.
@@ -24,7 +23,6 @@ func (r *SqlConfigRepository) PopulateDefaults() {
 	_ = r.SetServerWelcomeMessage("")
 	_ = r.SetServerName(defaults.Name)
 	_ = r.SetExtraPageBodyContent(defaults.PageBodyContent)
-	_ = r.SetFederationGoLiveMessage(defaults.FederationGoLiveMessage)
 	_ = r.SetSocialHandles([]models.SocialHandle{
 		{
 			Platform: "github",
@@ -32,29 +30,12 @@ func (r *SqlConfigRepository) PopulateDefaults() {
 		},
 	})
 
-	if !r.HasPopulatedFederationDefaults() {
-		if err := r.SetFederationGoLiveMessage(config.GetDefaults().FederationGoLiveMessage); err != nil {
-			log.Errorln(err)
-		}
-		if err := r.datastore.SetBool("HAS_POPULATED_FEDERATION_DEFAULTS", true); err != nil {
-			log.Errorln(err)
-		}
-	}
-
 	_ = r.datastore.SetBool(key, true)
 }
 
 // HasPopulatedDefaults will determine if the defaults have been inserted into the database.
 func (r *SqlConfigRepository) HasPopulatedDefaults() bool {
 	hasPopulated, err := r.datastore.GetBool("HAS_POPULATED_DEFAULTS")
-	if err != nil {
-		return false
-	}
-	return hasPopulated
-}
-
-func (r *SqlConfigRepository) HasPopulatedFederationDefaults() bool {
-	hasPopulated, err := r.datastore.GetBool("HAS_POPULATED_FEDERATION_DEFAULTS")
 	if err != nil {
 		return false
 	}

@@ -111,33 +111,6 @@ func SendSystemMessage(text string, ephemeral bool) error {
 	return nil
 }
 
-// SendFediverseAction will send a message indicating some Fediverse engagement took place.
-func SendFediverseAction(eventType string, userAccountName string, image *string, body string, link string) error {
-	message := events.FediverseEngagementEvent{
-		Event: events.Event{
-			Type: eventType,
-		},
-		MessageEvent: events.MessageEvent{
-			Body: body,
-		},
-		UserAccountName: userAccountName,
-		Image:           image,
-		Link:            link,
-	}
-
-	message.SetDefaults()
-
-	if err := Broadcast(&message); err != nil {
-		log.Errorln("error sending system message", err)
-		return err
-	}
-
-	chatMessageRepository := chatmessagerepository.Get()
-	chatMessageRepository.SaveFederatedAction(message)
-
-	return nil
-}
-
 // SendSystemAction will send a system action string as an action event to all clients.
 func SendSystemAction(text string, ephemeral bool) error {
 	message := events.ActionEvent{

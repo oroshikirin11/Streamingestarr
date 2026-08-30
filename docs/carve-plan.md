@@ -8,7 +8,15 @@ rename, then rebuild. Each step compiles and runs on its own.
 
 ---
 
-## Step 1 — Deletions (agreed in design.md §4)
+## Step 1 — Deletions (agreed in design.md §4) — **DONE (Go side), 2026-08-30**
+
+Everything below is removed from the Go codebase; `go build ./...` and
+`go test ./...` are green and the binary runs. The OpenAPI spec was trimmed
+and the API code regenerated (oapi-codegen, without the redocly lint step).
+Still pending from this step: stripping the dropped features from the
+`web/` frontend — deliberately deferred, since the UI is being rebuilt in
+Svelte anyway (design.md §7); the React app remains only as a working
+stopgap and a donor for reference.
 
 | What | Packages / files | Entanglement outside itself |
 |---|---|---|
@@ -56,10 +64,11 @@ for AV1-in-HLS.
 
 ## Step 7 — Viewer UI rebuild
 
-`web/` is Next.js. Strip dropped features first (step 1), rebrand (step 2),
-then the real work: theater-first page, lobby offline state, Sunset Coral
-theme on CSS custom properties, theme picker later. Design samples before
-building (design.md §7).
+**In Svelte** (decided 2026-08-30) — the Next.js `web/` app is a donor, not
+a base. Theater-first page, lobby offline state, Sunset Coral theme on CSS
+custom properties, theme picker later. Design samples before building
+(design.md §7). The React app keeps serving until the Svelte one replaces
+it wholesale; per-feature React surgery is not worth doing.
 
 ---
 

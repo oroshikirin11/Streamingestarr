@@ -38,8 +38,6 @@ type UserRepository interface {
 	SetModerator(userID string, isModerator bool) error
 	SetUserAsAuthenticated(userID string) error
 	HasValidScopes(scopes []string) bool
-	GetUserByAuth(authToken string, authType models.AuthType) *models.User
-	AddAuth(userID, authToken string, authType models.AuthType) error
 	SetExternalAPIUserAccessTokenAsUsed(token string) error
 	GetUsersCount() int
 }
@@ -270,44 +268,8 @@ func (r *SqlUserRepository) SetUserAsAuthenticated(userID string) error {
 	return errors.Wrap(r.datastore.GetQueries().SetUserAsAuthenticated(context.Background(), userID), "unable to set user as authenticated")
 }
 
-// AddAuth will add an external authentication token and type for a user.
-func (r *SqlUserRepository) AddAuth(userID, authToken string, authType models.AuthType) error {
-	return r.datastore.GetQueries().AddAuthForUser(context.Background(), db.AddAuthForUserParams{
-		UserID: userID,
-		Token:  authToken,
-		Type:   string(authType),
-	})
-}
-
 // GetUserByAuth will return an existing user given auth details if a user
 // has previously authenticated with that method.
-func (r *SqlUserRepository) GetUserByAuth(authToken string, authType models.AuthType) *models.User {
-	u, err := r.datastore.GetQueries().GetUserByAuth(context.Background(), db.GetUserByAuthParams{
-		Token: authToken,
-		Type:  string(authType),
-	})
-	if err != nil {
-		return nil
-	}
-
-	var scopes []string
-	if u.Scopes.Valid {
-		scopes = strings.Split(u.Scopes.String, ",")
-	}
-
-	return &models.User{
-		ID:              u.ID,
-		DisplayName:     u.DisplayName,
-		DisplayColor:    int(u.DisplayColor),
-		CreatedAt:       u.CreatedAt.Time,
-		DisabledAt:      &u.DisabledAt.Time,
-		PreviousNames:   strings.Split(u.PreviousNames.String, ","),
-		NameChangedAt:   &u.NamechangedAt.Time,
-		AuthenticatedAt: &u.AuthenticatedAt.Time,
-		Scopes:          scopes,
-	}
-}
-
 // SetModerator will add or remove moderator status for a single user by ID.
 func (r *SqlUserRepository) SetModerator(userID string, isModerator bool) error {
 	if isModerator {

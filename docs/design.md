@@ -154,6 +154,11 @@ remembers the chat name.
 
 Brief: **clean, peak UX, cozy viewing experience.**
 
+**Svelte, not React (decided 2026-08-30).** Owncast's Next.js/React frontend
+is a donor, not a base: the viewer and admin UIs get rebuilt in Svelte —
+same stack family as Jellystreamerr, so components, patterns, and the token
+system carry between the two projects.
+
 - **Theater-first viewer page.** Video dominant; chrome dims/auto-hides;
   chat is a collapsible side panel, not a fixed column. A screen with a room
   around it, not a profile page with a video in it.
@@ -173,6 +178,15 @@ Brief: **clean, peak UX, cozy viewing experience.**
 **Process:** when we get to it, build 3–4 full-page design samples of the
 viewer page in both states (live + lobby) and pick the winner; the admin UI
 derives from it.
+
+## 7b. Deployment
+
+**Docker-first, one command (decided 2026-08-30).** Setup should feel like
+Jellystreamerr: a short `docker-compose.yml`, sensible defaults, a volume
+for data, ports for web + ingest — up and running with `docker compose up`.
+Owncast already ships a Dockerfile; adapt it at rebrand time. First-run
+setup happens in the browser behind the setup gate (§5), never by editing
+files.
 
 ## 8. Multi-stream, architecturally
 

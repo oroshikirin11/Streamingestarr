@@ -13,7 +13,6 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/owncast/owncast/activitypub/outbox"
 	"github.com/owncast/owncast/core"
 	"github.com/owncast/owncast/core/chat"
 	"github.com/owncast/owncast/core/webhooks"
@@ -49,12 +48,6 @@ func SetTags(w http.ResponseWriter, r *http.Request) {
 
 	configRepository := configrepository.Get()
 	if err := configRepository.SetServerMetadataTags(tagStrings); err != nil {
-		webutils.WriteSimpleResponse(w, false, err.Error())
-		return
-	}
-
-	// Update Fediverse followers about this change.
-	if err := outbox.UpdateFollowersWithAccountUpdates(); err != nil {
 		webutils.WriteSimpleResponse(w, false, err.Error())
 		return
 	}
@@ -121,12 +114,6 @@ func SetServerName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update Fediverse followers about this change.
-	if err := outbox.UpdateFollowersWithAccountUpdates(); err != nil {
-		webutils.WriteSimpleResponse(w, false, err.Error())
-		return
-	}
-
 	webutils.WriteSimpleResponse(w, true, "changed")
 }
 
@@ -143,12 +130,6 @@ func SetServerSummary(w http.ResponseWriter, r *http.Request) {
 
 	configRepository := configrepository.Get()
 	if err := configRepository.SetServerSummary(configValue.Value.(string)); err != nil {
-		webutils.WriteSimpleResponse(w, false, err.Error())
-		return
-	}
-
-	// Update Fediverse followers about this change.
-	if err := outbox.UpdateFollowersWithAccountUpdates(); err != nil {
 		webutils.WriteSimpleResponse(w, false, err.Error())
 		return
 	}
@@ -273,12 +254,6 @@ func SetLogo(w http.ResponseWriter, r *http.Request) {
 
 	if err := configRepository.SetLogoUniquenessString(shortid.MustGenerate()); err != nil {
 		log.Error("Error saving logo uniqueness string: ", err)
-	}
-
-	// Update Fediverse followers about this change.
-	if err := outbox.UpdateFollowersWithAccountUpdates(); err != nil {
-		webutils.WriteSimpleResponse(w, false, err.Error())
-		return
 	}
 
 	webutils.WriteSimpleResponse(w, true, "changed")
@@ -573,26 +548,6 @@ func SetSocketHostOverride(w http.ResponseWriter, r *http.Request) {
 	webutils.WriteSimpleResponse(w, true, "websocket host override set")
 }
 
-// SetDirectoryEnabled will handle the web config request to enable or disable directory registration.
-func SetDirectoryEnabled(w http.ResponseWriter, r *http.Request) {
-	if !requirePOST(w, r) {
-		return
-	}
-
-	configValue, success := getValueFromRequest(w, r)
-	if !success {
-		return
-	}
-
-	configRepository := configrepository.Get()
-
-	if err := configRepository.SetDirectoryEnabled(configValue.Value.(bool)); err != nil {
-		webutils.WriteSimpleResponse(w, false, err.Error())
-		return
-	}
-	webutils.WriteSimpleResponse(w, true, "directory state changed")
-}
-
 // SetStreamLatencyLevel will handle the web config request to set the stream latency level.
 func SetStreamLatencyLevel(w http.ResponseWriter, r *http.Request) {
 	if !requirePOST(w, r) {
@@ -612,53 +567,6 @@ func SetStreamLatencyLevel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	webutils.WriteSimpleResponse(w, true, "set stream latency")
-}
-
-// SetS3Configuration will handle the web config request to set the storage configuration.
-func SetS3Configuration(w http.ResponseWriter, r *http.Request) {
-	if !requirePOST(w, r) {
-		return
-	}
-
-	type s3ConfigurationRequest struct {
-		Value models.S3 `json:"value"`
-	}
-
-	decoder := json.NewDecoder(r.Body)
-	var newS3Config s3ConfigurationRequest
-	if err := decoder.Decode(&newS3Config); err != nil {
-		webutils.WriteSimpleResponse(w, false, "unable to update s3 config with provided values")
-		return
-	}
-
-	if newS3Config.Value.Enabled {
-		if newS3Config.Value.Endpoint == "" || !utils.IsValidURL((newS3Config.Value.Endpoint)) {
-			webutils.WriteSimpleResponse(w, false, "s3 support requires an endpoint")
-			return
-		}
-
-		if newS3Config.Value.AccessKey == "" || newS3Config.Value.Secret == "" {
-			webutils.WriteSimpleResponse(w, false, "s3 support requires an access key and secret")
-			return
-		}
-
-		if newS3Config.Value.Region == "" {
-			webutils.WriteSimpleResponse(w, false, "s3 support requires a region and endpoint")
-			return
-		}
-
-		if newS3Config.Value.Bucket == "" {
-			webutils.WriteSimpleResponse(w, false, "s3 support requires a bucket created for storing public video segments")
-			return
-		}
-	}
-
-	configRepository := configrepository.Get()
-	if err := configRepository.SetS3Config(newS3Config.Value); err != nil {
-		webutils.WriteSimpleResponse(w, false, err.Error())
-		return
-	}
-	webutils.WriteSimpleResponse(w, true, "storage configuration changed")
 }
 
 // SetStreamOutputVariants will handle the web config request to set the video output stream variants.
@@ -707,12 +615,6 @@ func SetSocialHandles(w http.ResponseWriter, r *http.Request) {
 	configRepository := configrepository.Get()
 	if err := configRepository.SetSocialHandles(socialHandles.Value); err != nil {
 		webutils.WriteSimpleResponse(w, false, "unable to update social handles with provided values")
-		return
-	}
-
-	// Update Fediverse followers about this change.
-	if err := outbox.UpdateFollowersWithAccountUpdates(); err != nil {
-		webutils.WriteSimpleResponse(w, false, err.Error())
 		return
 	}
 

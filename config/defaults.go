@@ -11,8 +11,6 @@ import (
 type Defaults struct {
 	PageBodyContent string
 
-	FederationGoLiveMessage string
-
 	Summary              string
 	ServerWelcomeMessage string
 	Logo                 string
@@ -22,11 +20,10 @@ type Defaults struct {
 
 	DatabaseFilePath string
 
-	FederationUsername string
-	WebServerIP        string
-	Name               string
-	AdminPassword      string
-	StreamKeys         []generated.StreamKey
+	WebServerIP   string
+	Name          string
+	AdminPassword string
+	StreamKeys    []generated.StreamKey
 
 	StreamVariants []models.StreamOutputVariant
 
@@ -95,8 +92,5 @@ func GetDefaults() Defaults {
 				CPUUsageLevel:      2,
 			},
 		},
-
-		FederationUsername:      "streamer",
-		FederationGoLiveMessage: "I've gone live!",
 	}
 }

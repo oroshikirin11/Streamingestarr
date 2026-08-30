@@ -6,8 +6,6 @@ import (
 	"github.com/owncast/owncast/webserver/handlers/admin"
 	"github.com/owncast/owncast/webserver/handlers/generated"
 	"github.com/owncast/owncast/webserver/router/middleware"
-
-	"github.com/owncast/owncast/yp"
 )
 
 type ServerInterfaceImpl struct{}
@@ -55,10 +53,6 @@ func (*ServerInterfaceImpl) GetWebConfig(w http.ResponseWriter, r *http.Request)
 	GetWebConfig(w, r)
 }
 
-func (*ServerInterfaceImpl) GetYPResponse(w http.ResponseWriter, r *http.Request) {
-	yp.GetYPResponse(w, r)
-}
-
 func (*ServerInterfaceImpl) GetAllSocialPlatforms(w http.ResponseWriter, r *http.Request) {
 	GetAllSocialPlatforms(w, r)
 }
@@ -71,18 +65,6 @@ func (*ServerInterfaceImpl) Ping(w http.ResponseWriter, r *http.Request) {
 	Ping(w, r)
 }
 
-func (*ServerInterfaceImpl) RemoteFollow(w http.ResponseWriter, r *http.Request) {
-	RemoteFollow(w, r)
-}
-
-func (*ServerInterfaceImpl) GetFollowers(w http.ResponseWriter, r *http.Request, params generated.GetFollowersParams) {
-	middleware.HandlePagination(GetFollowers)(w, r)
-}
-
 func (*ServerInterfaceImpl) ReportPlaybackMetrics(w http.ResponseWriter, r *http.Request) {
 	ReportPlaybackMetrics(w, r)
-}
-
-func (*ServerInterfaceImpl) RegisterForLiveNotifications(w http.ResponseWriter, r *http.Request, params generated.RegisterForLiveNotificationsParams) {
-	middleware.RequireUserAccessToken(RegisterForLiveNotifications)(w, r)
 }

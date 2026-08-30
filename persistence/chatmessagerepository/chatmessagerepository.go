@@ -18,7 +18,6 @@ const maxBacklogNumber = 50 // Return max number of messages in history request
 
 type ChatMessageRepository interface {
 	SaveUserMessage(event events.UserMessageEvent)
-	SaveFederatedAction(event events.FediverseEngagementEvent)
 	SaveEvent(id string, userID *string, body string, eventType string, hidden *time.Time, timestamp time.Time, image *string, link *string, title *string, subtitle *string)
 	GetChatModerationHistory() []interface{}
 	GetChatHistory() []interface{}
@@ -56,10 +55,6 @@ func New(datastore *data.Datastore) ChatMessageRepository {
 // SaveUserMessage will save a single chat event to the messages database.
 func (r *SqlChatMessageRepository) SaveUserMessage(event events.UserMessageEvent) {
 	r.SaveEvent(event.ID, &event.User.ID, event.Body, event.Type, event.HiddenAt, event.Timestamp, nil, nil, nil, nil)
-}
-
-func (r *SqlChatMessageRepository) SaveFederatedAction(event events.FediverseEngagementEvent) {
-	r.SaveEvent(event.ID, nil, event.Body, event.Type, nil, event.Timestamp, event.Image, &event.Link, &event.UserAccountName, nil)
 }
 
 // nolint: unparam
@@ -186,24 +181,6 @@ func makeActionMessageChatEventFromRowData(row rowData) events.ActionEvent {
 	return message
 }
 
-func makeFederatedActionChatEventFromRowData(row rowData) events.FediverseEngagementEvent {
-	message := events.FediverseEngagementEvent{
-		Event: events.Event{
-			Type:      row.eventType,
-			ID:        row.id,
-			Timestamp: row.timestamp,
-		},
-		MessageEvent: events.MessageEvent{
-			Body:    row.body,
-			RawBody: row.body,
-		},
-		Image:           row.image,
-		Link:            *row.link,
-		UserAccountName: *row.title,
-	}
-	return message
-}
-
 type rowData struct {
 	timestamp         time.Time
 	image             *string
@@ -268,12 +245,6 @@ func getChat(rows *sql.Rows) ([]interface{}, error) {
 			message = makeSystemMessageChatEventFromRowData(row)
 		case events.ChatActionSent:
 			message = makeActionMessageChatEventFromRowData(row)
-		case events.FediverseEngagementFollow:
-			message = makeFederatedActionChatEventFromRowData(row)
-		case events.FediverseEngagementLike:
-			message = makeFederatedActionChatEventFromRowData(row)
-		case events.FediverseEngagementRepost:
-			message = makeFederatedActionChatEventFromRowData(row)
 		}
 
 		history = append(history, message)

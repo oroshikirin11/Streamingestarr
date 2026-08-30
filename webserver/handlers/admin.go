@@ -153,38 +153,6 @@ func (*ServerInterfaceImpl) GetWarningsOptions(w http.ResponseWriter, r *http.Re
 	middleware.RequireAdminAuth(admin.GetWarnings)(w, r)
 }
 
-func (*ServerInterfaceImpl) GetFollowersAdmin(w http.ResponseWriter, r *http.Request, params generated.GetFollowersAdminParams) {
-	middleware.RequireAdminAuth(middleware.HandlePagination(GetFollowers))(w, r)
-}
-
-func (*ServerInterfaceImpl) GetFollowersAdminOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(middleware.HandlePagination(GetFollowers))(w, r)
-}
-
-func (*ServerInterfaceImpl) GetPendingFollowRequests(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.GetPendingFollowRequests)(w, r)
-}
-
-func (*ServerInterfaceImpl) GetPendingFollowRequestsOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.GetPendingFollowRequests)(w, r)
-}
-
-func (*ServerInterfaceImpl) GetBlockedAndRejectedFollowers(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.GetBlockedAndRejectedFollowers)(w, r)
-}
-
-func (*ServerInterfaceImpl) GetBlockedAndRejectedFollowersOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.GetBlockedAndRejectedFollowers)(w, r)
-}
-
-func (*ServerInterfaceImpl) ApproveFollower(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.ApproveFollower)(w, r)
-}
-
-func (*ServerInterfaceImpl) ApproveFollowerOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.ApproveFollower)(w, r)
-}
-
 func (*ServerInterfaceImpl) UploadCustomEmoji(w http.ResponseWriter, r *http.Request) {
 	middleware.RequireAdminAuth(admin.UploadCustomEmoji)(w, r)
 }
@@ -273,36 +241,12 @@ func (*ServerInterfaceImpl) AutoUpdateForceQuitOptions(w http.ResponseWriter, r 
 	middleware.RequireAdminAuth(admin.AutoUpdateForceQuit)(w, r)
 }
 
-func (*ServerInterfaceImpl) ResetYPRegistration(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.ResetYPRegistration)(w, r)
-}
-
-func (*ServerInterfaceImpl) ResetYPRegistrationOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.ResetYPRegistration)(w, r)
-}
-
 func (*ServerInterfaceImpl) GetVideoPlaybackMetrics(w http.ResponseWriter, r *http.Request) {
 	middleware.RequireAdminAuth(admin.GetVideoPlaybackMetrics)(w, r)
 }
 
 func (*ServerInterfaceImpl) GetVideoPlaybackMetricsOptions(w http.ResponseWriter, r *http.Request) {
 	middleware.RequireAdminAuth(admin.GetVideoPlaybackMetrics)(w, r)
-}
-
-func (*ServerInterfaceImpl) SendFederatedMessage(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SendFederatedMessage)(w, r)
-}
-
-func (*ServerInterfaceImpl) SendFederatedMessageOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SendFederatedMessage)(w, r)
-}
-
-func (*ServerInterfaceImpl) GetFederatedActions(w http.ResponseWriter, r *http.Request, params generated.GetFederatedActionsParams) {
-	middleware.RequireAdminAuth(middleware.HandlePagination(admin.GetFederatedActions))(w, r)
-}
-
-func (*ServerInterfaceImpl) GetFederatedActionsOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(middleware.HandlePagination(admin.GetFederatedActions))(w, r)
 }
 
 // DisconnectInboundConnection will force-disconnect an inbound stream.

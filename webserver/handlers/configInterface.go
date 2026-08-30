@@ -251,28 +251,12 @@ func (*ServerInterfaceImpl) SetNSFWOptions(w http.ResponseWriter, r *http.Reques
 	middleware.RequireAdminAuth(admin.SetNSFW)(w, r)
 }
 
-func (*ServerInterfaceImpl) SetDirectoryEnabled(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetDirectoryEnabled)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetDirectoryEnabledOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetDirectoryEnabled)(w, r)
-}
-
 func (*ServerInterfaceImpl) SetSocialHandles(w http.ResponseWriter, r *http.Request) {
 	middleware.RequireAdminAuth(admin.SetSocialHandles)(w, r)
 }
 
 func (*ServerInterfaceImpl) SetSocialHandlesOptions(w http.ResponseWriter, r *http.Request) {
 	middleware.RequireAdminAuth(admin.SetSocialHandles)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetS3Configuration(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetS3Configuration)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetS3ConfigurationOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetS3Configuration)(w, r)
 }
 
 func (*ServerInterfaceImpl) SetServerURL(w http.ResponseWriter, r *http.Request) {
@@ -321,68 +305,4 @@ func (*ServerInterfaceImpl) SetDisableSearchIndexing(w http.ResponseWriter, r *h
 
 func (*ServerInterfaceImpl) SetDisableSearchIndexingOptions(w http.ResponseWriter, r *http.Request) {
 	middleware.RequireAdminAuth(admin.SetDisableSearchIndexing)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationEnabled(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationEnabled)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationEnabledOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationEnabled)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationActivityPrivate(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationActivityPrivate)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationActivityPrivateOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationActivityPrivate)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationShowEngagement(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationShowEngagement)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationShowEngagementOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationShowEngagement)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationUsername(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationUsername)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationUsernameOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationUsername)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationGoLiveMessage(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationGoLiveMessage)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationGoLiveMessageOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationGoLiveMessage)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationBlockDomains(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationBlockDomains)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetFederationBlockDomainsOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetFederationBlockDomains)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetDiscordNotificationConfiguration(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetDiscordNotificationConfiguration)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetDiscordNotificationConfigurationOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetDiscordNotificationConfiguration)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetBrowserNotificationConfiguration(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetBrowserNotificationConfiguration)(w, r)
-}
-
-func (*ServerInterfaceImpl) SetBrowserNotificationConfigurationOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.SetBrowserNotificationConfiguration)(w, r)
 }

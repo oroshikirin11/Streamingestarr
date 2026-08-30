@@ -70,13 +70,8 @@ func migrateToDatastoreValues2(datastore *data.Datastore, configRepository Confi
 }
 
 func migrateToDatastoreValues3ServingEndpoint3(configRepository ConfigRepository) {
-	s3Config := configRepository.GetS3Config()
-
-	if !s3Config.Enabled {
-		return
-	}
-
-	_ = configRepository.SetVideoServingEndpoint(s3Config.ServingEndpoint)
+	// S3 storage support was removed; the S3 serving-endpoint migration is no
+	// longer applicable and is intentionally a no-op.
 }
 
 func migrateToDatastoreValues4(datastore *data.Datastore, configRepository ConfigRepository) {

@@ -73,28 +73,11 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 			VideoQualityVariants: videoQualityVariants,
 			LatencyLevel:         configRepository.GetStreamLatencyLevel().Level,
 		},
-		YP: yp{
-			Enabled:     configRepository.GetDirectoryEnabled(),
-			InstanceURL: configRepository.GetServerURL(),
-		},
-		S3:                 configRepository.GetS3Config(),
 		ExternalActions:    configRepository.GetExternalActions(),
 		SupportedCodecs:    transcoder.GetCodecs(ffmpeg),
 		VideoCodec:         configRepository.GetVideoCodec(),
 		ForbiddenUsernames: usernameBlocklist,
 		SuggestedUsernames: usernameSuggestions,
-		Federation: federationConfigResponse{
-			Enabled:        configRepository.GetFederationEnabled(),
-			IsPrivate:      configRepository.GetFederationIsPrivate(),
-			Username:       configRepository.GetFederationUsername(),
-			GoLiveMessage:  configRepository.GetFederationGoLiveMessage(),
-			ShowEngagement: configRepository.GetFederationShowEngagement(),
-			BlockedDomains: configRepository.GetBlockedFederatedDomains(),
-		},
-		Notifications: notificationsConfigResponse{
-			Discord: configRepository.GetDiscordConfig(),
-			Browser: configRepository.GetBrowserPushConfig(),
-		},
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -106,34 +89,30 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 type serverConfigAdminResponse struct {
-	InstanceDetails           webConfigResponse           `json:"instanceDetails"`
-	Notifications             notificationsConfigResponse `json:"notifications"`
-	YP                        yp                          `json:"yp"`
-	FFmpegPath                string                      `json:"ffmpegPath"`
-	AdminPassword             string                      `json:"adminPassword"`
-	SocketHostOverride        string                      `json:"socketHostOverride,omitempty"`
-	WebServerIP               string                      `json:"webServerIP"`
-	VideoCodec                string                      `json:"videoCodec"`
-	VideoServingEndpoint      string                      `json:"videoServingEndpoint"`
-	S3                        models.S3                   `json:"s3"`
-	Federation                federationConfigResponse    `json:"federation"`
-	SupportedCodecs           []string                    `json:"supportedCodecs"`
-	ExternalActions           []models.ExternalAction     `json:"externalActions"`
-	ForbiddenUsernames        []string                    `json:"forbiddenUsernames"`
-	SuggestedUsernames        []string                    `json:"suggestedUsernames"`
-	StreamKeys                []generated.StreamKey       `json:"streamKeys"`
-	VideoSettings             videoSettings               `json:"videoSettings"`
-	RTMPServerPort            int                         `json:"rtmpServerPort"`
-	WebServerPort             int                         `json:"webServerPort"`
-	ChatDisabled              bool                        `json:"chatDisabled"`
-	ChatJoinMessagesEnabled   bool                        `json:"chatJoinMessagesEnabled"`
-	ChatEstablishedUserMode   bool                        `json:"chatEstablishedUserMode"`
-	ChatSpamProtectionEnabled bool                        `json:"chatSpamProtectionEnabled"`
-	ChatSlurFilterEnabled     bool                        `json:"chatSlurFilterEnabled"`
-	ChatRequireAuthentication bool                        `json:"chatRequireAuthentication"`
-	DisableSearchIndexing     bool                        `json:"disableSearchIndexing"`
-	StreamKeyOverridden       bool                        `json:"streamKeyOverridden"`
-	HideViewerCount           bool                        `json:"hideViewerCount"`
+	InstanceDetails           webConfigResponse       `json:"instanceDetails"`
+	FFmpegPath                string                  `json:"ffmpegPath"`
+	AdminPassword             string                  `json:"adminPassword"`
+	SocketHostOverride        string                  `json:"socketHostOverride,omitempty"`
+	WebServerIP               string                  `json:"webServerIP"`
+	VideoCodec                string                  `json:"videoCodec"`
+	VideoServingEndpoint      string                  `json:"videoServingEndpoint"`
+	SupportedCodecs           []string                `json:"supportedCodecs"`
+	ExternalActions           []models.ExternalAction `json:"externalActions"`
+	ForbiddenUsernames        []string                `json:"forbiddenUsernames"`
+	SuggestedUsernames        []string                `json:"suggestedUsernames"`
+	StreamKeys                []generated.StreamKey   `json:"streamKeys"`
+	VideoSettings             videoSettings           `json:"videoSettings"`
+	RTMPServerPort            int                     `json:"rtmpServerPort"`
+	WebServerPort             int                     `json:"webServerPort"`
+	ChatDisabled              bool                    `json:"chatDisabled"`
+	ChatJoinMessagesEnabled   bool                    `json:"chatJoinMessagesEnabled"`
+	ChatEstablishedUserMode   bool                    `json:"chatEstablishedUserMode"`
+	ChatSpamProtectionEnabled bool                    `json:"chatSpamProtectionEnabled"`
+	ChatSlurFilterEnabled     bool                    `json:"chatSlurFilterEnabled"`
+	ChatRequireAuthentication bool                    `json:"chatRequireAuthentication"`
+	DisableSearchIndexing     bool                    `json:"disableSearchIndexing"`
+	StreamKeyOverridden       bool                    `json:"streamKeyOverridden"`
+	HideViewerCount           bool                    `json:"hideViewerCount"`
 }
 
 type videoSettings struct {
@@ -156,24 +135,4 @@ type webConfigResponse struct {
 	Tags                []string              `json:"tags"`
 	SocialHandles       []models.SocialHandle `json:"socialHandles"`
 	NSFW                bool                  `json:"nsfw"`
-}
-
-type yp struct {
-	InstanceURL  string `json:"instanceUrl"` // The public URL the directory should link to
-	YPServiceURL string `json:"-"`           // The base URL to the YP API to register with (optional)
-	Enabled      bool   `json:"enabled"`
-}
-
-type federationConfigResponse struct {
-	Username       string   `json:"username"`
-	GoLiveMessage  string   `json:"goLiveMessage"`
-	BlockedDomains []string `json:"blockedDomains"`
-	Enabled        bool     `json:"enabled"`
-	IsPrivate      bool     `json:"isPrivate"`
-	ShowEngagement bool     `json:"showEngagement"`
-}
-
-type notificationsConfigResponse struct {
-	Browser models.BrowserNotificationConfiguration `json:"browser"`
-	Discord models.DiscordConfiguration             `json:"discord"`
 }

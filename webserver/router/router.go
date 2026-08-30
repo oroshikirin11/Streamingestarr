@@ -13,11 +13,8 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	"github.com/owncast/owncast/activitypub"
-	aphandlers "github.com/owncast/owncast/activitypub/controllers"
 	"github.com/owncast/owncast/config"
 	"github.com/owncast/owncast/core/chat"
-	"github.com/owncast/owncast/core/data"
 	"github.com/owncast/owncast/webserver/handlers"
 	"github.com/owncast/owncast/webserver/router/middleware"
 )
@@ -48,20 +45,11 @@ func Start(enableVerboseLogging bool) error {
 	// The admin web app.
 	r.HandleFunc("/admin/*", middleware.RequireAdminAuth(handlers.IndexHandler))
 
-	// Single ActivityPub Actor
-	r.HandleFunc("/federation/user/*", middleware.RequireActivityPubOrRedirect(aphandlers.ActorHandler))
-
-	// Single AP object
-	r.HandleFunc("/federation/*", middleware.RequireActivityPubOrRedirect(aphandlers.ObjectHandler))
-
 	// The primary web app.
 	r.HandleFunc("/*", handlers.IndexHandler)
 
 	// mount the api
 	r.Mount("/api/", handlers.New().Handler())
-
-	// ActivityPub has its own router
-	activitypub.Start(data.GetDatastore())
 
 	// Create a custom mux handler to intercept the /debug/vars endpoint.
 	// This is a hack because Prometheus enables this endpoint by default
@@ -124,22 +112,4 @@ func addStaticFileEndpoints(r chi.Router) {
 		emojiDir += "*"
 	}
 	r.HandleFunc(emojiDir, handlers.GetCustomEmojiImage)
-
-	// WebFinger
-	r.HandleFunc("/.well-known/webfinger", aphandlers.WebfingerHandler)
-
-	// Host Metadata
-	r.HandleFunc("/.well-known/host-meta", aphandlers.HostMetaController)
-
-	// Nodeinfo v1
-	r.HandleFunc("/.well-known/nodeinfo", aphandlers.NodeInfoController)
-
-	// x-nodeinfo v2
-	r.HandleFunc("/.well-known/x-nodeinfo2", aphandlers.XNodeInfo2Controller)
-
-	// Nodeinfo v2
-	r.HandleFunc("/nodeinfo/2.0", aphandlers.NodeInfoV2Controller)
-
-	// Instance details
-	r.HandleFunc("/api/v1/instance", aphandlers.InstanceV1Controller)
 }

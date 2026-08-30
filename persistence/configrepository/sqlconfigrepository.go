@@ -301,32 +301,6 @@ func (r *SqlConfigRepository) SetServerMetadataTags(tags []string) error {
 	return r.datastore.SetString(serverMetadataTagsKey, tagString)
 }
 
-// GetDirectoryEnabled will return if this server should register to YP.
-func (r *SqlConfigRepository) GetDirectoryEnabled() bool {
-	enabled, err := r.datastore.GetBool(directoryEnabledKey)
-	if err != nil {
-		return config.GetDefaults().YPEnabled
-	}
-
-	return enabled
-}
-
-// SetDirectoryEnabled will set if this server should register to YP.
-func (r *SqlConfigRepository) SetDirectoryEnabled(enabled bool) error {
-	return r.datastore.SetBool(directoryEnabledKey, enabled)
-}
-
-// SetDirectoryRegistrationKey will set the YP protocol registration key.
-func (r *SqlConfigRepository) SetDirectoryRegistrationKey(key string) error {
-	return r.datastore.SetString(directoryRegistrationKeyKey, key)
-}
-
-// GetDirectoryRegistrationKey will return the YP protocol registration key.
-func (r *SqlConfigRepository) GetDirectoryRegistrationKey() string {
-	key, _ := r.datastore.GetString(directoryRegistrationKeyKey)
-	return key
-}
-
 // GetSocialHandles will return the external social links.
 func (r *SqlConfigRepository) GetSocialHandles() []models.SocialHandle {
 	var socialHandles []models.SocialHandle
@@ -432,27 +406,6 @@ func (r *SqlConfigRepository) GetFfMpegPath() string {
 		return ""
 	}
 	return path
-}
-
-// GetS3Config will return the external storage configuration.
-func (r *SqlConfigRepository) GetS3Config() models.S3 {
-	configEntry, err := r.datastore.Get(s3StorageConfigKey)
-	if err != nil {
-		return models.S3{Enabled: false}
-	}
-
-	var s3Config models.S3
-	if err := configEntry.GetObject(&s3Config); err != nil {
-		return models.S3{Enabled: false}
-	}
-
-	return s3Config
-}
-
-// SetS3Config will set the external storage configuration.
-func (r *SqlConfigRepository) SetS3Config(config models.S3) error {
-	configEntry := models.ConfigEntry{Key: s3StorageConfigKey, Value: config}
-	return r.datastore.Save(configEntry)
 }
 
 // GetStreamLatencyLevel will return the stream latency level.
@@ -761,101 +714,6 @@ func (r *SqlConfigRepository) SetServerInitTime(t time.Time) error {
 	return r.datastore.Save(configEntry)
 }
 
-// SetFederationEnabled will enable federation if set to true.
-func (r *SqlConfigRepository) SetFederationEnabled(enabled bool) error {
-	return r.datastore.SetBool(federationEnabledKey, enabled)
-}
-
-// GetFederationEnabled will return if federation is enabled.
-func (r *SqlConfigRepository) GetFederationEnabled() bool {
-	enabled, err := r.datastore.GetBool(federationEnabledKey)
-	if err == nil {
-		return enabled
-	}
-
-	return false
-}
-
-// SetFederationUsername will set the username used in federated activities.
-func (r *SqlConfigRepository) SetFederationUsername(username string) error {
-	return r.datastore.SetString(federationUsernameKey, username)
-}
-
-// GetFederationUsername will return the username used in federated activities.
-func (r *SqlConfigRepository) GetFederationUsername() string {
-	username, err := r.datastore.GetString(federationUsernameKey)
-	if username == "" || err != nil {
-		return config.GetDefaults().FederationUsername
-	}
-
-	return username
-}
-
-// SetFederationGoLiveMessage will set the message sent when going live.
-func (r *SqlConfigRepository) SetFederationGoLiveMessage(message string) error {
-	return r.datastore.SetString(federationGoLiveMessageKey, message)
-}
-
-// GetFederationGoLiveMessage will return the message sent when going live.
-func (r *SqlConfigRepository) GetFederationGoLiveMessage() string {
-	// Empty message means it's disabled.
-	message, err := r.datastore.GetString(federationGoLiveMessageKey)
-	if err != nil {
-		log.Traceln("unable to fetch go live message.", err)
-	}
-
-	return message
-}
-
-// SetFederationIsPrivate will set if federation activity is private.
-func (r *SqlConfigRepository) SetFederationIsPrivate(isPrivate bool) error {
-	return r.datastore.SetBool(federationPrivateKey, isPrivate)
-}
-
-// GetFederationIsPrivate will return if federation is private.
-func (r *SqlConfigRepository) GetFederationIsPrivate() bool {
-	isPrivate, err := r.datastore.GetBool(federationPrivateKey)
-	if err == nil {
-		return isPrivate
-	}
-
-	return false
-}
-
-// SetFederationShowEngagement will set if fediverse engagement shows in chat.
-func (r *SqlConfigRepository) SetFederationShowEngagement(showEngagement bool) error {
-	return r.datastore.SetBool(federationShowEngagementKey, showEngagement)
-}
-
-// GetFederationShowEngagement will return if fediverse engagement shows in chat.
-func (r *SqlConfigRepository) GetFederationShowEngagement() bool {
-	showEngagement, err := r.datastore.GetBool(federationShowEngagementKey)
-	if err == nil {
-		return showEngagement
-	}
-
-	return true
-}
-
-// SetBlockedFederatedDomains will set the blocked federated domains.
-func (r *SqlConfigRepository) SetBlockedFederatedDomains(domains []string) error {
-	return r.datastore.SetString(federationBlockedDomainsKey, strings.Join(domains, ","))
-}
-
-// GetBlockedFederatedDomains will return a list of blocked federated domains.
-func (r *SqlConfigRepository) GetBlockedFederatedDomains() []string {
-	domains, err := r.datastore.GetString(federationBlockedDomainsKey)
-	if err != nil {
-		return []string{}
-	}
-
-	if domains == "" {
-		return []string{}
-	}
-
-	return strings.Split(domains, ",")
-}
-
 // SetChatJoinMessagesEnabled will set if chat join messages are enabled.
 func (r *SqlConfigRepository) SetChatJoinMessagesEnabled(enabled bool) error {
 	return r.datastore.SetBool(chatJoinMessagesEnabledKey, enabled)
@@ -880,79 +738,6 @@ func (r *SqlConfigRepository) SetNotificationsEnabled(enabled bool) error {
 func (r *SqlConfigRepository) GetNotificationsEnabled() bool {
 	enabled, _ := r.datastore.GetBool(notificationsEnabledKey)
 	return enabled
-}
-
-// GetDiscordConfig will return the Discord configuration.
-func (r *SqlConfigRepository) GetDiscordConfig() models.DiscordConfiguration {
-	configEntry, err := r.datastore.Get(discordConfigurationKey)
-	if err != nil {
-		return models.DiscordConfiguration{Enabled: false}
-	}
-
-	var config models.DiscordConfiguration
-	if err := configEntry.GetObject(&config); err != nil {
-		return models.DiscordConfiguration{Enabled: false}
-	}
-
-	return config
-}
-
-// SetDiscordConfig will set the Discord configuration.
-func (r *SqlConfigRepository) SetDiscordConfig(config models.DiscordConfiguration) error {
-	configEntry := models.ConfigEntry{Key: discordConfigurationKey, Value: config}
-	return r.datastore.Save(configEntry)
-}
-
-// GetBrowserPushConfig will return the browser push configuration.
-func (r *SqlConfigRepository) GetBrowserPushConfig() models.BrowserNotificationConfiguration {
-	configEntry, err := r.datastore.Get(browserPushConfigurationKey)
-	if err != nil {
-		return models.BrowserNotificationConfiguration{Enabled: false}
-	}
-
-	var config models.BrowserNotificationConfiguration
-	if err := configEntry.GetObject(&config); err != nil {
-		return models.BrowserNotificationConfiguration{Enabled: false}
-	}
-
-	return config
-}
-
-// SetBrowserPushConfig will set the browser push configuration.
-func (r *SqlConfigRepository) SetBrowserPushConfig(config models.BrowserNotificationConfiguration) error {
-	configEntry := models.ConfigEntry{Key: browserPushConfigurationKey, Value: config}
-	return r.datastore.Save(configEntry)
-}
-
-// SetBrowserPushPublicKey will set the public key for browser pushes.
-func (r *SqlConfigRepository) SetBrowserPushPublicKey(key string) error {
-	return r.datastore.SetString(browserPushPublicKeyKey, key)
-}
-
-// GetBrowserPushPublicKey will return the public key for browser pushes.
-func (r *SqlConfigRepository) GetBrowserPushPublicKey() (string, error) {
-	return r.datastore.GetString(browserPushPublicKeyKey)
-}
-
-// SetBrowserPushPrivateKey will set the private key for browser pushes.
-func (r *SqlConfigRepository) SetBrowserPushPrivateKey(key string) error {
-	return r.datastore.SetString(browserPushPrivateKeyKey, key)
-}
-
-// GetBrowserPushPrivateKey will return the private key for browser pushes.
-func (r *SqlConfigRepository) GetBrowserPushPrivateKey() (string, error) {
-	return r.datastore.GetString(browserPushPrivateKeyKey)
-}
-
-// SetHasPerformedInitialNotificationsConfig sets when performed initial setup.
-func (r *SqlConfigRepository) SetHasPerformedInitialNotificationsConfig(hasConfigured bool) error {
-	return r.datastore.SetBool(hasConfiguredInitialNotificationsKey, true)
-}
-
-// GetHasPerformedInitialNotificationsConfig gets when performed initial setup.
-func (r *SqlConfigRepository) GetHasPerformedInitialNotificationsConfig() bool {
-	configured, _ := r.datastore.GetBool(hasConfiguredInitialNotificationsKey)
-	return configured
 }
 
 // GetHideViewerCount will return if the viewer count shold be hidden.
