@@ -194,18 +194,20 @@
 		}
 	}
 
-	/* ---------- mobile ---------- */
-	@media (max-width: 860px) {
+	/* ---------- mobile portrait: stack and allow scrolling ---------- */
+	@media (max-width: 860px) and (orientation: portrait) {
 		.room {
 			padding: 8px;
 			gap: 8px;
 			height: 100dvh;
+			overflow-y: auto;
 		}
 		.mood {
 			display: none;
 		}
 		.lounge {
 			flex-direction: column;
+			min-height: 0;
 		}
 		.screen-zone {
 			flex: none;
@@ -213,11 +215,38 @@
 		.lounge :global(.chat) {
 			width: 100%;
 			flex: 1;
-			min-height: 160px;
+			min-height: 200px;
 		}
 		.lounge :global(.frame-wrap) {
 			flex: none;
 			aspect-ratio: 16/9;
+		}
+	}
+
+	/* ---------- phone landscape: keep the theater side-by-side ---------- */
+	@media (max-height: 520px) {
+		.room {
+			padding: 6px 8px;
+			gap: 6px;
+		}
+		header.soft {
+			padding: 0 4px;
+		}
+		.name {
+			font-size: 14px;
+		}
+		.mood,
+		.presence {
+			display: none;
+		}
+		.lounge {
+			gap: 8px;
+		}
+		.lounge :global(.chat) {
+			width: 240px;
+		}
+		.screen-zone :global(.now-tray) {
+			display: none;
 		}
 	}
 </style>

@@ -126,7 +126,7 @@
 		display: flex;
 		align-items: stretch;
 		background: color-mix(in srgb, var(--surface) 75%, transparent);
-		border: 1px solid var(--border);
+		border: 1px solid var(--border-soft);
 		border-radius: var(--radius);
 		padding: 14px 20px;
 		backdrop-filter: blur(10px);
@@ -143,7 +143,7 @@
 	}
 	.tray-sep {
 		width: 1px;
-		background: var(--border);
+		background: var(--border-soft);
 		margin: 2px 20px;
 		flex: none;
 	}

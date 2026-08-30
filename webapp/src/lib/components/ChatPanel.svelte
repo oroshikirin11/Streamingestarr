@@ -133,7 +133,7 @@
 		flex-direction: column;
 		min-height: 0;
 		background: color-mix(in srgb, var(--surface) 72%, transparent);
-		border: 1px solid var(--border);
+		border: 1px solid var(--border-soft);
 		border-radius: var(--radius);
 		backdrop-filter: blur(10px);
 		overflow: hidden;
