@@ -15,6 +15,12 @@
 	let nameDraft = $state('');
 	let scroller;
 
+	// autofocus + select when the rename field appears
+	function focusSelect(node) {
+		node.focus();
+		node.select();
+	}
+
 	onMount(connectChat);
 	onDestroy(disconnectChat);
 
@@ -40,10 +46,14 @@
 	}
 
 	function submitRename(e) {
-		e.preventDefault();
+		e?.preventDefault();
 		const name = nameDraft.trim();
 		if (name && name !== $me?.displayName) requestNameChange(name);
 		renaming = false;
+	}
+
+	function renameKeys(e) {
+		if (e.key === 'Escape') renaming = false;
 	}
 
 	const initials = (name) =>
@@ -80,28 +90,38 @@
 		{/each}
 	</div>
 	<div class="compose">
-		{#if renaming}
-			<form onsubmit={submitRename}>
-				<input
-					bind:value={nameDraft}
-					maxlength="30"
-					placeholder="Pick a name…"
-					onblur={() => (renaming = false)}
-				/>
-			</form>
-		{:else}
-			<div class="me-row">
-				{#if $me}
-					<button class="me" onclick={startRename} title="Change name">
-						you are <b>{$me.displayName}</b>
+		<div class="me-row">
+			{#if $me}
+				<span class="face {tint($me)} small">{initials($me.displayName)}</span>
+				{#if renaming}
+					<form class="rename-form" onsubmit={submitRename}>
+						<input
+							class="rename-input"
+							bind:value={nameDraft}
+							maxlength="30"
+							placeholder="Pick a new name…"
+							use:focusSelect
+							onkeydown={renameKeys}
+						/>
+						<button type="submit" class="chip ok" title="Save name" aria-label="Save name">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+						</button>
+						<button type="button" class="chip" title="Cancel" aria-label="Cancel" onclick={() => (renaming = false)}>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+						</button>
+					</form>
+				{:else}
+					<button class="me" onclick={startRename} title="Change your name">
+						<b>{$me.displayName}</b>
+						<svg class="pencil" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
 					</button>
 				{/if}
-				{#if !$connected}<span class="conn">reconnecting…</span>{/if}
-			</div>
-			<form onsubmit={send}>
-				<input bind:value={draft} maxlength="500" placeholder="Say something soft…" />
-			</form>
-		{/if}
+			{/if}
+			<span class="dot" class:on={$connected} title={$connected ? 'connected' : 'reconnecting…'}></span>
+		</div>
+		<form onsubmit={send}>
+			<input bind:value={draft} maxlength="500" placeholder="Say something soft…" disabled={renaming} />
+		</form>
 	</div>
 </aside>
 
@@ -176,27 +196,105 @@
 	.me-row {
 		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		padding: 0 6px 6px;
+		gap: 8px;
+		padding: 0 4px 8px;
+		min-height: 30px;
+	}
+	.face.small {
+		width: 22px;
+		height: 22px;
+		font-size: 9px;
+		margin: 0;
 	}
 	.me {
+		display: flex;
+		align-items: center;
+		gap: 6px;
 		background: none;
-		border: 0;
+		border: 1px solid transparent;
+		border-radius: 8px;
 		color: var(--muted);
-		font-size: 11px;
+		font-size: 12.5px;
 		cursor: pointer;
-		padding: 2px 4px;
+		padding: 3px 8px;
 	}
 	.me b {
 		color: var(--accent);
 		font-weight: 650;
 	}
-	.me:hover b {
-		text-decoration: underline;
+	.me .pencil {
+		width: 12px;
+		height: 12px;
+		opacity: 0.5;
+		transition: opacity 0.15s;
 	}
-	.conn {
-		font-size: 10.5px;
+	.me:hover {
+		border-color: var(--border);
+		background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+	}
+	.me:hover .pencil {
+		opacity: 1;
+		color: var(--accent);
+	}
+	.rename-form {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		flex: 1;
+	}
+	.rename-input {
+		flex: 1;
+		min-width: 0;
+		background: var(--surface-2);
+		border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+		color: var(--text);
+		border-radius: 8px;
+		padding: 5px 10px;
+		font-size: 12.5px;
+	}
+	.rename-input:focus {
+		outline: 0;
+		border-color: var(--accent);
+	}
+	.chip {
+		width: 24px;
+		height: 24px;
+		flex: none;
+		border-radius: 7px;
+		border: 1px solid var(--border);
+		background: transparent;
 		color: var(--muted);
+		display: grid;
+		place-items: center;
+		cursor: pointer;
+	}
+	.chip svg {
+		width: 12px;
+		height: 12px;
+	}
+	.chip:hover {
+		color: var(--text);
+		border-color: var(--muted);
+	}
+	.chip.ok {
+		color: var(--accent);
+		border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+	}
+	.chip.ok:hover {
+		background: var(--accent);
+		color: #141416;
+	}
+	.dot {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: var(--danger);
+		margin-left: auto;
+		flex: none;
+		transition: background 0.3s;
+	}
+	.dot.on {
+		background: #5fc493;
 	}
 	.compose input {
 		width: 100%;
