@@ -6,6 +6,7 @@
 
 	let videoEl;
 	let frameEl;
+	let ambiEl;
 	let hls = null;
 	let muted = $state(true); // autoplay needs muted; one click un-mutes
 	let volume = $state(Number(localStorage.getItem('sgr_volume') ?? 1) || 1);
@@ -40,6 +41,25 @@
 		}
 	});
 
+	// Ambilight: the video is drawn tiny (32×18) into a canvas that sits
+	// behind the frame, scaled up and heavily blurred by CSS. Drawing with
+	// low alpha accumulates frames, so colour changes ease in like a TV
+	// backlight instead of flickering per cut.
+	let ambiTimer;
+	onMount(() => {
+		const ctx = ambiEl.getContext('2d', { alpha: false });
+		ctx.fillStyle = '#141416';
+		ctx.fillRect(0, 0, 32, 18);
+		ambiTimer = setInterval(() => {
+			if (document.hidden || !videoEl || videoEl.readyState < 2 || videoEl.paused) return;
+			ctx.globalAlpha = 0.18;
+			try {
+				ctx.drawImage(videoEl, 0, 0, 32, 18);
+			} catch {}
+		}, 120);
+		return () => clearInterval(ambiTimer);
+	});
+
 	onDestroy(() => {
 		hls?.destroy();
 		hls = null;
@@ -70,10 +90,11 @@
 	}
 </script>
 
-<div class="glow-frame" bind:this={frameEl}>
-	<div class="lamp"></div>
-	<!-- svelte-ignore a11y_media_has_caption -->
-	<video bind:this={videoEl} playsinline muted={muted}></video>
+<div class="frame-wrap">
+	<canvas class="ambilight" bind:this={ambiEl} width="32" height="18"></canvas>
+	<div class="glow-frame" bind:this={frameEl}>
+		<!-- svelte-ignore a11y_media_has_caption -->
+		<video bind:this={videoEl} playsinline muted={muted}></video>
 	<div class="sound">
 		<button class="snd-btn" title={muted ? 'Unmute' : 'Mute'} aria-label={muted ? 'Unmute' : 'Mute'} onclick={toggleMute}>
 			{#if muted || volume === 0}
@@ -84,22 +105,34 @@
 		</button>
 		<input class="vol" type="range" min="0" max="1" step="0.02" value={muted ? 0 : volume} oninput={setVolume} aria-label="Volume" />
 	</div>
-	<button class="frame-fs" title="Fullscreen" onclick={goFullscreen} aria-label="Fullscreen">
-		<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-	</button>
+		<button class="frame-fs" title="Fullscreen" onclick={goFullscreen} aria-label="Fullscreen">
+			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+		</button>
+	</div>
 </div>
 
 <style>
-	.glow-frame {
+	.frame-wrap {
 		flex: 1;
-		border-radius: var(--radius);
 		position: relative;
 		min-height: 0;
-		background: linear-gradient(170deg, #1e1e26, #131318);
-		box-shadow:
-			0 0 90px -8px color-mix(in srgb, var(--accent) 22%, transparent),
-			0 0 240px -30px color-mix(in srgb, var(--accent) 30%, transparent),
-			inset 0 0 0 1px #ffffff10;
+	}
+	.ambilight {
+		position: absolute;
+		inset: -28px;
+		width: calc(100% + 56px);
+		height: calc(100% + 56px);
+		border-radius: calc(var(--radius) * 2);
+		filter: blur(46px) saturate(1.5) brightness(0.9);
+		opacity: 0.55;
+		pointer-events: none;
+	}
+	.glow-frame {
+		position: absolute;
+		inset: 0;
+		border-radius: var(--radius);
+		background: #101014;
+		box-shadow: inset 0 0 0 1px #ffffff10;
 		overflow: hidden;
 	}
 	video {
@@ -109,15 +142,6 @@
 		height: 100%;
 		object-fit: contain;
 		background: transparent;
-	}
-	.lamp {
-		position: absolute;
-		inset: 0;
-		background: radial-gradient(
-			ellipse 120% 90% at 50% 120%,
-			color-mix(in srgb, var(--accent) 7%, transparent),
-			transparent 55%
-		);
 	}
 	.sound {
 		position: absolute;

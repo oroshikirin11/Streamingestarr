@@ -74,8 +74,8 @@
 		height: 100vh;
 		display: flex;
 		flex-direction: column;
-		padding: 22px 26px;
-		gap: 18px;
+		padding: 11px 13px;
+		gap: 9px;
 	}
 	header.soft {
 		display: flex;
@@ -137,14 +137,14 @@
 	.lounge {
 		flex: 1;
 		display: flex;
-		gap: 20px;
+		gap: 10px;
 		min-height: 0;
 	}
 	.screen-zone {
 		flex: 1;
 		display: flex;
 		flex-direction: column;
-		gap: 16px;
+		gap: 8px;
 		min-width: 0;
 	}
 	.loading {
