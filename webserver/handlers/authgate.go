@@ -80,7 +80,12 @@ document.querySelector('form').addEventListener('submit', async (e) => {
       body: JSON.stringify(body),
     });
     const data = await res.json();
-    if (res.ok && data.success) { window.location.href = '/'; return; }
+    if (res.ok && data.success) {
+      if (form.hasAttribute('data-savename') && body.username && body.username.toLowerCase() !== 'admin') {
+        try { localStorage.setItem('sgr_preferred_name', body.username); } catch {}
+      }
+      window.location.href = '/'; return;
+    }
     errEl.textContent = data.message || 'That did not work.';
   } catch { errEl.textContent = 'Could not reach the server.'; }
 });
@@ -89,10 +94,10 @@ document.querySelector('form').addEventListener('submit', async (e) => {
 </html>`
 
 const loginFormHTML = `
-  <p class="sub">This theater is private. Enter to take a seat.</p>
-  <form action="/api/auth/login" method="post">
-    <label for="username">Name</label>
-    <input id="username" name="username" autocomplete="username" required autofocus>
+  <p class="sub">This theater is private. Pick your name, bring the room password.</p>
+  <form action="/api/auth/login" method="post" data-savename>
+    <label for="username">Your name</label>
+    <input id="username" name="username" maxlength="30" autocomplete="username" required autofocus>
     <label for="password">Password</label>
     <input id="password" name="password" type="password" autocomplete="current-password" required>
     <p class="error"></p>
@@ -100,12 +105,10 @@ const loginFormHTML = `
   </form>`
 
 const setupFormHTML = `
-  <p class="sub">First run — set the keys to the theater. The viewer login is shared by everyone who watches; the admin password is yours.</p>
+  <p class="sub">First run — set the keys to the theater. The room password is shared by everyone who watches; the admin password is yours. At the door, everyone picks their own name.</p>
   <form action="/api/auth/setup" method="post">
-    <label for="viewerUsername">Viewer name</label>
-    <input id="viewerUsername" name="viewerUsername" required autofocus>
-    <label for="viewerPassword">Viewer password</label>
-    <input id="viewerPassword" name="viewerPassword" type="password" autocomplete="new-password" required minlength="8">
+    <label for="viewerPassword">Room password</label>
+    <input id="viewerPassword" name="viewerPassword" type="password" autocomplete="new-password" required minlength="8" autofocus>
     <label for="adminPassword">Admin password</label>
     <input id="adminPassword" name="adminPassword" type="password" autocomplete="new-password" required minlength="8">
     <p class="error"></p>
@@ -174,12 +177,22 @@ func PostAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req.Username = strings.TrimSpace(req.Username)
+	if req.Username == "" || len(req.Username) > 64 {
+		authJSON(w, http.StatusBadRequest, false, "Pick a name (1-64 characters).")
+		return
+	}
+
+	// Two fields, one door: the name is yours, the password decides the
+	// role. "admin" + the admin password is the admin; the shared room
+	// password lets anyone in as a viewer under the name they picked
+	// (which becomes their proposed chat name).
 	configRepository := configrepository.Get()
 	role := auth.Role("")
 	switch {
 	case strings.EqualFold(req.Username, "admin") && auth.VerifyPassword(req.Password, configRepository.GetAdminPassword()):
 		role = auth.RoleAdmin
-	case strings.EqualFold(req.Username, configRepository.GetViewerUsername()) && auth.VerifyPassword(req.Password, configRepository.GetViewerPasswordHash()):
+	case !strings.EqualFold(req.Username, "admin") && auth.VerifyPassword(req.Password, configRepository.GetViewerPasswordHash()):
 		role = auth.RoleViewer
 	default:
 		auth.ThrottleFail(ip)
@@ -219,19 +232,9 @@ func PostAuthSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req.ViewerUsername = strings.TrimSpace(req.ViewerUsername)
-	if req.ViewerUsername == "" || len(req.ViewerUsername) > 64 {
-		authJSON(w, http.StatusBadRequest, false, "Viewer name must be 1-64 characters.")
-		return
-	}
-	if strings.EqualFold(req.ViewerUsername, "admin") {
-		authJSON(w, http.StatusBadRequest, false, "The viewer name cannot be \"admin\".")
-		return
-	}
-
 	viewerHash, err := auth.HashPassword(req.ViewerPassword)
 	if err != nil {
-		authJSON(w, http.StatusBadRequest, false, "Viewer password must be at least 8 characters.")
+		authJSON(w, http.StatusBadRequest, false, "Room password must be at least 8 characters.")
 		return
 	}
 	if len(req.AdminPassword) < auth.MinPasswordLength {
@@ -242,11 +245,6 @@ func PostAuthSetup(w http.ResponseWriter, r *http.Request) {
 	configRepository := configrepository.Get()
 	if err := configRepository.SetAdminPassword(req.AdminPassword); err != nil {
 		log.Errorln("unable to store admin password:", err)
-		authJSON(w, http.StatusInternalServerError, false, "Unable to store credentials.")
-		return
-	}
-	if err := configRepository.SetViewerUsername(req.ViewerUsername); err != nil {
-		log.Errorln("unable to store viewer username:", err)
 		authJSON(w, http.StatusInternalServerError, false, "Unable to store credentials.")
 		return
 	}
@@ -266,8 +264,8 @@ func PostAuthSetup(w http.ResponseWriter, r *http.Request) {
 	authJSON(w, http.StatusOK, true, "")
 }
 
-// SetViewerLogin lets the admin change the shared viewer credentials.
-// Changing them evicts every session except the caller's — that is the
+// SetViewerLogin lets the admin change the shared room password.
+// Changing it evicts every session except the caller's — that is the
 // design's "change the password to clear the room" lever.
 func SetViewerLogin(w http.ResponseWriter, r *http.Request) {
 	var req authRequest
@@ -276,29 +274,20 @@ func SetViewerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req.ViewerUsername = strings.TrimSpace(req.ViewerUsername)
-	if req.ViewerUsername == "" || len(req.ViewerUsername) > 64 || strings.EqualFold(req.ViewerUsername, "admin") {
-		authJSON(w, http.StatusBadRequest, false, "Viewer name must be 1-64 characters and not \"admin\".")
-		return
-	}
 	hash, err := auth.HashPassword(req.ViewerPassword)
 	if err != nil {
-		authJSON(w, http.StatusBadRequest, false, "Viewer password must be at least 8 characters.")
+		authJSON(w, http.StatusBadRequest, false, "Room password must be at least 8 characters.")
 		return
 	}
 
 	configRepository := configrepository.Get()
-	if err := configRepository.SetViewerUsername(req.ViewerUsername); err != nil {
-		authJSON(w, http.StatusInternalServerError, false, "Unable to store credentials.")
-		return
-	}
 	if err := configRepository.SetViewerPasswordHash(hash); err != nil {
 		authJSON(w, http.StatusInternalServerError, false, "Unable to store credentials.")
 		return
 	}
 
 	auth.DestroyAllSessions(auth.TokenFromRequest(r))
-	log.Infoln("Viewer login changed; all other sessions ended.")
+	log.Infoln("Room password changed; all other sessions ended.")
 	authJSON(w, http.StatusOK, true, "")
 }
 

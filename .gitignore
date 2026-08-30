@@ -48,3 +48,4 @@ web/style-definitions/build/
 web/public/sw.js
 web/public/workbox-*.js
 bin/
+streamingestarr

@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"streamingestarr/config"
@@ -87,8 +88,16 @@ func RegisterAnonymousChatUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if proposedNewDisplayName != "" {
-		// A requested name must not collide with a live reservation.
+		// A requested name must not collide with a live reservation or the
+		// forbidden-name list.
 		proposedNewDisplayName = utils.MakeSafeStringOfLength(proposedNewDisplayName, config.MaxChatDisplayNameLength)
+		for _, blocked := range configRepository.GetForbiddenUsernameList() {
+			if strings.EqualFold(strings.TrimSpace(blocked), proposedNewDisplayName) {
+				w.WriteHeader(http.StatusConflict)
+				webutils.WriteSimpleResponse(w, false, "That name is reserved.")
+				return
+			}
+		}
 		if available, err := userRepository.IsDisplayNameAvailableToUser(proposedNewDisplayName, "", reservationDays); err != nil || !available {
 			w.WriteHeader(http.StatusConflict)
 			webutils.WriteSimpleResponse(w, false, "That name is taken.")

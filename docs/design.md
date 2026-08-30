@@ -116,11 +116,14 @@ Lift the pattern from Jellystreamerr's `src/auth.js`:
 
 Differences from the Jellystreamerr original:
 
-- **Two roles, two credentials**: one **shared viewer login** (common
-  username + password for everyone; the admin may change it — changing it
-  is also how you evict the whole room) and a separate **admin login**.
-  No per-viewer accounts and no viewer self-service; who-is-who lives in
-  chat identity (§6), not in auth.
+- **One door, two fields (refined 2026-08-30): Name + Password.** The name
+  is yours; the password decides the role. `admin` + the admin password →
+  admin session (which also watches and chats — admin implies viewer);
+  any other name + the shared **room password** → viewer session, and the
+  name you entered becomes your proposed chat name (§6). The admin may
+  change the room password — doing so evicts the whole room. No per-viewer
+  accounts and no viewer self-service. First-run setup asks exactly two
+  things: the room password and the admin password.
 - **Sessions persist across restarts** (SQLite — Owncast already ships it);
   restarting the service must not log twenty viewers out mid-movie
 - **The gate covers the video itself**: every HLS playlist/segment request

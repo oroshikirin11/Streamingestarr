@@ -28,7 +28,7 @@ var gateExemptPrefixes = []string{
 // Until it has, nothing but the setup flow is served.
 func SetupComplete() bool {
 	configRepository := configrepository.Get()
-	return configRepository.GetViewerPasswordHash() != "" && configRepository.GetViewerUsername() != ""
+	return configRepository.GetViewerPasswordHash() != ""
 }
 
 // RequireViewerAccess is the router-wide gate. A valid viewer or admin

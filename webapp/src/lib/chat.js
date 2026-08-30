@@ -22,10 +22,19 @@ function pushMessage(m) {
 	});
 }
 
-async function ensureRegistered(forceNew = false, proposedName = null) {
+async function ensureRegistered(forceNew = false) {
 	let token = forceNew ? null : localStorage.getItem(TOKEN_KEY);
 	if (!token) {
-		const reg = await registerChatUser(proposedName);
+		// The name chosen at the login door is the proposed chat name; if
+		// it is taken (someone else's reservation) fall back to a
+		// generated one — renaming later is one click.
+		const preferred = localStorage.getItem('sgr_preferred_name');
+		let reg;
+		try {
+			reg = await registerChatUser(preferred || null);
+		} catch {
+			reg = await registerChatUser(null);
+		}
 		token = reg.accessToken;
 		localStorage.setItem(TOKEN_KEY, token);
 		me.set({ id: reg.id, displayName: reg.displayName });
