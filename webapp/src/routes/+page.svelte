@@ -1,6 +1,6 @@
 <script>
 	import '../app.css';
-	import { status, config, role } from '$lib/stores.js';
+	import { status, config, role, reachable } from '$lib/stores.js';
 	import { logout } from '$lib/api.js';
 	import GlowFrame from '$lib/components/GlowFrame.svelte';
 	import NowTray from '$lib/components/NowTray.svelte';
@@ -27,6 +27,9 @@
 </svelte:head>
 
 <div class="room">
+	{#if !$reachable}
+		<div class="offline-banner"><span class="pulse"></span> connection lost — retrying…</div>
+	{/if}
 	<header class="soft">
 		<div class="name"><b>●</b> {theaterName}</div>
 		{#if $status?.streamTitle && live}
@@ -159,6 +162,36 @@
 		display: grid;
 		place-items: center;
 		color: var(--muted);
+	}
+
+	.offline-banner {
+		position: fixed;
+		top: 14px;
+		left: 50%;
+		transform: translateX(-50%);
+		z-index: 60;
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background: #000000c0;
+		border: 1px solid var(--danger);
+		color: var(--text);
+		font-size: 12.5px;
+		padding: 8px 16px;
+		border-radius: 99px;
+		backdrop-filter: blur(8px);
+	}
+	.offline-banner .pulse {
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--danger);
+		animation: bannerpulse 1.2s infinite;
+	}
+	@keyframes bannerpulse {
+		50% {
+			opacity: 0.3;
+		}
 	}
 
 	/* ---------- mobile ---------- */
