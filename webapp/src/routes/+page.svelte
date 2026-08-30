@@ -1,6 +1,7 @@
 <script>
 	import '../app.css';
 	import { status, config } from '$lib/stores.js';
+	import { logout } from '$lib/api.js';
 	import GlowFrame from '$lib/components/GlowFrame.svelte';
 	import NowTray from '$lib/components/NowTray.svelte';
 	import ChatPanel from '$lib/components/ChatPanel.svelte';
@@ -29,6 +30,9 @@
 			<div class="presence">{viewers} watching</div>
 		{/if}
 		<div class="iconbar">
+			<button class="icon-btn" title="Log out" aria-label="Log out" onclick={logout}>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+			</button>
 			{#if live}
 				<button
 					class="icon-btn"

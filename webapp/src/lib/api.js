@@ -23,3 +23,11 @@ export const registerChatUser = (displayName) =>
 
 export const getChatHistory = (accessToken) =>
 	request(`/api/chat?accessToken=${encodeURIComponent(accessToken)}`);
+
+export async function logout() {
+	try {
+		await fetch('/api/auth/logout', { method: 'POST' });
+	} finally {
+		window.location.href = '/login';
+	}
+}
