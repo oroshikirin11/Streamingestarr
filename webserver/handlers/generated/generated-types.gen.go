@@ -64,6 +64,45 @@ func (e WebhookEventType) Valid() bool {
 	}
 }
 
+// Defines values for SetVideoSegmentFormatJSONBodyValue.
+const (
+	Fmp4 SetVideoSegmentFormatJSONBodyValue = "fmp4"
+	Ts   SetVideoSegmentFormatJSONBodyValue = "ts"
+)
+
+// Valid indicates whether the value is a known member of the SetVideoSegmentFormatJSONBodyValue enum.
+func (e SetVideoSegmentFormatJSONBodyValue) Valid() bool {
+	switch e {
+	case Fmp4:
+		return true
+	case Ts:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SetArtworkMetadataJSONBodyType.
+const (
+	Imagejpeg SetArtworkMetadataJSONBodyType = "image/jpeg"
+	Imagepng  SetArtworkMetadataJSONBodyType = "image/png"
+	Imagewebp SetArtworkMetadataJSONBodyType = "image/webp"
+)
+
+// Valid indicates whether the value is a known member of the SetArtworkMetadataJSONBodyType enum.
+func (e SetArtworkMetadataJSONBodyType) Valid() bool {
+	switch e {
+	case Imagejpeg:
+		return true
+	case Imagepng:
+		return true
+	case Imagewebp:
+		return true
+	default:
+		return false
+	}
+}
+
 // ActionMessage defines model for ActionMessage.
 type ActionMessage struct {
 	Body      *string `json:"body,omitempty"`
@@ -530,6 +569,11 @@ type SetForbiddenUsernameListJSONBody struct {
 	Value *[]string `json:"value,omitempty"`
 }
 
+// SetChatNameReservationDaysJSONBody defines parameters for SetChatNameReservationDays.
+type SetChatNameReservationDaysJSONBody struct {
+	Value *int `json:"value,omitempty"`
+}
+
 // SetSuggestedUsernameListJSONBody defines parameters for SetSuggestedUsernameList.
 type SetSuggestedUsernameListJSONBody struct {
 	Value *[]string `json:"value,omitempty"`
@@ -551,14 +595,37 @@ type SetSocialHandlesJSONBody struct {
 	Value *[]SocialHandle `json:"value,omitempty"`
 }
 
+// SetSRTEnabledJSONBody defines parameters for SetSRTEnabled.
+type SetSRTEnabledJSONBody struct {
+	Value *bool `json:"value,omitempty"`
+}
+
+// SetSRTPortJSONBody defines parameters for SetSRTPort.
+type SetSRTPortJSONBody struct {
+	Value *int `json:"value,omitempty"`
+}
+
 // SetStreamKeysJSONBody defines parameters for SetStreamKeys.
 type SetStreamKeysJSONBody struct {
 	Value *[]StreamKey `json:"value,omitempty"`
 }
 
+// SetVideoSegmentFormatJSONBody defines parameters for SetVideoSegmentFormat.
+type SetVideoSegmentFormatJSONBody struct {
+	Value *SetVideoSegmentFormatJSONBodyValue `json:"value,omitempty"`
+}
+
+// SetVideoSegmentFormatJSONBodyValue defines parameters for SetVideoSegmentFormat.
+type SetVideoSegmentFormatJSONBodyValue string
+
 // SetStreamOutputVariantsJSONBody defines parameters for SetStreamOutputVariants.
 type SetStreamOutputVariantsJSONBody struct {
 	Value *[]StreamOutputVariant `json:"value,omitempty"`
+}
+
+// SetRoomPasswordJSONBody defines parameters for SetRoomPassword.
+type SetRoomPasswordJSONBody struct {
+	ViewerPassword *string `json:"viewerPassword,omitempty"`
 }
 
 // DeleteCustomEmojiJSONBody defines parameters for DeleteCustomEmoji.
@@ -590,6 +657,18 @@ type DeleteWebhookJSONBody struct {
 	Id *int `json:"id,omitempty"`
 }
 
+// AuthLoginJSONBody defines parameters for AuthLogin.
+type AuthLoginJSONBody struct {
+	Password *string `json:"password,omitempty"`
+	Username *string `json:"username,omitempty"`
+}
+
+// AuthSetupJSONBody defines parameters for AuthSetup.
+type AuthSetupJSONBody struct {
+	AdminPassword  *string `json:"adminPassword,omitempty"`
+	ViewerPassword *string `json:"viewerPassword,omitempty"`
+}
+
 // GetChatMessagesParams defines parameters for GetChatMessages.
 type GetChatMessagesParams struct {
 	AccessToken AccessToken `form:"accessToken" json:"accessToken"`
@@ -619,6 +698,43 @@ type UpdateUserEnabledJSONBody struct {
 // UpdateUserEnabledParams defines parameters for UpdateUserEnabled.
 type UpdateUserEnabledParams struct {
 	AccessToken AccessToken `form:"accessToken" json:"accessToken"`
+}
+
+// SetArtworkMetadataJSONBody defines parameters for SetArtworkMetadata.
+type SetArtworkMetadataJSONBody struct {
+	Data []byte                         `json:"data"`
+	Id   string                         `json:"id"`
+	Type SetArtworkMetadataJSONBodyType `json:"type"`
+}
+
+// SetArtworkMetadataJSONBodyType defines parameters for SetArtworkMetadata.
+type SetArtworkMetadataJSONBodyType string
+
+// SetNowPlayingMetadataJSONBody defines parameters for SetNowPlayingMetadata.
+type SetNowPlayingMetadataJSONBody struct {
+	Announce  *bool    `json:"announce,omitempty"`
+	ArtworkId *string  `json:"artworkId,omitempty"`
+	Channel   *string  `json:"channel,omitempty"`
+	Duration  *float32 `json:"duration,omitempty"`
+	Paused    *bool    `json:"paused,omitempty"`
+	Position  *float32 `json:"position,omitempty"`
+	Subtitle  *string  `json:"subtitle,omitempty"`
+	Title     string   `json:"title"`
+	UpNext    *struct {
+		ArtworkId *string `json:"artworkId,omitempty"`
+		Subtitle  *string `json:"subtitle,omitempty"`
+		Title     *string `json:"title,omitempty"`
+	} `json:"upNext,omitempty"`
+}
+
+// SetScheduleMetadataJSONBody defines parameters for SetScheduleMetadata.
+type SetScheduleMetadataJSONBody struct {
+	Items *[]struct {
+		ArtworkId *string   `json:"artworkId,omitempty"`
+		StartsAt  time.Time `json:"startsAt"`
+		Subtitle  *string   `json:"subtitle,omitempty"`
+		Title     string    `json:"title"`
+	} `json:"items,omitempty"`
 }
 
 // GetUserDetailsParams defines parameters for GetUserDetails.
@@ -664,6 +780,9 @@ type SetForbiddenUsernameListJSONRequestBody SetForbiddenUsernameListJSONBody
 
 // SetChatJoinMessagesEnabledJSONRequestBody defines body for SetChatJoinMessagesEnabled for application/json ContentType.
 type SetChatJoinMessagesEnabledJSONRequestBody = AdminConfigValue
+
+// SetChatNameReservationDaysJSONRequestBody defines body for SetChatNameReservationDays for application/json ContentType.
+type SetChatNameReservationDaysJSONRequestBody SetChatNameReservationDaysJSONBody
 
 // SetChatRequireAuthenticationJSONRequestBody defines body for SetChatRequireAuthentication for application/json ContentType.
 type SetChatRequireAuthenticationJSONRequestBody = AdminConfigValue
@@ -728,6 +847,12 @@ type SetSocialHandlesJSONRequestBody SetSocialHandlesJSONBody
 // SetSocketHostOverrideJSONRequestBody defines body for SetSocketHostOverride for application/json ContentType.
 type SetSocketHostOverrideJSONRequestBody = AdminConfigValue
 
+// SetSRTEnabledJSONRequestBody defines body for SetSRTEnabled for application/json ContentType.
+type SetSRTEnabledJSONRequestBody SetSRTEnabledJSONBody
+
+// SetSRTPortJSONRequestBody defines body for SetSRTPort for application/json ContentType.
+type SetSRTPortJSONRequestBody SetSRTPortJSONBody
+
 // SetStreamKeysJSONRequestBody defines body for SetStreamKeys for application/json ContentType.
 type SetStreamKeysJSONRequestBody SetStreamKeysJSONBody
 
@@ -740,6 +865,9 @@ type SetTagsJSONRequestBody = AdminConfigValue
 // SetVideoCodecJSONRequestBody defines body for SetVideoCodec for application/json ContentType.
 type SetVideoCodecJSONRequestBody = AdminConfigValue
 
+// SetVideoSegmentFormatJSONRequestBody defines body for SetVideoSegmentFormat for application/json ContentType.
+type SetVideoSegmentFormatJSONRequestBody SetVideoSegmentFormatJSONBody
+
 // SetStreamLatencyLevelJSONRequestBody defines body for SetStreamLatencyLevel for application/json ContentType.
 type SetStreamLatencyLevelJSONRequestBody = AdminConfigValue
 
@@ -748,6 +876,9 @@ type SetStreamOutputVariantsJSONRequestBody SetStreamOutputVariantsJSONBody
 
 // SetVideoServingEndpointJSONRequestBody defines body for SetVideoServingEndpoint for application/json ContentType.
 type SetVideoServingEndpointJSONRequestBody = AdminConfigValue
+
+// SetRoomPasswordJSONRequestBody defines body for SetRoomPassword for application/json ContentType.
+type SetRoomPasswordJSONRequestBody SetRoomPasswordJSONBody
 
 // SetWebServerIPJSONRequestBody defines body for SetWebServerIP for application/json ContentType.
 type SetWebServerIPJSONRequestBody = AdminConfigValue
@@ -769,6 +900,12 @@ type CreateWebhookJSONRequestBody CreateWebhookJSONBody
 
 // DeleteWebhookJSONRequestBody defines body for DeleteWebhook for application/json ContentType.
 type DeleteWebhookJSONRequestBody DeleteWebhookJSONBody
+
+// AuthLoginJSONRequestBody defines body for AuthLogin for application/json ContentType.
+type AuthLoginJSONRequestBody AuthLoginJSONBody
+
+// AuthSetupJSONRequestBody defines body for AuthSetup for application/json ContentType.
+type AuthSetupJSONRequestBody AuthSetupJSONBody
 
 // UpdateMessageVisibilityJSONRequestBody defines body for UpdateMessageVisibility for application/json ContentType.
 type UpdateMessageVisibilityJSONRequestBody = MessageVisibilityUpdate
@@ -793,6 +930,15 @@ type SendSystemMessageJSONRequestBody = MessageEvent
 
 // SendSystemMessageToConnectedClientJSONRequestBody defines body for SendSystemMessageToConnectedClient for application/json ContentType.
 type SendSystemMessageToConnectedClientJSONRequestBody = SystemMessage
+
+// SetArtworkMetadataJSONRequestBody defines body for SetArtworkMetadata for application/json ContentType.
+type SetArtworkMetadataJSONRequestBody SetArtworkMetadataJSONBody
+
+// SetNowPlayingMetadataJSONRequestBody defines body for SetNowPlayingMetadata for application/json ContentType.
+type SetNowPlayingMetadataJSONRequestBody SetNowPlayingMetadataJSONBody
+
+// SetScheduleMetadataJSONRequestBody defines body for SetScheduleMetadata for application/json ContentType.
+type SetScheduleMetadataJSONRequestBody SetScheduleMetadataJSONBody
 
 // ExternalSetStreamTitleJSONRequestBody defines body for ExternalSetStreamTitle for application/json ContentType.
 type ExternalSetStreamTitleJSONRequestBody = AdminConfigValue

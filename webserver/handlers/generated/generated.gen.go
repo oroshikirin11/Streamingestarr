@@ -128,6 +128,9 @@ type ServerInterface interface {
 	// Enable chat for user join messages
 	// (POST /admin/config/chat/joinmessagesenabled)
 	SetChatJoinMessagesEnabled(w http.ResponseWriter, r *http.Request)
+	// Days an unseen chat name stays reserved (0 = forever)
+	// (POST /admin/config/chat/namereservationdays)
+	SetChatNameReservationDays(w http.ResponseWriter, r *http.Request)
 
 	// (OPTIONS /admin/config/chat/requireauthentication)
 	SetChatRequireAuthenticationOptions(w http.ResponseWriter, r *http.Request)
@@ -257,6 +260,12 @@ type ServerInterface interface {
 	// Update websocket host override
 	// (POST /admin/config/sockethostoverride)
 	SetSocketHostOverride(w http.ResponseWriter, r *http.Request)
+	// Toggle the SRT ingest listener (restart to apply)
+	// (POST /admin/config/srt/enabled)
+	SetSRTEnabled(w http.ResponseWriter, r *http.Request)
+	// SRT ingest UDP port (restart to apply)
+	// (POST /admin/config/srt/port)
+	SetSRTPort(w http.ResponseWriter, r *http.Request)
 
 	// (OPTIONS /admin/config/streamkeys)
 	SetStreamKeysOptions(w http.ResponseWriter, r *http.Request)
@@ -281,6 +290,9 @@ type ServerInterface interface {
 	// Set video codec
 	// (POST /admin/config/video/codec)
 	SetVideoCodec(w http.ResponseWriter, r *http.Request)
+	// HLS segment container: ts or fmp4
+	// (POST /admin/config/video/segmentformat)
+	SetVideoSegmentFormat(w http.ResponseWriter, r *http.Request)
 
 	// (OPTIONS /admin/config/video/streamlatencylevel)
 	SetStreamLatencyLevelOptions(w http.ResponseWriter, r *http.Request)
@@ -299,6 +311,9 @@ type ServerInterface interface {
 	// Update custom video serving endpoint
 	// (POST /admin/config/videoservingendpoint)
 	SetVideoServingEndpoint(w http.ResponseWriter, r *http.Request)
+	// Change the shared room password (ends all other sessions)
+	// (POST /admin/config/viewerlogin)
+	SetRoomPassword(w http.ResponseWriter, r *http.Request)
 
 	// (OPTIONS /admin/config/webserverip)
 	SetWebServerIPOptions(w http.ResponseWriter, r *http.Request)
@@ -416,6 +431,18 @@ type ServerInterface interface {
 	// Delete a single webhook
 	// (POST /admin/webhooks/delete)
 	DeleteWebhook(w http.ResponseWriter, r *http.Request)
+	// Log in with a name and the room or admin password
+	// (POST /auth/login)
+	AuthLogin(w http.ResponseWriter, r *http.Request)
+	// End the current session
+	// (POST /auth/logout)
+	AuthLogout(w http.ResponseWriter, r *http.Request)
+	// First-run setup: set the room and admin passwords
+	// (POST /auth/setup)
+	AuthSetup(w http.ResponseWriter, r *http.Request)
+	// Session and setup state
+	// (GET /auth/status)
+	AuthStatus(w http.ResponseWriter, r *http.Request)
 	// Gets a list of chat messages
 	// (GET /chat)
 	GetChatMessages(w http.ResponseWriter, r *http.Request, params GetChatMessagesParams)
@@ -437,6 +464,9 @@ type ServerInterface interface {
 	// Get list of custom emojis supported in the chat
 	// (GET /emoji)
 	GetCustomEmojiList(w http.ResponseWriter, r *http.Request)
+	// What this receiver accepts (ingest, containers, metadata features)
+	// (GET /integrations/capabilities)
+	GetIntegrationCapabilities(w http.ResponseWriter, r *http.Request)
 	// Get chat history
 	// (GET /integrations/chat)
 	ExternalGetChatMessages(w http.ResponseWriter, r *http.Request)
@@ -485,6 +515,15 @@ type ServerInterface interface {
 
 	// (OPTIONS /integrations/clients)
 	ExternalGetConnectedChatClientsOptions(w http.ResponseWriter, r *http.Request)
+	// Push poster artwork (max 1 MiB decoded)
+	// (POST /integrations/metadata/artwork)
+	SetArtworkMetadata(w http.ResponseWriter, r *http.Request)
+	// Push structured now-playing metadata
+	// (POST /integrations/metadata/nowplaying)
+	SetNowPlayingMetadata(w http.ResponseWriter, r *http.Request)
+	// Replace the upcoming-showings schedule
+	// (POST /integrations/metadata/schedule)
+	SetScheduleMetadata(w http.ResponseWriter, r *http.Request)
 	// Get a user's details
 	// (GET /integrations/moderation/chat/user/{userId})
 	ExternalGetUserDetails(w http.ResponseWriter, r *http.Request, userId string)
@@ -730,6 +769,12 @@ func (_ Unimplemented) SetChatJoinMessagesEnabled(w http.ResponseWriter, r *http
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Days an unseen chat name stays reserved (0 = forever)
+// (POST /admin/config/chat/namereservationdays)
+func (_ Unimplemented) SetChatNameReservationDays(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (OPTIONS /admin/config/chat/requireauthentication)
 func (_ Unimplemented) SetChatRequireAuthenticationOptions(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -967,6 +1012,18 @@ func (_ Unimplemented) SetSocketHostOverride(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Toggle the SRT ingest listener (restart to apply)
+// (POST /admin/config/srt/enabled)
+func (_ Unimplemented) SetSRTEnabled(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SRT ingest UDP port (restart to apply)
+// (POST /admin/config/srt/port)
+func (_ Unimplemented) SetSRTPort(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (OPTIONS /admin/config/streamkeys)
 func (_ Unimplemented) SetStreamKeysOptions(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1011,6 +1068,12 @@ func (_ Unimplemented) SetVideoCodec(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// HLS segment container: ts or fmp4
+// (POST /admin/config/video/segmentformat)
+func (_ Unimplemented) SetVideoSegmentFormat(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (OPTIONS /admin/config/video/streamlatencylevel)
 func (_ Unimplemented) SetStreamLatencyLevelOptions(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -1041,6 +1104,12 @@ func (_ Unimplemented) SetVideoServingEndpointOptions(w http.ResponseWriter, r *
 // Update custom video serving endpoint
 // (POST /admin/config/videoservingendpoint)
 func (_ Unimplemented) SetVideoServingEndpoint(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Change the shared room password (ends all other sessions)
+// (POST /admin/config/viewerlogin)
+func (_ Unimplemented) SetRoomPassword(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1261,6 +1330,30 @@ func (_ Unimplemented) DeleteWebhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// Log in with a name and the room or admin password
+// (POST /auth/login)
+func (_ Unimplemented) AuthLogin(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// End the current session
+// (POST /auth/logout)
+func (_ Unimplemented) AuthLogout(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// First-run setup: set the room and admin passwords
+// (POST /auth/setup)
+func (_ Unimplemented) AuthSetup(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Session and setup state
+// (GET /auth/status)
+func (_ Unimplemented) AuthStatus(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Gets a list of chat messages
 // (GET /chat)
 func (_ Unimplemented) GetChatMessages(w http.ResponseWriter, r *http.Request, params GetChatMessagesParams) {
@@ -1299,6 +1392,12 @@ func (_ Unimplemented) GetWebConfig(w http.ResponseWriter, r *http.Request) {
 // Get list of custom emojis supported in the chat
 // (GET /emoji)
 func (_ Unimplemented) GetCustomEmojiList(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// What this receiver accepts (ingest, containers, metadata features)
+// (GET /integrations/capabilities)
+func (_ Unimplemented) GetIntegrationCapabilities(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1387,6 +1486,24 @@ func (_ Unimplemented) ExternalGetConnectedChatClients(w http.ResponseWriter, r 
 
 // (OPTIONS /integrations/clients)
 func (_ Unimplemented) ExternalGetConnectedChatClientsOptions(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Push poster artwork (max 1 MiB decoded)
+// (POST /integrations/metadata/artwork)
+func (_ Unimplemented) SetArtworkMetadata(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Push structured now-playing metadata
+// (POST /integrations/metadata/nowplaying)
+func (_ Unimplemented) SetNowPlayingMetadata(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Replace the upcoming-showings schedule
+// (POST /integrations/metadata/schedule)
+func (_ Unimplemented) SetScheduleMetadata(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2095,6 +2212,20 @@ func (siw *ServerInterfaceWrapper) SetChatJoinMessagesEnabled(w http.ResponseWri
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetChatJoinMessagesEnabled(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetChatNameReservationDays operation middleware
+func (siw *ServerInterfaceWrapper) SetChatNameReservationDays(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetChatNameReservationDays(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2838,6 +2969,34 @@ func (siw *ServerInterfaceWrapper) SetSocketHostOverride(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// SetSRTEnabled operation middleware
+func (siw *ServerInterfaceWrapper) SetSRTEnabled(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetSRTEnabled(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetSRTPort operation middleware
+func (siw *ServerInterfaceWrapper) SetSRTPort(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetSRTPort(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SetStreamKeysOptions operation middleware
 func (siw *ServerInterfaceWrapper) SetStreamKeysOptions(w http.ResponseWriter, r *http.Request) {
 
@@ -2974,6 +3133,20 @@ func (siw *ServerInterfaceWrapper) SetVideoCodec(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// SetVideoSegmentFormat operation middleware
+func (siw *ServerInterfaceWrapper) SetVideoSegmentFormat(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetVideoSegmentFormat(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SetStreamLatencyLevelOptions operation middleware
 func (siw *ServerInterfaceWrapper) SetStreamLatencyLevelOptions(w http.ResponseWriter, r *http.Request) {
 
@@ -3067,6 +3240,20 @@ func (siw *ServerInterfaceWrapper) SetVideoServingEndpoint(w http.ResponseWriter
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetVideoServingEndpoint(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetRoomPassword operation middleware
+func (siw *ServerInterfaceWrapper) SetRoomPassword(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetRoomPassword(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3737,6 +3924,62 @@ func (siw *ServerInterfaceWrapper) DeleteWebhook(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// AuthLogin operation middleware
+func (siw *ServerInterfaceWrapper) AuthLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AuthLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AuthLogout operation middleware
+func (siw *ServerInterfaceWrapper) AuthLogout(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AuthLogout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AuthSetup operation middleware
+func (siw *ServerInterfaceWrapper) AuthSetup(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AuthSetup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AuthStatus operation middleware
+func (siw *ServerInterfaceWrapper) AuthStatus(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AuthStatus(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetChatMessages operation middleware
 func (siw *ServerInterfaceWrapper) GetChatMessages(w http.ResponseWriter, r *http.Request) {
 
@@ -3912,6 +4155,20 @@ func (siw *ServerInterfaceWrapper) GetCustomEmojiList(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetCustomEmojiList(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetIntegrationCapabilities operation middleware
+func (siw *ServerInterfaceWrapper) GetIntegrationCapabilities(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetIntegrationCapabilities(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4206,6 +4463,48 @@ func (siw *ServerInterfaceWrapper) ExternalGetConnectedChatClientsOptions(w http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ExternalGetConnectedChatClientsOptions(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetArtworkMetadata operation middleware
+func (siw *ServerInterfaceWrapper) SetArtworkMetadata(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetArtworkMetadata(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetNowPlayingMetadata operation middleware
+func (siw *ServerInterfaceWrapper) SetNowPlayingMetadata(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetNowPlayingMetadata(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetScheduleMetadata operation middleware
+func (siw *ServerInterfaceWrapper) SetScheduleMetadata(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetScheduleMetadata(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4641,6 +4940,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/admin/config/chat/joinmessagesenabled", wrapper.SetChatJoinMessagesEnabled)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/admin/config/chat/namereservationdays", wrapper.SetChatNameReservationDays)
+	})
+	r.Group(func(r chi.Router) {
 		r.Options(options.BaseURL+"/admin/config/chat/requireauthentication", wrapper.SetChatRequireAuthenticationOptions)
 	})
 	r.Group(func(r chi.Router) {
@@ -4770,6 +5072,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/admin/config/sockethostoverride", wrapper.SetSocketHostOverride)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/admin/config/srt/enabled", wrapper.SetSRTEnabled)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/admin/config/srt/port", wrapper.SetSRTPort)
+	})
+	r.Group(func(r chi.Router) {
 		r.Options(options.BaseURL+"/admin/config/streamkeys", wrapper.SetStreamKeysOptions)
 	})
 	r.Group(func(r chi.Router) {
@@ -4794,6 +5102,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/admin/config/video/codec", wrapper.SetVideoCodec)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/admin/config/video/segmentformat", wrapper.SetVideoSegmentFormat)
+	})
+	r.Group(func(r chi.Router) {
 		r.Options(options.BaseURL+"/admin/config/video/streamlatencylevel", wrapper.SetStreamLatencyLevelOptions)
 	})
 	r.Group(func(r chi.Router) {
@@ -4810,6 +5121,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/admin/config/videoservingendpoint", wrapper.SetVideoServingEndpoint)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/admin/config/viewerlogin", wrapper.SetRoomPassword)
 	})
 	r.Group(func(r chi.Router) {
 		r.Options(options.BaseURL+"/admin/config/webserverip", wrapper.SetWebServerIPOptions)
@@ -4929,6 +5243,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/admin/webhooks/delete", wrapper.DeleteWebhook)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/login", wrapper.AuthLogin)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/logout", wrapper.AuthLogout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/setup", wrapper.AuthSetup)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/auth/status", wrapper.AuthStatus)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/chat", wrapper.GetChatMessages)
 	})
 	r.Group(func(r chi.Router) {
@@ -4948,6 +5274,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/emoji", wrapper.GetCustomEmojiList)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/integrations/capabilities", wrapper.GetIntegrationCapabilities)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/integrations/chat", wrapper.ExternalGetChatMessages)
@@ -4996,6 +5325,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Options(options.BaseURL+"/integrations/clients", wrapper.ExternalGetConnectedChatClientsOptions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/integrations/metadata/artwork", wrapper.SetArtworkMetadata)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/integrations/metadata/nowplaying", wrapper.SetNowPlayingMetadata)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/integrations/metadata/schedule", wrapper.SetScheduleMetadata)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/integrations/moderation/chat/user/{userId}", wrapper.ExternalGetUserDetails)

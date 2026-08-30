@@ -15,7 +15,6 @@ import (
 
 	"streamingestarr/config"
 	"streamingestarr/core/chat"
-	"streamingestarr/models"
 	"streamingestarr/webserver/handlers"
 	"streamingestarr/webserver/router/middleware"
 )
@@ -38,20 +37,7 @@ func Start(enableVerboseLogging bool) error {
 	// The gate's own surface: login, first-run setup, session management.
 	r.Get("/login", handlers.GetLoginPage)
 	r.Get("/setup", handlers.GetSetupPage)
-	r.Post("/api/auth/login", handlers.PostAuthLogin)
-	r.Post("/api/auth/setup", handlers.PostAuthSetup)
-	r.Post("/api/auth/logout", handlers.PostAuthLogout)
-	r.Get("/api/auth/status", handlers.GetAuthStatus)
-	r.Post("/api/admin/config/viewerlogin", middleware.RequireAdminAuth(handlers.SetViewerLogin))
-	r.Post("/api/admin/config/chat/namereservationdays", middleware.RequireAdminAuth(handlers.SetChatNameReservationDays))
-	r.Post("/api/admin/config/video/segmentformat", middleware.RequireAdminAuth(handlers.SetVideoSegmentFormat))
-	r.Post("/api/integrations/metadata/nowplaying", middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.SetNowPlayingMetadata))
-	r.Post("/api/integrations/metadata/schedule", middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.SetScheduleMetadata))
-	r.Get("/api/integrations/capabilities", middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.GetCapabilities))
-	r.Post("/api/integrations/metadata/artwork", middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.SetArtworkMetadata))
 	r.Get("/artwork/*", handlers.GetArtwork)
-	r.Post("/api/admin/config/srt/enabled", middleware.RequireAdminAuth(handlers.SetSRTEnabled))
-	r.Post("/api/admin/config/srt/port", middleware.RequireAdminAuth(handlers.SetSRTPort))
 
 	addStaticFileEndpoints(r)
 

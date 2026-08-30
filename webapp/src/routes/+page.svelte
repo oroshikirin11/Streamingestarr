@@ -153,4 +153,31 @@
 		place-items: center;
 		color: var(--muted);
 	}
+
+	/* ---------- mobile ---------- */
+	@media (max-width: 860px) {
+		.room {
+			padding: 8px;
+			gap: 8px;
+			height: 100dvh;
+		}
+		.mood {
+			display: none;
+		}
+		.lounge {
+			flex-direction: column;
+		}
+		.screen-zone {
+			flex: none;
+		}
+		.lounge :global(.chat) {
+			width: 100%;
+			flex: 1;
+			min-height: 160px;
+		}
+		.lounge :global(.frame-wrap) {
+			flex: none;
+			aspect-ratio: 16/9;
+		}
+	}
 </style>

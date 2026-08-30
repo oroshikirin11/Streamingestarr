@@ -3120,6 +3120,263 @@ paths:
           $ref: '#/components/responses/404'
         default:
           $ref: '#/components/responses/Default'
+  /auth/login:
+    post:
+      operationId: AuthLogin
+      summary: Log in with a name and the room or admin password
+      tags:
+      - Auth
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+  /auth/setup:
+    post:
+      operationId: AuthSetup
+      summary: 'First-run setup: set the room and admin passwords'
+      tags:
+      - Auth
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                viewerPassword:
+                  type: string
+                adminPassword:
+                  type: string
+  /auth/logout:
+    post:
+      operationId: AuthLogout
+      summary: End the current session
+      tags:
+      - Auth
+      responses:
+        '200':
+          description: Operation result
+  /auth/status:
+    get:
+      operationId: AuthStatus
+      summary: Session and setup state
+      tags:
+      - Auth
+      responses:
+        '200':
+          description: '{setupComplete, authenticated, role}'
+  /admin/config/viewerlogin:
+    post:
+      operationId: SetRoomPassword
+      summary: Change the shared room password (ends all other sessions)
+      tags:
+      - Admin
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                viewerPassword:
+                  type: string
+  /admin/config/chat/namereservationdays:
+    post:
+      operationId: SetChatNameReservationDays
+      summary: Days an unseen chat name stays reserved (0 = forever)
+      tags:
+      - Admin
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: integer
+  /admin/config/video/segmentformat:
+    post:
+      operationId: SetVideoSegmentFormat
+      summary: 'HLS segment container: ts or fmp4'
+      tags:
+      - Admin
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: string
+                  enum:
+                  - ts
+                  - fmp4
+  /admin/config/srt/enabled:
+    post:
+      operationId: SetSRTEnabled
+      summary: Toggle the SRT ingest listener (restart to apply)
+      tags:
+      - Admin
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: boolean
+  /admin/config/srt/port:
+    post:
+      operationId: SetSRTPort
+      summary: SRT ingest UDP port (restart to apply)
+      tags:
+      - Admin
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: integer
+  /integrations/metadata/nowplaying:
+    post:
+      operationId: SetNowPlayingMetadata
+      summary: Push structured now-playing metadata
+      tags:
+      - Integrations
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - title
+              properties:
+                title:
+                  type: string
+                subtitle:
+                  type: string
+                artworkId:
+                  type: string
+                upNext:
+                  type: object
+                  properties:
+                    title:
+                      type: string
+                    subtitle:
+                      type: string
+                    artworkId:
+                      type: string
+                position:
+                  type: number
+                duration:
+                  type: number
+                paused:
+                  type: boolean
+                announce:
+                  type: boolean
+                channel:
+                  type: string
+  /integrations/metadata/schedule:
+    post:
+      operationId: SetScheduleMetadata
+      summary: Replace the upcoming-showings schedule
+      tags:
+      - Integrations
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                    - title
+                    - startsAt
+                    properties:
+                      title:
+                        type: string
+                      subtitle:
+                        type: string
+                      artworkId:
+                        type: string
+                      startsAt:
+                        type: string
+                        format: date-time
+  /integrations/metadata/artwork:
+    post:
+      operationId: SetArtworkMetadata
+      summary: Push poster artwork (max 1 MiB decoded)
+      tags:
+      - Integrations
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - id
+              - type
+              - data
+              properties:
+                id:
+                  type: string
+                type:
+                  type: string
+                  enum:
+                  - image/jpeg
+                  - image/png
+                  - image/webp
+                data:
+                  type: string
+                  format: byte
+  /integrations/capabilities:
+    get:
+      operationId: GetIntegrationCapabilities
+      summary: What this receiver accepts (ingest, containers, metadata features)
+      tags:
+      - Integrations
+      responses:
+        '200':
+          description: Operation result
 components:
   schemas:
     Error:

@@ -689,4 +689,25 @@
 	}
 	.toast.err { border-color: var(--danger); color: var(--danger); }
 	@keyframes pop { from { transform: translateY(6px); opacity: 0; } }
+
+	/* ---------- mobile ---------- */
+	@media (max-width: 760px) {
+		.admin { flex-direction: column; }
+		nav {
+			width: 100%;
+			flex-direction: row;
+			align-items: center;
+			overflow-x: auto;
+			padding: 10px 12px;
+			border-right: 0;
+			border-bottom: 1px solid var(--border);
+			gap: 2px;
+		}
+		.brand { margin: 0 10px 0 2px; white-space: nowrap; }
+		nav button { white-space: nowrap; padding: 7px 10px; }
+		.back { display: none; }
+		.grow { display: none; }
+		main { padding: 16px 14px 60px; }
+		.tiles { flex-direction: column; }
+	}
 </style>

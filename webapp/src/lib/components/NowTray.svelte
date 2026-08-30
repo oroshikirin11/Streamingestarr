@@ -16,14 +16,18 @@
 
 	// True position: pushed position + time since the push.
 	const position = $derived.by(() => {
-		if (!np?.duration) return null;
-		if (np.paused) return Math.min(np.position, np.duration);
-		const drift = (now - new Date(np.receivedAt).getTime()) / 1000;
-		return Math.min(np.position + Math.max(drift, 0), np.duration);
+		// Guard everything a sender could get wrong — the ring must never
+		// show NaN.
+		if (!np || !Number.isFinite(np.duration) || np.duration <= 0) return null;
+		const base = Number.isFinite(np.position) ? np.position : 0;
+		if (np.paused) return Math.min(base, np.duration);
+		const received = new Date(np.receivedAt).getTime();
+		const drift = Number.isFinite(received) ? (now - received) / 1000 : 0;
+		return Math.min(base + Math.max(drift, 0), np.duration);
 	});
 
 	const fmt = (s) => {
-		if (s == null) return '';
+		if (s == null || !Number.isFinite(s)) return '';
 		s = Math.floor(s);
 		const h = Math.floor(s / 3600);
 		const m = Math.floor((s % 3600) / 60);
@@ -219,5 +223,16 @@
 		font-size: 9px;
 		color: var(--muted);
 		font-variant-numeric: tabular-nums;
+	}
+
+	@media (max-width: 860px) {
+		.now-tray {
+			padding: 10px 14px;
+		}
+		/* one cell on phones: now playing carries the essentials */
+		.tray-sep,
+		.tray-cell:not(.now) {
+			display: none;
+		}
 	}
 </style>
