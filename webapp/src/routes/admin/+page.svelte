@@ -6,7 +6,7 @@
 	let section = $state('status');
 	let cfg = $state(null);
 	let status = $state(null);
-	let feedback = $state({}); // per-card save feedback
+	let toasts = $state([]);
 
 	// editable copies
 	let serverName = $state('');
@@ -19,13 +19,30 @@
 	let srtEnabled = $state(true);
 	let srtPort = $state(9710);
 	let reservationDays = $state(30);
-	let chatDisabled = $state(false);
+	let chatEnabled = $state(true);
 	let joinMessages = $state(true);
 	let forbiddenNames = $state('');
 	let newAdminPw = $state('');
 	let newRoomPw = $state('');
 	let messages = $state([]);
 	let disabledUsers = $state([]);
+
+	function toast(text, ok = true) {
+		const id = crypto.randomUUID();
+		toasts = [...toasts, { id, text, ok }];
+		setTimeout(() => (toasts = toasts.filter((t) => t.id !== id)), 2600);
+	}
+
+	async function run(fn, okText = 'Saved') {
+		try {
+			const res = await fn();
+			if (res?.success === false) toast(res.message || 'That did not work', false);
+			else toast(res?.message && res.message !== 'changed' ? res.message : okText);
+			return res;
+		} catch {
+			toast('That did not work', false);
+		}
+	}
 
 	async function loadConfig() {
 		cfg = await api.getServerConfig();
@@ -39,7 +56,7 @@
 		srtEnabled = cfg.srtServerEnabled ?? true;
 		srtPort = cfg.srtServerPort ?? 9710;
 		reservationDays = cfg.chatNameReservationDays ?? 30;
-		chatDisabled = cfg.chatDisabled ?? false;
+		chatEnabled = !(cfg.chatDisabled ?? false);
 		joinMessages = cfg.chatJoinMessagesEnabled ?? true;
 		forbiddenNames = (cfg.forbiddenUsernames ?? []).join(', ');
 	}
@@ -57,20 +74,13 @@
 		return () => clearInterval(t);
 	});
 
-	async function save(card, fn) {
-		feedback[card] = '…';
-		try {
-			const res = await fn();
-			feedback[card] = res?.success === false ? (res.message || 'failed') : (res?.message || 'saved ✓');
-		} catch (e) {
-			feedback[card] = 'failed';
-		}
-		setTimeout(() => (feedback[card] = ''), 4000);
-	}
-
 	function randomKey() {
 		const bytes = crypto.getRandomValues(new Uint8Array(12));
 		return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+	}
+
+	function copy(text) {
+		navigator.clipboard?.writeText(text).then(() => toast('Copied'));
 	}
 
 	async function loadModeration() {
@@ -86,6 +96,9 @@
 	}
 
 	const host = typeof location !== 'undefined' ? location.hostname : 'localhost';
+	const rtmpURL = $derived(`rtmp://${host}:${cfg?.rtmpServerPort ?? 1935}/live/${keys[0]?.key ?? ''}`);
+	const srtURL = $derived(`srt://${host}:${srtPort}?streamid=${keys[0]?.key ?? ''}`);
+
 	const uptime = $derived.by(() => {
 		const t = status?.broadcaster?.time;
 		if (!t || !status?.broadcastActive) return null;
@@ -118,205 +131,244 @@
 
 	<main>
 		{#if section === 'status'}
-			<h1>Status</h1>
+			<hgroup><h1>Status</h1><p>What the ingest and the room are doing right now.</p></hgroup>
+
 			<div class="card">
 				<div class="statusline">
 					<span class="dot" class:live={status?.online}></span>
 					{#if status?.online}
-						<b>Live</b> · {status.viewerCount ?? 0} watching{#if uptime}&nbsp;· ingest up {uptime}{/if}
+						<b>Live</b><span class="sep">·</span>{status.viewerCount ?? 0} watching{#if uptime}<span class="sep">·</span>ingest up {uptime}{/if}
 					{:else if status?.broadcaster}
-						<b>Ingest connected</b> — buffering to viewers
+						<b>Ingest connected</b><span class="sep">—</span>buffering to viewers
 					{:else}
-						<b>Offline</b> — waiting for a stream
+						<b>Offline</b><span class="sep">—</span>waiting for a stream
 					{/if}
 				</div>
-				{#if status?.broadcaster}
-					<table class="kv">
-						<tbody>
-							<tr><td>Source</td><td>{status.broadcaster.remoteAddr}</td></tr>
-							<tr><td>Encoder</td><td>{status.broadcaster.streamDetails?.encoder || '—'}</td></tr>
-							<tr><td>Video</td><td>{status.broadcaster.streamDetails?.videoCodec || '—'} {status.broadcaster.streamDetails?.width || ''}{status.broadcaster.streamDetails?.width ? '×' + status.broadcaster.streamDetails?.height : ''}</td></tr>
-							<tr><td>Audio</td><td>{status.broadcaster.streamDetails?.audioCodec || '—'}</td></tr>
-						</tbody>
-					</table>
-					<button class="danger" onclick={() => save('disconnect', () => api.disconnectStream())}>Disconnect the stream</button>
-					<span class="fb">{feedback['disconnect'] ?? ''}</span>
-				{/if}
 			</div>
 
-		{:else if section === 'stream'}
-			<h1>Stream</h1>
-			<div class="card">
-				<h2>Ingest</h2>
-				<p class="hint">Point your source at either. The stream key doubles as the SRT streamid.</p>
-				{#each keys.slice(0, 1) as k}
-					<table class="kv mono">
-						<tbody>
-							<tr><td>RTMP</td><td>rtmp://{host}:{cfg?.rtmpServerPort ?? 1935}/live/{k.key}</td></tr>
-							<tr><td>SRT</td><td>srt://{host}:{srtPort}?streamid={k.key}</td></tr>
-						</tbody>
-					</table>
-				{/each}
-				<div class="row">
-					<label><input type="checkbox" bind:checked={srtEnabled} onchange={() => save('srt', () => api.setSRTEnabled(srtEnabled))} /> SRT ingest enabled</label>
-					<label>UDP port <input class="short" type="number" bind:value={srtPort} /></label>
-					<button onclick={() => save('srt', () => api.setSRTPort(Number(srtPort)))}>Save port</button>
-					<span class="fb">{feedback['srt'] ?? ''}</span>
+			{#if status?.broadcaster}
+				<div class="card">
+					<header><h2>Broadcaster</h2></header>
+					<dl>
+						<div><dt>Source</dt><dd>{status.broadcaster.remoteAddr}</dd></div>
+						<div><dt>Encoder</dt><dd>{status.broadcaster.streamDetails?.encoder || '—'}</dd></div>
+						<div><dt>Video</dt><dd>{status.broadcaster.streamDetails?.videoCodec || '—'}{status.broadcaster.streamDetails?.width ? ` · ${status.broadcaster.streamDetails.width}×${status.broadcaster.streamDetails.height}` : ''}</dd></div>
+						<div><dt>Audio</dt><dd>{status.broadcaster.streamDetails?.audioCodec || '—'}</dd></div>
+					</dl>
+					<footer>
+						<button class="danger" onclick={() => run(api.disconnectStream, 'Stream disconnected')}>Disconnect the stream</button>
+					</footer>
 				</div>
-			</div>
+			{/if}
+
+		{:else if section === 'stream'}
+			<hgroup><h1>Stream</h1><p>Where your source connects, and the keys that open the door.</p></hgroup>
+
 			<div class="card">
-				<h2>Stream keys</h2>
+				<header><h2>Ingest addresses</h2><p>Point your source at either. The stream key doubles as the SRT streamid.</p></header>
+				<dl class="mono">
+					<div><dt>RTMP</dt><dd>{rtmpURL}</dd><button class="ghost tiny" onclick={() => copy(rtmpURL)}>Copy</button></div>
+					<div><dt>SRT</dt><dd>{srtURL}</dd><button class="ghost tiny" onclick={() => copy(srtURL)}>Copy</button></div>
+				</dl>
+			</div>
+
+			<div class="card">
+				<header><h2>SRT ingest</h2><p>The preferred path — carries AV1 and HEVC. Changes take effect after a restart.</p></header>
+				<div class="field-row">
+					<label class="switch">
+						<input type="checkbox" bind:checked={srtEnabled} onchange={() => run(() => api.setSRTEnabled(srtEnabled))} />
+						<span class="track"></span> Enabled
+					</label>
+					<div class="field compact">
+						<label for="srtport">UDP port</label>
+						<input id="srtport" type="number" bind:value={srtPort} />
+					</div>
+				</div>
+				<footer><button onclick={() => run(() => api.setSRTPort(Number(srtPort)))}>Save</button></footer>
+			</div>
+
+			<div class="card">
+				<header><h2>Stream keys</h2><p>Anyone holding a key can broadcast to the theater.</p></header>
 				{#each keys as k, i}
-					<div class="row">
-						<input class="mono grow-input" bind:value={k.key} placeholder="key" />
-						<input bind:value={k.comment} placeholder="comment" />
-						<button class="ghost" onclick={() => (k.key = randomKey())}>Randomize</button>
-						<button class="ghost danger-text" onclick={() => (keys = keys.filter((_, j) => j !== i))}>Remove</button>
+					<div class="keyrow">
+						<input class="mono" bind:value={k.key} placeholder="key" />
+						<input class="comment" bind:value={k.comment} placeholder="comment" />
+						<button class="ghost tiny" onclick={() => (k.key = randomKey())}>Randomize</button>
+						<button class="ghost tiny danger-text" onclick={() => (keys = keys.filter((_, j) => j !== i))}>Remove</button>
 					</div>
 				{/each}
-				<div class="row">
-					<button class="ghost" onclick={() => (keys = [...keys, { key: randomKey(), comment: '' }])}>Add key</button>
-					<button onclick={() => save('keys', () => api.setStreamKeys(keys.filter((k) => k.key)))}>Save keys</button>
-					<span class="fb">{feedback['keys'] ?? ''}</span>
-				</div>
+				<footer>
+					<button class="ghost" onclick={() => (keys = [...keys, { key: randomKey(), comment: '' }])}>Add a key</button>
+					<button onclick={() => run(() => api.setStreamKeys(keys.filter((k) => k.key)))}>Save</button>
+				</footer>
 			</div>
 
 		{:else if section === 'video'}
-			<h1>Video</h1>
+			<hgroup><h1>Video</h1><p>What happens between the ingest and the viewers.</p></hgroup>
+
 			<div class="card">
-				<h2>Output</h2>
+				<header><h2>Output</h2><p>Passthrough relays the incoming stream untouched — the normal case when the sender controls its own encode.</p></header>
 				{#each variants as v, i}
 					<div class="variant">
-						<input bind:value={v.name} placeholder="name" />
-						<label><input type="checkbox" bind:checked={v.videoPassthrough} /> video passthrough</label>
-						<label><input type="checkbox" bind:checked={v.audioPassthrough} /> audio passthrough</label>
+						<div class="field"><label for={'vn' + i}>Name</label><input id={'vn' + i} bind:value={v.name} /></div>
+						<label class="switch"><input type="checkbox" bind:checked={v.videoPassthrough} /><span class="track"></span> Video passthrough</label>
+						<label class="switch"><input type="checkbox" bind:checked={v.audioPassthrough} /><span class="track"></span> Audio passthrough</label>
 						{#if !v.videoPassthrough}
-							<label>kbps <input class="short" type="number" bind:value={v.videoBitrate} /></label>
-							<label>fps <input class="short" type="number" bind:value={v.framerate} /></label>
+							<div class="field compact"><label for={'vb' + i}>kbps</label><input id={'vb' + i} type="number" bind:value={v.videoBitrate} /></div>
+							<div class="field compact"><label for={'vf' + i}>fps</label><input id={'vf' + i} type="number" bind:value={v.framerate} /></div>
 						{/if}
-						<button class="ghost danger-text" onclick={() => (variants = variants.filter((_, j) => j !== i))}>Remove</button>
+						<button class="ghost tiny danger-text remove" onclick={() => (variants = variants.filter((_, j) => j !== i))}>Remove</button>
 					</div>
 				{/each}
-				<div class="row">
-					<button class="ghost" onclick={() => (variants = [...variants, { name: 'passthrough', videoPassthrough: true, audioPassthrough: true, cpuUsageLevel: 2 }])}>Add variant</button>
-					<button onclick={() => save('variants', () => api.setOutputVariants(variants))}>Save output</button>
-					<span class="fb">{feedback['variants'] ?? ''}</span>
-				</div>
-				<p class="hint">Passthrough relays the incoming stream untouched — the normal case when Jellystreamerr is the sender.</p>
+				<footer>
+					<button class="ghost" onclick={() => (variants = [...variants, { name: 'passthrough', videoPassthrough: true, audioPassthrough: true, cpuUsageLevel: 2 }])}>Add a variant</button>
+					<button onclick={() => run(() => api.setOutputVariants(variants))}>Save</button>
+				</footer>
 			</div>
+
 			<div class="card">
-				<h2>Delivery</h2>
-				<div class="row">
-					<label>Segment container
-						<select bind:value={segmentFormat} onchange={() => save('segfmt', () => api.setSegmentFormat(segmentFormat))}>
-							<option value="ts">mpegts (H.264)</option>
-							<option value="fmp4">fMP4 (AV1 / HEVC ready)</option>
+				<header><h2>Delivery</h2></header>
+				<div class="field-row">
+					<div class="field">
+						<label for="segfmt">Segment container</label>
+						<select id="segfmt" bind:value={segmentFormat} onchange={() => run(() => api.setSegmentFormat(segmentFormat))}>
+							<option value="ts">mpegts — H.264 today</option>
+							<option value="fmp4">fMP4 — AV1 / HEVC ready</option>
 						</select>
-					</label>
-					<label>Latency
-						<select bind:value={latency} onchange={() => save('latency', () => api.setConfigValue('video/streamlatencylevel', Number(latency)))}>
+					</div>
+					<div class="field">
+						<label for="latency">Latency</label>
+						<select id="latency" bind:value={latency} onchange={() => run(() => api.setConfigValue('video/streamlatencylevel', Number(latency)))}>
 							<option value={0}>Lowest</option><option value={1}>Low</option>
 							<option value={2}>Default</option><option value={3}>High</option>
 							<option value={4}>Highest buffer</option>
 						</select>
-					</label>
-					<span class="fb">{feedback['segfmt'] || feedback['latency'] || ''}</span>
+					</div>
 				</div>
 			</div>
 
 		{:else if section === 'chat'}
-			<h1>Chat</h1>
+			<hgroup><h1>Chat</h1><p>The room's rules, and the tools to keep it kind.</p></hgroup>
+
 			<div class="card">
-				<div class="row">
-					<label><input type="checkbox" checked={!chatDisabled} onchange={(e) => { chatDisabled = !e.target.checked; save('chaten', () => api.setConfigValue('chat/disable', chatDisabled)); }} /> Chat enabled</label>
-					<label><input type="checkbox" bind:checked={joinMessages} onchange={() => save('chaten', () => api.setConfigValue('chat/joinmessagesenabled', joinMessages))} /> Join messages</label>
-					<span class="fb">{feedback['chaten'] ?? ''}</span>
+				<header><h2>Room</h2></header>
+				<div class="field-row">
+					<label class="switch"><input type="checkbox" bind:checked={chatEnabled} onchange={() => run(() => api.setConfigValue('chat/disable', !chatEnabled))} /><span class="track"></span> Chat enabled</label>
+					<label class="switch"><input type="checkbox" bind:checked={joinMessages} onchange={() => run(() => api.setConfigValue('chat/joinmessagesenabled', joinMessages))} /><span class="track"></span> Join messages</label>
 				</div>
-				<div class="row">
-					<label class="grow-input">Welcome message <input bind:value={welcomeMessage} /></label>
-					<button onclick={() => save('welcome', () => api.setConfigValue('welcomemessage', welcomeMessage))}>Save</button>
-					<span class="fb">{feedback['welcome'] ?? ''}</span>
+				<div class="field">
+					<label for="welcome">Welcome message</label>
+					<input id="welcome" bind:value={welcomeMessage} placeholder="Shown to everyone who joins" />
 				</div>
-				<div class="row">
-					<label class="grow-input">Forbidden names (comma-separated) <input bind:value={forbiddenNames} /></label>
-					<button onclick={() => save('forbidden', () => api.setConfigValue('chat/forbiddenusernames', forbiddenNames.split(',').map((s) => s.trim()).filter(Boolean)))}>Save</button>
-					<span class="fb">{feedback['forbidden'] ?? ''}</span>
-				</div>
-				<div class="row">
-					<label>Name reservation (days, 0 = forever) <input class="short" type="number" min="0" max="3650" bind:value={reservationDays} /></label>
-					<button onclick={() => save('resdays', () => api.setNameReservationDays(Number(reservationDays)))}>Save</button>
-					<span class="fb">{feedback['resdays'] ?? ''}</span>
-				</div>
+				<footer><button onclick={() => run(() => api.setConfigValue('welcomemessage', welcomeMessage))}>Save</button></footer>
 			</div>
+
 			<div class="card">
-				<h2>Recent messages</h2>
-				{#if messages.length === 0}<p class="hint">Nothing yet.</p>{/if}
-				{#each messages as m (m.id)}
-					<div class="msgrow" class:hidden-msg={m.hiddenAt}>
-						<span class="who">{m.user?.displayName ?? '—'}</span>
-						<span class="body">{@html m.body}</span>
-						<button class="ghost" onclick={() => save('mod', async () => { const r = await api.setMessageVisibility([m.id], !!m.hiddenAt); m.hiddenAt = m.hiddenAt ? null : new Date().toISOString(); return r; })}>{m.hiddenAt ? 'Unhide' : 'Hide'}</button>
-						{#if m.user?.id}
-							<button class="ghost danger-text" onclick={() => save('mod', () => api.setUserEnabled(m.user.id, false))}>Ban user</button>
-						{/if}
-					</div>
-				{/each}
+				<header><h2>Names</h2><p>Chat names are first-come, unique, and reserved while their owner keeps visiting.</p></header>
+				<div class="field">
+					<label for="forbidden">Forbidden names</label>
+					<input id="forbidden" bind:value={forbiddenNames} placeholder="comma, separated" />
+				</div>
+				<div class="field compact">
+					<label for="resdays">Reservation window (days · 0 = forever)</label>
+					<input id="resdays" type="number" min="0" max="3650" bind:value={reservationDays} />
+				</div>
+				<footer>
+					<button onclick={() => run(async () => { await api.setConfigValue('chat/forbiddenusernames', forbiddenNames.split(',').map((s) => s.trim()).filter(Boolean)); return api.setNameReservationDays(Number(reservationDays)); })}>Save</button>
+				</footer>
+			</div>
+
+			<div class="card">
+				<header><h2>Moderation</h2><p>The last hour of the room. Hidden messages stay hidden for everyone.</p></header>
+				{#if messages.length === 0}<p class="empty">Nothing said yet.</p>{/if}
+				<div class="modlist">
+					{#each messages as m (m.id)}
+						<div class="msgrow" class:hidden-msg={m.hiddenAt}>
+							<span class="who">{m.user?.displayName ?? '—'}</span>
+							<span class="body">{@html m.body}</span>
+							<span class="actions">
+								<button class="ghost tiny" onclick={() => run(async () => { const r = await api.setMessageVisibility([m.id], !!m.hiddenAt); m.hiddenAt = m.hiddenAt ? null : new Date().toISOString(); return r; }, m.hiddenAt ? 'Message restored' : 'Message hidden')}>{m.hiddenAt ? 'Unhide' : 'Hide'}</button>
+								{#if m.user?.id}
+									<button class="ghost tiny danger-text" onclick={() => run(() => api.setUserEnabled(m.user.id, false), 'User banned')}>Ban</button>
+								{/if}
+							</span>
+						</div>
+					{/each}
+				</div>
 				{#if disabledUsers.length}
-					<h2>Banned</h2>
+					<header class="mt"><h2>Banned</h2></header>
 					{#each disabledUsers as u (u.id)}
 						<div class="msgrow">
 							<span class="who">{u.displayName}</span>
-							<button class="ghost" onclick={() => save('mod', async () => { const r = await api.setUserEnabled(u.id, true); disabledUsers = disabledUsers.filter((x) => x.id !== u.id); return r; })}>Unban</button>
+							<span class="body"></span>
+							<span class="actions"><button class="ghost tiny" onclick={() => run(async () => { const r = await api.setUserEnabled(u.id, true); disabledUsers = disabledUsers.filter((x) => x.id !== u.id); return r; }, 'User unbanned')}>Unban</button></span>
 						</div>
 					{/each}
 				{/if}
-				<span class="fb">{feedback['mod'] ?? ''}</span>
 			</div>
 
 		{:else if section === 'settings'}
-			<h1>Settings</h1>
+			<hgroup><h1>Settings</h1><p>The theater's identity, and the keys to its doors.</p></hgroup>
+
 			<div class="card">
-				<h2>Theater</h2>
-				<div class="row">
-					<label class="grow-input">Name <input bind:value={serverName} /></label>
-					<button onclick={() => save('name', () => api.setConfigValue('name', serverName))}>Save</button>
-					<span class="fb">{feedback['name'] ?? ''}</span>
+				<header><h2>Theater</h2></header>
+				<div class="field">
+					<label for="sname">Name</label>
+					<input id="sname" bind:value={serverName} />
 				</div>
-				<div class="row">
-					<label class="grow-input">Stream title <input bind:value={streamTitle} /></label>
-					<button onclick={() => save('title', () => api.setConfigValue('streamtitle', streamTitle))}>Save</button>
-					<span class="fb">{feedback['title'] ?? ''}</span>
+				<div class="field">
+					<label for="stitle">Stream title</label>
+					<input id="stitle" bind:value={streamTitle} placeholder="Shown as “now playing” while live" />
 				</div>
+				<footer>
+					<button onclick={() => run(async () => { await api.setConfigValue('name', serverName); return api.setConfigValue('streamtitle', streamTitle); })}>Save</button>
+				</footer>
 			</div>
+
 			<div class="card">
-				<h2>Access</h2>
-				<div class="row">
-					<label class="grow-input">New room password <input type="password" bind:value={newRoomPw} /></label>
-					<button onclick={() => save('roompw', async () => { const r = await api.setRoomPassword(newRoomPw); newRoomPw = ''; return r; })}>Change</button>
-					<span class="fb">{feedback['roompw'] ?? ''}</span>
+				<header><h2>Room password</h2><p>Shared by everyone who watches. Changing it ends every session except yours — the whole room re-enters with the new key.</p></header>
+				<div class="field">
+					<label for="roompw">New room password</label>
+					<input id="roompw" type="password" bind:value={newRoomPw} autocomplete="new-password" />
 				</div>
-				<p class="hint">Changing the room password ends every session except yours — the whole room re-enters with the new key.</p>
-				<div class="row">
-					<label class="grow-input">New admin password (min 8) <input type="password" bind:value={newAdminPw} /></label>
-					<button onclick={() => save('adminpw', async () => { const r = await api.setAdminPassword(newAdminPw); newAdminPw = ''; return r; })}>Change</button>
-					<span class="fb">{feedback['adminpw'] ?? ''}</span>
+				<footer>
+					<button disabled={!newRoomPw} onclick={() => run(async () => { const r = await api.setRoomPassword(newRoomPw); newRoomPw = ''; return r; }, 'Room password changed — everyone else was signed out')}>Change</button>
+				</footer>
+			</div>
+
+			<div class="card">
+				<header><h2>Admin password</h2><p>Yours alone. At least 8 characters.</p></header>
+				<div class="field">
+					<label for="adminpw">New admin password</label>
+					<input id="adminpw" type="password" bind:value={newAdminPw} autocomplete="new-password" />
 				</div>
+				<footer>
+					<button disabled={newAdminPw.length < 8} onclick={() => run(async () => { const r = await api.setAdminPassword(newAdminPw); newAdminPw = ''; return r; }, 'Admin password changed')}>Change</button>
+				</footer>
 			</div>
 		{/if}
 	</main>
+
+	<div class="toasts">
+		{#each toasts as t (t.id)}
+			<div class="toast" class:err={!t.ok}>{t.text}</div>
+		{/each}
+	</div>
 </div>
 
 <style>
 	.admin {
 		/* ops-blue accent: same family as the theater, different job */
 		--accent: #6ba3f0;
-		--radius: 10px;
+		--radius: 12px;
 		height: 100vh;
 		display: flex;
 		font-size: 13.5px;
 	}
+
+	/* ---------- nav ---------- */
 	nav {
-		width: 210px;
+		width: 216px;
 		flex: none;
 		display: flex;
 		flex-direction: column;
@@ -325,95 +377,151 @@
 		border-right: 1px solid var(--border);
 		background: color-mix(in srgb, var(--surface) 60%, transparent);
 	}
-	.brand {
-		font-size: 13px;
-		font-weight: 700;
-		margin: 0 8px 18px;
-	}
+	.brand { font-size: 13px; font-weight: 700; margin: 0 8px 18px; }
 	.brand b { color: var(--accent); }
 	.brand span { color: var(--muted); font-weight: 400; }
 	nav button {
-		text-align: left;
-		background: none;
-		border: 0;
-		color: var(--muted);
-		padding: 8px 10px;
-		border-radius: 8px;
-		cursor: pointer;
-		font-size: 13.5px;
+		text-align: left; background: none; border: 0; color: var(--muted);
+		padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13.5px;
 	}
 	nav button:hover { color: var(--text); background: var(--surface-2); }
 	nav button.on { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); font-weight: 600; }
 	.grow { flex: 1; }
-	.back { color: var(--muted); font-size: 12px; text-decoration: none; padding: 8px 10px; }
+	.back { color: var(--muted); font-size: 12px; text-decoration: none; padding: 8px 12px; }
 	.back:hover { color: var(--accent); }
 
-	main { flex: 1; overflow-y: auto; padding: 26px 30px 60px; }
-	h1 { font-size: 18px; font-weight: 650; margin-bottom: 16px; }
-	h2 { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); margin: 4px 0 12px; }
+	/* ---------- main column ---------- */
+	main { flex: 1; overflow-y: auto; padding: 30px 34px 80px; }
+	hgroup { margin-bottom: 20px; }
+	hgroup h1 { font-size: 19px; font-weight: 650; }
+	hgroup p { color: var(--muted); font-size: 13px; margin-top: 3px; }
+
+	/* ---------- cards ---------- */
 	.card {
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
-		padding: 16px 18px;
-		margin-bottom: 14px;
-		max-width: 860px;
+		padding: 18px 20px 14px;
+		margin-bottom: 16px;
+		max-width: 640px;
 	}
-	.hint { color: var(--muted); font-size: 12px; margin: 8px 0 4px; }
-	.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
-	label { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+	.card header { margin-bottom: 14px; }
+	.card header.mt { margin-top: 18px; }
+	.card h2 { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+	.card header p { color: var(--muted); font-size: 12.5px; margin-top: 5px; line-height: 1.45; }
+	.card footer {
+		display: flex; justify-content: flex-end; gap: 10px; align-items: center;
+		margin-top: 14px; padding-top: 12px;
+		border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+	}
+
+	/* ---------- fields ---------- */
+	.field { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+	.field label { font-size: 12px; color: var(--muted); }
+	.field input, .field select { width: 100%; }
+	.field.compact { max-width: 240px; }
+	.field-row { display: flex; gap: 26px; align-items: flex-end; flex-wrap: wrap; margin: 12px 0; }
+	.field-row .field { flex: 1; min-width: 180px; margin: 0; }
+
 	input, select {
 		background: var(--surface-2);
 		border: 1px solid var(--border);
 		color: var(--text);
-		border-radius: 7px;
-		padding: 7px 10px;
+		border-radius: 8px;
+		padding: 8px 11px;
 		font-size: 13px;
 	}
 	input:focus, select:focus { outline: 0; border-color: var(--accent); }
-	input[type='checkbox'] { accent-color: var(--accent); width: 15px; height: 15px; padding: 0; }
-	.short { width: 76px; }
-	.grow-input { flex: 1; }
-	.grow-input input { flex: 1; width: 100%; }
+
+	/* ---------- switches ---------- */
+	.switch { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 13px; cursor: pointer; padding: 4px 0; }
+	.switch input { position: absolute; opacity: 0; pointer-events: none; }
+	.switch .track {
+		width: 32px; height: 18px; border-radius: 99px; flex: none;
+		background: var(--surface-2); border: 1px solid var(--border);
+		position: relative; transition: background 0.15s, border-color 0.15s;
+	}
+	.switch .track::after {
+		content: ''; position: absolute; top: 2px; left: 2px;
+		width: 12px; height: 12px; border-radius: 50%;
+		background: var(--muted); transition: transform 0.15s, background 0.15s;
+	}
+	.switch input:checked + .track { background: color-mix(in srgb, var(--accent) 30%, var(--surface-2)); border-color: var(--accent); }
+	.switch input:checked + .track::after { transform: translateX(14px); background: var(--accent); }
+
+	/* ---------- buttons ---------- */
 	button {
-		background: var(--accent);
-		color: #101216;
-		border: 0;
-		border-radius: 7px;
-		padding: 7px 14px;
-		font-weight: 600;
-		cursor: pointer;
-		font-size: 13px;
+		background: var(--accent); color: #101216; border: 0; border-radius: 8px;
+		padding: 8px 16px; font-weight: 600; cursor: pointer; font-size: 13px;
 	}
-	button.ghost {
-		background: transparent;
-		color: var(--muted);
-		border: 1px solid var(--border);
-		font-weight: 500;
-	}
+	button:disabled { opacity: 0.4; cursor: default; }
+	button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-weight: 500; }
 	button.ghost:hover { color: var(--accent); border-color: var(--accent); }
+	button.tiny { padding: 5px 11px; font-size: 12px; }
 	button.danger { background: var(--danger); color: #16090a; }
 	.danger-text:hover { color: var(--danger) !important; border-color: var(--danger) !important; }
-	.fb { color: var(--accent); font-size: 12px; min-width: 60px; }
 
-	.statusline { display: flex; align-items: center; gap: 10px; font-size: 15px; margin-bottom: 6px; }
-	.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+	/* ---------- status ---------- */
+	.statusline { display: flex; align-items: center; gap: 9px; font-size: 15px; }
+	.statusline .sep { color: var(--muted); }
+	.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
 	.dot.live { background: #5fc493; box-shadow: 0 0 10px #5fc493; }
-	table.kv { border-collapse: collapse; margin: 10px 0; }
-	table.kv td { padding: 4px 18px 4px 0; color: var(--text); }
-	table.kv td:first-child { color: var(--muted); font-size: 12px; }
-	.mono td:last-child, input.mono { font-family: ui-monospace, monospace; font-size: 12.5px; }
 
-	.variant {
-		display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-		border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; margin: 7px 0;
+	/* ---------- definition rows ---------- */
+	dl { display: flex; flex-direction: column; gap: 2px; }
+	dl div {
+		display: flex; align-items: center; gap: 14px; padding: 7px 0;
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
 	}
+	dl div:last-child { border-bottom: 0; }
+	dt { color: var(--muted); font-size: 12px; width: 74px; flex: none; }
+	dd { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+	dl.mono dd { font-family: ui-monospace, monospace; font-size: 12.5px; }
+
+	/* ---------- stream keys ---------- */
+	.keyrow { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+	.keyrow input.mono { font-family: ui-monospace, monospace; font-size: 12.5px; flex: 1.4; }
+	.keyrow input.comment { flex: 1; }
+
+	/* ---------- variants ---------- */
+	.variant {
+		display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap;
+		border: 1px solid var(--border); border-radius: 10px;
+		padding: 12px 14px; margin: 10px 0;
+		background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+	}
+	.variant .field { margin: 0; max-width: 170px; }
+	.variant .switch { padding-bottom: 8px; }
+	.variant .remove { margin-left: auto; margin-bottom: 6px; }
+
+	/* ---------- moderation ---------- */
+	.empty { color: var(--muted); font-size: 13px; }
+	.modlist { max-height: 380px; overflow-y: auto; }
 	.msgrow {
-		display: flex; align-items: center; gap: 10px; padding: 6px 0;
-		border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+		display: flex; align-items: center; gap: 12px; padding: 8px 2px;
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
 		font-size: 13px;
 	}
-	.msgrow .who { color: var(--accent); font-weight: 600; flex: none; min-width: 110px; }
+	.msgrow:last-child { border-bottom: 0; }
+	.msgrow .who { color: var(--accent); font-weight: 600; flex: none; width: 118px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.msgrow .body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+	.msgrow .actions { flex: none; display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; }
+	.msgrow:hover .actions { opacity: 1; }
 	.msgrow.hidden-msg .body { opacity: 0.35; text-decoration: line-through; }
+	.msgrow.hidden-msg .actions { opacity: 1; }
+
+	/* ---------- toasts ---------- */
+	.toasts {
+		position: fixed; bottom: 22px; right: 22px; z-index: 50;
+		display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+	}
+	.toast {
+		background: var(--surface-2); border: 1px solid var(--accent);
+		color: var(--text); font-size: 12.5px;
+		padding: 9px 16px; border-radius: 10px;
+		box-shadow: 0 6px 24px -8px #000;
+		animation: pop 0.18s ease;
+	}
+	.toast.err { border-color: var(--danger); color: var(--danger); }
+	@keyframes pop { from { transform: translateY(6px); opacity: 0; } }
 </style>
