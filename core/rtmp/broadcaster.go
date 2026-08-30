@@ -8,7 +8,7 @@ import (
 	"streamingestarr/models"
 )
 
-func setCurrentBroadcasterInfo(t flvio.Tag, remoteAddr string) {
+func setCurrentBroadcasterInfo(t flvio.Tag, remoteAddr string, streamKey string) {
 	data, err := getInboundDetailsFromMetadata(t.DebugFields())
 	if err != nil {
 		log.Traceln("Unable to parse inbound broadcaster details:", err)
@@ -30,5 +30,5 @@ func setCurrentBroadcasterInfo(t flvio.Tag, remoteAddr string) {
 		},
 	}
 
-	_setBroadcaster(broadcaster)
+	_setBroadcaster(broadcaster, streamKey)
 }

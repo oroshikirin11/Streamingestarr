@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	log "github.com/sirupsen/logrus"
-	"streamingestarr/config"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/utils"
 )
@@ -98,18 +97,18 @@ func handleTranscoderMessage(message string) {
 	_lastTranscoderLogMessage = message
 }
 
-func createVariantDirectories() {
+func createVariantDirectories(baseDir string) {
 	// Create private hls data dirs
-	utils.CleanupDirectory(config.HLSStoragePath)
+	utils.CleanupDirectory(baseDir)
 	configRepository := configrepository.Get()
 	if len(configRepository.GetStreamOutputVariants()) != 0 {
 		for index := range configRepository.GetStreamOutputVariants() {
-			if err := os.MkdirAll(path.Join(config.HLSStoragePath, strconv.Itoa(index)), 0o750); err != nil {
+			if err := os.MkdirAll(path.Join(baseDir, strconv.Itoa(index)), 0o750); err != nil {
 				log.Fatalln(err)
 			}
 		}
 	} else {
-		dir := path.Join(config.HLSStoragePath, strconv.Itoa(0))
+		dir := path.Join(baseDir, strconv.Itoa(0))
 		log.Traceln("Creating", dir)
 		if err := os.MkdirAll(dir, 0o750); err != nil {
 			log.Fatalln(err)

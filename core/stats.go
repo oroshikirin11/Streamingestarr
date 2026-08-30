@@ -2,7 +2,6 @@ package core
 
 import (
 	"math"
-	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -13,114 +12,136 @@ import (
 )
 
 var (
-	l                         = &sync.RWMutex{}
 	_activeViewerPurgeTimeout = time.Second * 15
 	_geoIPClient              = geoip.NewClient()
 )
 
-func setupStats() error {
+func (c *ChannelRuntime) setupStats() error {
 	s := getSavedStats()
-	_stats = &s
+	c.stats = &s
 
 	statsSaveTimer := time.NewTicker(1 * time.Minute)
 	go func() {
 		for range statsSaveTimer.C {
-			saveStats()
+			c.saveStats()
 		}
 	}()
 
 	viewerCountPruneTimer := time.NewTicker(5 * time.Second)
 	go func() {
 		for range viewerCountPruneTimer.C {
-			pruneViewerCount()
+			c.pruneViewerCount()
 		}
 	}()
 
 	return nil
 }
 
-// IsStreamConnected checks if the stream is connected or not.
-func IsStreamConnected() bool {
-	if !_stats.StreamConnected {
+// IsStreamConnected checks if the channel's stream is connected or not.
+func (c *ChannelRuntime) IsStreamConnected() bool {
+	if !c.stats.StreamConnected {
 		return false
 	}
 
 	// Kind of a hack.  It takes a handful of seconds between a RTMP connection and when HLS data is available.
 	// So account for that with an artificial buffer of four segments.
-	timeSinceLastConnected := time.Since(_stats.LastConnectTime.Time).Seconds()
+	timeSinceLastConnected := time.Since(c.stats.LastConnectTime.Time).Seconds()
 	configRepository := configrepository.Get()
 	waitTime := math.Max(float64(configRepository.GetStreamLatencyLevel().SecondsPerSegment)*3.0, 7)
 	if timeSinceLastConnected < waitTime {
 		return false
 	}
 
-	return _stats.StreamConnected
+	return c.stats.StreamConnected
+}
+
+// IsStreamConnected reports the default channel's stream state.
+func IsStreamConnected() bool {
+	return Default().IsStreamConnected()
 }
 
 // RemoveChatClient removes a client from the active clients record.
-func RemoveChatClient(clientID string) {
+func (c *ChannelRuntime) RemoveChatClient(clientID string) {
 	log.Trace("Removing the client:", clientID)
 
-	l.Lock()
-	delete(_stats.ChatClients, clientID)
-	l.Unlock()
+	c.viewersLock.Lock()
+	delete(c.stats.ChatClients, clientID)
+	c.viewersLock.Unlock()
+}
+
+// RemoveChatClient removes a client from the default channel.
+func RemoveChatClient(clientID string) {
+	Default().RemoveChatClient(clientID)
 }
 
 // SetViewerActive sets a client as active and connected.
-func SetViewerActive(viewer *models.Viewer) {
+func (c *ChannelRuntime) SetViewerActive(viewer *models.Viewer) {
 	// Don't update viewer counts if a live stream session is not active.
-	if !_stats.StreamConnected {
+	if !c.stats.StreamConnected {
 		return
 	}
 
-	l.Lock()
-	defer l.Unlock()
+	c.viewersLock.Lock()
+	defer c.viewersLock.Unlock()
 
 	// Asynchronously, optionally, fetch GeoIP configRepository.
 	go func(viewer *models.Viewer) {
 		viewer.Geo = _geoIPClient.GetGeoFromIP(viewer.IPAddress)
 	}(viewer)
 
-	if _, exists := _stats.Viewers[viewer.ClientID]; exists {
-		_stats.Viewers[viewer.ClientID].LastSeen = time.Now()
+	if _, exists := c.stats.Viewers[viewer.ClientID]; exists {
+		c.stats.Viewers[viewer.ClientID].LastSeen = time.Now()
 	} else {
-		_stats.Viewers[viewer.ClientID] = viewer
+		c.stats.Viewers[viewer.ClientID] = viewer
 	}
-	_stats.SessionMaxViewerCount = int(math.Max(float64(len(_stats.Viewers)), float64(_stats.SessionMaxViewerCount)))
-	_stats.OverallMaxViewerCount = int(math.Max(float64(_stats.SessionMaxViewerCount), float64(_stats.OverallMaxViewerCount)))
+	c.stats.SessionMaxViewerCount = int(math.Max(float64(len(c.stats.Viewers)), float64(c.stats.SessionMaxViewerCount)))
+	c.stats.OverallMaxViewerCount = int(math.Max(float64(c.stats.SessionMaxViewerCount), float64(c.stats.OverallMaxViewerCount)))
 }
 
-// GetActiveViewers will return the active viewers.
+// SetViewerActive marks a viewer on the default channel.
+func SetViewerActive(viewer *models.Viewer) {
+	Default().SetViewerActive(viewer)
+}
+
+// GetActiveViewers will return the channel's active viewers.
+func (c *ChannelRuntime) GetActiveViewers() map[string]*models.Viewer {
+	return c.stats.Viewers
+}
+
+// GetActiveViewers returns the default channel's active viewers.
 func GetActiveViewers() map[string]*models.Viewer {
-	return _stats.Viewers
+	return Default().GetActiveViewers()
 }
 
-func pruneViewerCount() {
+func (c *ChannelRuntime) pruneViewerCount() {
 	viewers := make(map[string]*models.Viewer)
 
-	l.Lock()
-	defer l.Unlock()
+	c.viewersLock.Lock()
+	defer c.viewersLock.Unlock()
 
-	for viewerID, viewer := range _stats.Viewers {
-		viewerLastSeenTime := _stats.Viewers[viewerID].LastSeen
+	for viewerID, viewer := range c.stats.Viewers {
+		viewerLastSeenTime := c.stats.Viewers[viewerID].LastSeen
 		if time.Since(viewerLastSeenTime) < _activeViewerPurgeTimeout {
 			viewers[viewerID] = viewer
 		}
 	}
 
-	_stats.Viewers = viewers
+	c.stats.Viewers = viewers
 }
 
-func saveStats() {
+// Peak counts persist through the config repository, which is not yet
+// channel-scoped — with one channel that is exact; per-channel keys arrive
+// with the second channel.
+func (c *ChannelRuntime) saveStats() {
 	configRepository := configrepository.Get()
-	if err := configRepository.SetPeakOverallViewerCount(_stats.OverallMaxViewerCount); err != nil {
+	if err := configRepository.SetPeakOverallViewerCount(c.stats.OverallMaxViewerCount); err != nil {
 		log.Errorln("error saving viewer count", err)
 	}
-	if err := configRepository.SetPeakSessionViewerCount(_stats.SessionMaxViewerCount); err != nil {
+	if err := configRepository.SetPeakSessionViewerCount(c.stats.SessionMaxViewerCount); err != nil {
 		log.Errorln("error saving viewer count", err)
 	}
-	if _stats.LastDisconnectTime != nil && _stats.LastDisconnectTime.Valid {
-		if err := configRepository.SetLastDisconnectTime(_stats.LastDisconnectTime.Time); err != nil {
+	if c.stats.LastDisconnectTime != nil && c.stats.LastDisconnectTime.Valid {
+		if err := configRepository.SetLastDisconnectTime(c.stats.LastDisconnectTime.Time); err != nil {
 			log.Errorln("error saving disconnect time", err)
 		}
 	}

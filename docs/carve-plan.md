@@ -74,13 +74,36 @@ gating, throttle lockout, restart persistence, and room eviction.
 Known consequence: external players (VLC on the HLS URL) need the cookie —
 acceptable for a private cinema; tokenized playback URLs can come later.
 
-## Step 4 — Channel entity (design.md §8)
+## Step 4 — Channel entity (design.md §8) — **DONE, 2026-08-30**
 
-Introduce the channel struct and thread it through stream state, stream
-keys, HLS output paths (`/hls/<channel>/`), chat rooms, status, webhooks.
-`core/` is global-heavy (`core.go`, `streamState.go`, `status.go`) — this is
-the biggest refactor of the carve and the reason to do it before building
-features on top. UI stays single-theater.
+The de-globalization landed:
+
+- `channels` table (`persistence/channelrepository/`, seeded with `main`) +
+  `models.Channel`.
+- **`core.ChannelRuntime`** holds ALL per-stream state (stats, storage,
+  transcoder, broadcaster, current broadcast, timers, HLS handler, file
+  writer) in a map keyed by channel ID. `core.Start` loops over the channel
+  list — that loop is the multi-channel seam. Package-level functions
+  remain as default-channel delegates so existing callers didn't change.
+- **HLS is channel-scoped on disk and URL**: segments live in
+  `data/hls/<channel>/`, served at `/hls/<channel>/...`; unscoped legacy
+  URLs (`/hls/stream.m3u8`, what the React player requests) resolve to the
+  default channel. Each runtime has its own file-writer port and its
+  transcoders write only into its directory.
+- **RTMP callbacks carry the matched stream key**;
+  `ChannelRuntimeForStreamKey` resolves the channel (all keys → default
+  today; a channel column on keys is the one change needed later).
+- **Status and webhook payloads carry the channel** (`channelId` /
+  `channel` fields).
+- `/t/<channel>` serves the viewer app (root stays the single theater).
+
+Deliberately still global, each a one-place change when theater #2 lands:
+chat (single room), peak-viewer persistence keys, thumbnail/preview paths,
+stream title, and the single RTMP listener's one-connection limit.
+
+Verified live end to end: RTMP ingest → segments under `data/hls/main/` →
+playback on both scoped and legacy URLs → disconnect → offline playlist
+appended. Full test suite green.
 
 ## Step 5 — Chat identity changes (design.md §6)
 

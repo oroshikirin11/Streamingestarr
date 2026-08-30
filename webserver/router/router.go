@@ -52,8 +52,13 @@ func Start(enableVerboseLogging bool) error {
 	fs := http.FileServer(http.Dir(config.PublicFilesPath))
 	r.Handle("/public/*", http.StripPrefix("/public/", fs))
 
-	// Return HLS video
+	// Return HLS video. URLs are channel-scoped (/hls/<channel>/...);
+	// unscoped paths resolve to the default channel.
 	r.HandleFunc("/hls/*", handlers.HandleHLSRequest)
+
+	// Channel-scoped viewer pages. One theater today: the root serves it,
+	// and /t/<channel> is the scoped address the multi-channel future uses.
+	r.HandleFunc("/t/*", handlers.IndexHandler)
 
 	// The admin web app.
 	r.HandleFunc("/admin/*", middleware.RequireAdminAuth(handlers.IndexHandler))

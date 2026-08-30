@@ -28,7 +28,7 @@ var gc = cache.GetGlobalCache()
 func IndexHandler(w http.ResponseWriter, r *http.Request) {
 	middleware.EnableCors(w)
 
-	isIndexRequest := r.URL.Path == "/" || filepath.Base(r.URL.Path) == "index.html" || filepath.Base(r.URL.Path) == ""
+	isIndexRequest := r.URL.Path == "/" || strings.HasPrefix(r.URL.Path, "/t/") || filepath.Base(r.URL.Path) == "index.html" || filepath.Base(r.URL.Path) == ""
 
 	if utils.IsUserAgentAPlayer(r.UserAgent()) && isIndexRequest {
 		http.Redirect(w, r, "/hls/stream.m3u8", http.StatusTemporaryRedirect)

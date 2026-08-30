@@ -4,14 +4,14 @@ import (
 	"streamingestarr/core/storageproviders"
 )
 
-func setupStorage() error {
-	_storage = storageproviders.NewLocalStorage()
+func (c *ChannelRuntime) setupStorage() error {
+	c.storage = storageproviders.NewLocalStorage(c.HLSOutputPath)
 
-	if err := _storage.Setup(); err != nil {
+	if err := c.storage.Setup(); err != nil {
 		return err
 	}
 
-	handler.Storage = _storage
+	c.handler.Storage = c.storage
 
 	return nil
 }

@@ -17,12 +17,14 @@ func TestSendStreamStatusEvent(t *testing.T) {
 	configRepository.SetStreamTitle("my stream")
 
 	checkPayload(t, models.StreamStarted, func() {
-		sendStreamStatusEvent(events.StreamStarted, "id", time.Unix(72, 6).UTC())
+		sendStreamStatusEvent(events.StreamStarted, "main", "id", time.Unix(72, 6).UTC())
 	}, `{
+		"channel": "main",
 		"id": "id",
 		"name": "my server",
 		"serverURL": "http://localhost:8080",
 		"status": {
+			"channelId": "",
 			"lastConnectTime": null,
 			"lastDisconnectTime": null,
 			"online": true,

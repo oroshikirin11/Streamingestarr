@@ -129,7 +129,7 @@ func (t *Transcoder) Start(shouldLog bool) {
 	if shouldLog {
 		log.Infof("Processing video using codec %s with %d output qualities configured.", t.codec.DisplayName(), len(t.variants))
 	}
-	createVariantDirectories()
+	createVariantDirectories(t.segmentOutputPath)
 	command := flags.String()
 
 	if config.EnableDebugFeatures {
@@ -483,6 +483,7 @@ func (t *Transcoder) SetStdin(pipe *io.PipeReader) {
 // SetOutputPath sets the root directory that should include playlists and video segments.
 func (t *Transcoder) SetOutputPath(output string) {
 	t.segmentOutputPath = output
+	t.playlistOutputPath = output
 }
 
 // SetIdentifier enables appending a unique identifier to segment file name.

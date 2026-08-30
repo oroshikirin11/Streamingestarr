@@ -27,6 +27,7 @@ func GetStatus(w http.ResponseWriter, r *http.Request) {
 func getStatusResponse() webStatusResponse {
 	status := core.GetStatus()
 	response := webStatusResponse{
+		ChannelID:          status.ChannelID,
 		Online:             status.Online,
 		ServerTime:         time.Now(),
 		LastConnectTime:    status.LastConnectTime,
@@ -46,6 +47,7 @@ type webStatusResponse struct {
 	LastConnectTime    *utils.NullTime `json:"lastConnectTime"`
 	LastDisconnectTime *utils.NullTime `json:"lastDisconnectTime"`
 
+	ChannelID     string `json:"channelId"`
 	VersionNumber string `json:"versionNumber"`
 	StreamTitle   string `json:"streamTitle"`
 	ViewerCount   int    `json:"viewerCount,omitempty"`

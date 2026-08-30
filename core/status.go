@@ -6,41 +6,63 @@ import (
 	"streamingestarr/persistence/configrepository"
 )
 
-// GetStatus gets the status of the system.
-func GetStatus() models.Status {
-	if _stats == nil {
+// GetStatus gets the status of a channel.
+func (c *ChannelRuntime) GetStatus() models.Status {
+	if c.stats == nil {
 		return models.Status{}
 	}
 
 	viewerCount := 0
-	if IsStreamConnected() {
-		viewerCount = len(_stats.Viewers)
+	if c.IsStreamConnected() {
+		viewerCount = len(c.stats.Viewers)
 	}
 
 	configRepository := configrepository.Get()
 	return models.Status{
-		Online:                IsStreamConnected(),
+		ChannelID:             c.ID,
+		Online:                c.IsStreamConnected(),
 		ViewerCount:           viewerCount,
-		OverallMaxViewerCount: _stats.OverallMaxViewerCount,
-		SessionMaxViewerCount: _stats.SessionMaxViewerCount,
-		LastDisconnectTime:    _stats.LastDisconnectTime,
-		LastConnectTime:       _stats.LastConnectTime,
+		OverallMaxViewerCount: c.stats.OverallMaxViewerCount,
+		SessionMaxViewerCount: c.stats.SessionMaxViewerCount,
+		LastDisconnectTime:    c.stats.LastDisconnectTime,
+		LastConnectTime:       c.stats.LastConnectTime,
 		VersionNumber:         config.VersionNumber,
 		StreamTitle:           configRepository.GetStreamTitle(),
 	}
 }
 
-// GetCurrentBroadcast will return the currently active broadcast.
+// GetStatus gets the status of the default channel.
+func GetStatus() models.Status {
+	c := Default()
+	if c == nil {
+		return models.Status{}
+	}
+	return c.GetStatus()
+}
+
+// GetCurrentBroadcast will return the channel's currently active broadcast.
+func (c *ChannelRuntime) GetCurrentBroadcast() *models.CurrentBroadcast {
+	return c.currentBroadcast
+}
+
+// GetCurrentBroadcast will return the default channel's active broadcast.
 func GetCurrentBroadcast() *models.CurrentBroadcast {
-	return _currentBroadcast
+	return Default().GetCurrentBroadcast()
 }
 
-// setBroadcaster will store the current inbound broadcasting details.
-func setBroadcaster(broadcaster models.Broadcaster) {
-	_broadcaster = &broadcaster
+// setBroadcaster will store the current inbound broadcasting details on
+// the channel the stream key feeds.
+func setBroadcaster(broadcaster models.Broadcaster, streamKey string) {
+	c := ChannelRuntimeForStreamKey(streamKey)
+	c.broadcaster = &broadcaster
 }
 
-// GetBroadcaster will return the details of the currently active broadcaster.
+// GetBroadcaster will return the details of the channel's active broadcaster.
+func (c *ChannelRuntime) GetBroadcaster() *models.Broadcaster {
+	return c.broadcaster
+}
+
+// GetBroadcaster returns the default channel's active broadcaster.
 func GetBroadcaster() *models.Broadcaster {
-	return _broadcaster
+	return Default().GetBroadcaster()
 }

@@ -25,12 +25,14 @@ var (
 )
 
 var (
-	_setStreamAsConnected func(*io.PipeReader)
-	_setBroadcaster       func(models.Broadcaster)
+	_setStreamAsConnected func(*io.PipeReader, string)
+	_setBroadcaster       func(models.Broadcaster, string)
 )
 
-// Start starts the rtmp service, listening on specified RTMP port.
-func Start(setStreamAsConnected func(*io.PipeReader), setBroadcaster func(models.Broadcaster)) {
+// Start starts the rtmp service, listening on specified RTMP port. The
+// callbacks receive the matched stream key so the core can resolve which
+// channel the inbound stream feeds.
+func Start(setStreamAsConnected func(*io.PipeReader, string), setBroadcaster func(models.Broadcaster, string)) {
 	_setStreamAsConnected = setStreamAsConnected
 	_setBroadcaster = setBroadcaster
 
@@ -68,12 +70,6 @@ func Start(setStreamAsConnected func(*io.PipeReader), setBroadcaster func(models
 
 // HandleConn is fired when an inbound RTMP connection takes place.
 func HandleConn(c *rtmp.Conn, nc net.Conn) {
-	c.LogTagEvent = func(isRead bool, t flvio.Tag) {
-		if t.Type == flvio.TAG_AMF0 {
-			log.Tracef("%+v\n", t.DebugFields())
-			setCurrentBroadcasterInfo(t, nc.RemoteAddr().String())
-		}
-	}
 
 	if _hasInboundRTMPConnection {
 		log.Errorln("stream already running; can not overtake an existing stream from", nc.RemoteAddr().String())
@@ -84,6 +80,7 @@ func HandleConn(c *rtmp.Conn, nc net.Conn) {
 	configRepository := configrepository.Get()
 
 	accessGranted := false
+	streamKey := ""
 	validStreamingKeys := configRepository.GetStreamKeys()
 
 	// If a stream key override was specified then use that instead.
@@ -94,6 +91,7 @@ func HandleConn(c *rtmp.Conn, nc net.Conn) {
 	for _, key := range validStreamingKeys {
 		if key.Key != nil && secretMatch(*key.Key, c.URL.Path) {
 			accessGranted = true
+			streamKey = *key.Key
 			break
 		}
 	}
@@ -104,10 +102,17 @@ func HandleConn(c *rtmp.Conn, nc net.Conn) {
 		return
 	}
 
+	c.LogTagEvent = func(isRead bool, t flvio.Tag) {
+		if t.Type == flvio.TAG_AMF0 {
+			log.Tracef("%+v\n", t.DebugFields())
+			setCurrentBroadcasterInfo(t, nc.RemoteAddr().String(), streamKey)
+		}
+	}
+
 	rtmpOut, rtmpIn := io.Pipe()
 	_pipe = rtmpIn
 	log.Infoln("Inbound stream connected from", nc.RemoteAddr().String())
-	_setStreamAsConnected(rtmpOut)
+	_setStreamAsConnected(rtmpOut, streamKey)
 
 	_hasInboundRTMPConnection = true
 	_rtmpConnection = nc

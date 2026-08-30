@@ -7,6 +7,7 @@ type Status struct {
 	LastConnectTime    *utils.NullTime `json:"lastConnectTime"`
 	LastDisconnectTime *utils.NullTime `json:"lastDisconnectTime"`
 
+	ChannelID             string `json:"channelId"`
 	VersionNumber         string `json:"versionNumber"`
 	StreamTitle           string `json:"streamTitle"`
 	ViewerCount           int    `json:"viewerCount"`

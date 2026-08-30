@@ -19,6 +19,7 @@ import (
 	"streamingestarr/core/chat"
 	"streamingestarr/core/webhooks"
 	"streamingestarr/models"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/utils"
 	"streamingestarr/webserver/handlers/generated"
@@ -75,7 +76,7 @@ func SetStreamTitle(w http.ResponseWriter, r *http.Request) {
 	}
 	if value != "" {
 		sendSystemChatAction(fmt.Sprintf("Stream title changed to **%s**", value), true)
-		go webhooks.SendStreamStatusEvent(models.StreamTitleUpdated)
+		go webhooks.SendStreamStatusEvent(models.StreamTitleUpdated, channelrepository.DefaultChannelID)
 	}
 	webutils.WriteSimpleResponse(w, true, "changed")
 }

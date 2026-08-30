@@ -6,7 +6,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"streamingestarr/config"
 	"streamingestarr/core/chat"
 	"streamingestarr/core/rtmp"
 	"streamingestarr/core/transcoder"
@@ -16,67 +15,65 @@ import (
 	"streamingestarr/utils"
 )
 
-// After the stream goes offline this timer fires a full cleanup after N min.
-var _offlineCleanupTimer *time.Timer
-
-// While a stream takes place cleanup old HLS content every N min.
-var _onlineCleanupTicker *time.Ticker
-
-var _currentBroadcast *models.CurrentBroadcast
+// setStreamAsConnected resolves the channel the stream key feeds and marks
+// its stream as connected.
+func setStreamAsConnected(rtmpOut *io.PipeReader, streamKey string) {
+	ChannelRuntimeForStreamKey(streamKey).setStreamAsConnected(rtmpOut)
+}
 
 // setStreamAsConnected sets the stream as connected.
-func setStreamAsConnected(rtmpOut *io.PipeReader) {
+func (c *ChannelRuntime) setStreamAsConnected(rtmpOut *io.PipeReader) {
 	now := utils.NullTime{Time: time.Now(), Valid: true}
-	_stats.StreamConnected = true
-	_stats.LastDisconnectTime = nil
-	_stats.LastConnectTime = &now
-	_stats.SessionMaxViewerCount = 0
+	c.stats.StreamConnected = true
+	c.stats.LastDisconnectTime = nil
+	c.stats.LastConnectTime = &now
+	c.stats.SessionMaxViewerCount = 0
 
 	configRepository := configrepository.Get()
 
-	_currentBroadcast = &models.CurrentBroadcast{
+	c.currentBroadcast = &models.CurrentBroadcast{
 		LatencyLevel:   configRepository.GetStreamLatencyLevel(),
 		OutputSettings: configRepository.GetStreamOutputVariants(),
 	}
 
-	StopOfflineCleanupTimer()
-	startOnlineCleanupTimer()
+	c.StopOfflineCleanupTimer()
+	c.startOnlineCleanupTimer()
 
-	segmentPath := config.HLSStoragePath
-
-	if err := setupStorage(); err != nil {
+	if err := c.setupStorage(); err != nil {
 		log.Fatalln("failed to setup the storage", err)
 	}
 
 	go func() {
-		_transcoder = transcoder.NewTranscoder()
-		_transcoder.TranscoderCompleted = func(error) {
-			SetStreamAsDisconnected()
-			_transcoder = nil
-			_currentBroadcast = nil
+		c.transcoder = transcoder.NewTranscoder()
+		c.transcoder.SetOutputPath(c.HLSOutputPath)
+		c.transcoder.SetInternalHTTPPort(c.fileWriter.Port())
+		c.transcoder.TranscoderCompleted = func(error) {
+			c.SetStreamAsDisconnected()
+			c.transcoder = nil
+			c.currentBroadcast = nil
 		}
-		_transcoder.SetStdin(rtmpOut)
-		_transcoder.Start(true)
+		c.transcoder.SetStdin(rtmpOut)
+		c.transcoder.Start(true)
 	}()
 
-	go webhooks.SendStreamStatusEvent(models.StreamStarted)
-	selectedThumbnailVideoQualityIndex, isVideoPassthrough := configRepository.FindHighestVideoQualityIndex(_currentBroadcast.OutputSettings)
-	transcoder.StartThumbnailGenerator(segmentPath, selectedThumbnailVideoQualityIndex, isVideoPassthrough)
+	go webhooks.SendStreamStatusEvent(models.StreamStarted, c.ID)
+	selectedThumbnailVideoQualityIndex, isVideoPassthrough := configRepository.FindHighestVideoQualityIndex(c.currentBroadcast.OutputSettings)
+	transcoder.StartThumbnailGenerator(c.HLSOutputPath, selectedThumbnailVideoQualityIndex, isVideoPassthrough)
 
 	_ = chat.SendSystemAction("Stay tuned, the stream is **starting**!", true)
 	chat.SendAllWelcomeMessage()
 }
 
-// SetStreamAsDisconnected sets the stream as disconnected.
-func SetStreamAsDisconnected() {
+// SetStreamAsDisconnected sets the channel's stream as disconnected.
+func (c *ChannelRuntime) SetStreamAsDisconnected() {
 	_ = chat.SendSystemAction("The stream is ending.", true)
 
 	now := utils.NullTime{Time: time.Now(), Valid: true}
 
-	_stats.StreamConnected = false
-	_stats.LastDisconnectTime = &now
-	_stats.LastConnectTime = nil
-	_broadcaster = nil
+	c.stats.StreamConnected = false
+	c.stats.LastDisconnectTime = &now
+	c.stats.LastConnectTime = nil
+	c.broadcaster = nil
 
 	offlineFilename := "offline-v2.ts"
 
@@ -92,56 +89,61 @@ func SetStreamAsDisconnected() {
 	// If there is no current broadcast available the previous stream
 	// likely failed for some reason. Don't try to append to it.
 	// Just transition to offline.
-	if _currentBroadcast == nil {
-		stopOnlineCleanupTimer()
-		transitionToOfflineVideoStreamContent()
+	if c.currentBroadcast == nil {
+		c.stopOnlineCleanupTimer()
+		c.transitionToOfflineVideoStreamContent()
 		log.Errorln("unexpected nil _currentBroadcast")
 		return
 	}
 
-	for index := range _currentBroadcast.OutputSettings {
-		makeVariantIndexOffline(index, offlineFilePath, offlineFilename)
+	for index := range c.currentBroadcast.OutputSettings {
+		c.makeVariantIndexOffline(index, offlineFilePath, offlineFilename)
 	}
 
-	StartOfflineCleanupTimer()
-	stopOnlineCleanupTimer()
-	saveStats()
+	c.StartOfflineCleanupTimer()
+	c.stopOnlineCleanupTimer()
+	c.saveStats()
 
-	go webhooks.SendStreamStatusEvent(models.StreamStopped)
+	go webhooks.SendStreamStatusEvent(models.StreamStopped, c.ID)
 }
 
 // StartOfflineCleanupTimer will fire a cleanup after n minutes being disconnected.
-func StartOfflineCleanupTimer() {
-	_offlineCleanupTimer = time.NewTimer(5 * time.Minute)
+func (c *ChannelRuntime) StartOfflineCleanupTimer() {
+	c.offlineCleanupTimer = time.NewTimer(5 * time.Minute)
 	go func() {
-		for range _offlineCleanupTimer.C {
+		for range c.offlineCleanupTimer.C {
 			// Set video to offline state
-			resetDirectories()
-			transitionToOfflineVideoStreamContent()
+			c.resetDirectories()
+			c.transitionToOfflineVideoStreamContent()
 		}
 	}()
 }
 
 // StopOfflineCleanupTimer will stop the previous cleanup timer.
-func StopOfflineCleanupTimer() {
-	if _offlineCleanupTimer != nil {
-		_offlineCleanupTimer.Stop()
+func (c *ChannelRuntime) StopOfflineCleanupTimer() {
+	if c.offlineCleanupTimer != nil {
+		c.offlineCleanupTimer.Stop()
 	}
 }
 
-func startOnlineCleanupTimer() {
-	_onlineCleanupTicker = time.NewTicker(1 * time.Minute)
+func (c *ChannelRuntime) startOnlineCleanupTimer() {
+	c.onlineCleanupTicker = time.NewTicker(1 * time.Minute)
 	go func() {
-		for range _onlineCleanupTicker.C {
-			if err := _storage.Cleanup(); err != nil {
+		for range c.onlineCleanupTicker.C {
+			if err := c.storage.Cleanup(); err != nil {
 				log.Errorln(err)
 			}
 		}
 	}()
 }
 
-func stopOnlineCleanupTimer() {
-	if _onlineCleanupTicker != nil {
-		_onlineCleanupTicker.Stop()
+func (c *ChannelRuntime) stopOnlineCleanupTimer() {
+	if c.onlineCleanupTicker != nil {
+		c.onlineCleanupTicker.Stop()
 	}
+}
+
+// SetStreamAsDisconnected sets the default channel's stream as disconnected.
+func SetStreamAsDisconnected() {
+	Default().SetStreamAsDisconnected()
 }

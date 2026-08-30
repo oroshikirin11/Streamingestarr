@@ -6,11 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"streamingestarr/config"
 )
 
-func localCleanup(maxNumber int) error {
-	baseDirectory := config.HLSStoragePath
+func localCleanup(baseDirectory string, maxNumber int) error {
 
 	files, err := getAllFilesRecursive(baseDirectory)
 	if err != nil {

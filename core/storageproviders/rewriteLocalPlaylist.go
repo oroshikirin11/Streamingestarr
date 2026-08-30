@@ -6,14 +6,13 @@ import (
 	"path/filepath"
 
 	"github.com/grafov/m3u8"
-	"streamingestarr/config"
 	"streamingestarr/core/playlist"
 
 	log "github.com/sirupsen/logrus"
 )
 
 // rewritePlaylistLocations will take a local playlist and rewrite it to have absolute URLs to a specified location.
-func rewritePlaylistLocations(localFilePath, remoteServingEndpoint, hlsPrefix string) error {
+func rewritePlaylistLocations(localFilePath, remoteServingEndpoint, hlsPrefix, baseDir string) error {
 	f, err := os.Open(localFilePath) // nolint
 	if err != nil {
 		log.Fatalln(err)
@@ -32,7 +31,7 @@ func rewritePlaylistLocations(localFilePath, remoteServingEndpoint, hlsPrefix st
 		item.URI = remoteServingEndpoint + "/" + hlsPrefix + "/" + item.URI
 	}
 
-	publicPath := filepath.Join(config.HLSStoragePath, filepath.Base(localFilePath))
+	publicPath := filepath.Join(baseDir, filepath.Base(localFilePath))
 
 	newPlaylist := p.String()
 

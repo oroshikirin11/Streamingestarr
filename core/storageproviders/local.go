@@ -12,11 +12,13 @@ import (
 // LocalStorage represents an instance of the local storage provider for HLS video.
 type LocalStorage struct {
 	host string
+	// baseDir is the channel's HLS directory this provider manages.
+	baseDir string
 }
 
-// NewLocalStorage returns a new LocalStorage instance.
-func NewLocalStorage() *LocalStorage {
-	return &LocalStorage{}
+// NewLocalStorage returns a new LocalStorage instance rooted at baseDir.
+func NewLocalStorage(baseDir string) *LocalStorage {
+	return &LocalStorage{baseDir: baseDir}
 }
 
 // Setup configures this storage provider.
@@ -45,7 +47,7 @@ func (s *LocalStorage) VariantPlaylistWritten(localFilePath string) {
 func (s *LocalStorage) MasterPlaylistWritten(localFilePath string) {
 	// If we're using a remote serving endpoint, we need to rewrite the master playlist
 	if s.host != "" {
-		if err := rewritePlaylistLocations(localFilePath, s.host, ""); err != nil {
+		if err := rewritePlaylistLocations(localFilePath, s.host, "", s.baseDir); err != nil {
 			log.Warnln(err)
 		}
 	} else {
@@ -66,7 +68,7 @@ func (s *LocalStorage) Cleanup() error {
 	configRepository := configrepository.Get()
 	maxNumber := configRepository.GetStreamLatencyLevel().SegmentCount
 	buffer := 10
-	return localCleanup(maxNumber + buffer)
+	return localCleanup(s.baseDir, maxNumber+buffer)
 }
 
 func getAllFilesRecursive(baseDirectory string) (map[string][]os.FileInfo, error) {

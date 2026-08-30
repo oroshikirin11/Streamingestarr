@@ -54,6 +54,7 @@ func TestSendChatEvent(t *testing.T) {
 		"rawBody": "raw body",
 		"serverURL": "http://localhost:8080",
 		"status": {
+			"channelId": "",
 			"lastConnectTime": null,
 			"lastDisconnectTime": null,
 			"online": true,
@@ -112,6 +113,7 @@ func TestSendChatEventUsernameChanged(t *testing.T) {
 		"newName": "new name",
 		"serverURL": "http://localhost:8080",
 		"status": {
+			"channelId": "",
 			"lastConnectTime": null,
 			"lastDisconnectTime": null,
 			"online": true,
@@ -167,6 +169,7 @@ func TestSendChatEventUserJoined(t *testing.T) {
 		"id": "id",
 		"serverURL": "http://localhost:8080",
 		"status": {
+			"channelId": "",
 			"lastConnectTime": null,
 			"lastDisconnectTime": null,
 			"online": true,
@@ -211,6 +214,7 @@ func TestSendChatEventSetMessageVisibility(t *testing.T) {
 		],
 		"serverURL": "http://localhost:8080",
 		"status": {
+			"channelId": "",
 			"lastConnectTime": null,
 			"lastDisconnectTime": null,
 			"online": true,

@@ -15,55 +15,43 @@ import (
 	"streamingestarr/core/transcoder"
 	"streamingestarr/core/webhooks"
 	"streamingestarr/models"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/persistence/tables"
 	"streamingestarr/utils"
 )
 
-var (
-	_stats       *models.Stats
-	_storage     models.StorageProvider
-	_transcoder  *transcoder.Transcoder
-	_broadcaster *models.Broadcaster
-	handler      transcoder.HLSHandler
-	fileWriter   = transcoder.FileWriterReceiverService{}
-)
-
 // Start starts up the core processing.
 func Start() error {
-	resetDirectories()
 	configRepository := configrepository.Get()
-	// configRepository.PopulateDefaults()
 
 	if err := configRepository.VerifySettings(); err != nil {
 		log.Error(err)
 		return err
 	}
 
-	if err := setupStats(); err != nil {
-		log.Error("failed to setup the stats")
-		return err
-	}
-
-	// The HLS handler takes the written HLS playlists and segments
-	// and makes storage decisions.  It's rather simple right now
-	// but will play more useful when recordings come into play.
-	handler = transcoder.HLSHandler{}
-
-	if err := setupStorage(); err != nil {
-		log.Errorln("storage error", err)
-	}
-
 	tables.SetupUsers(data.GetDatastore().DB)
 	auth.Setup(data.GetDatastore().DB)
+	channelrepository.Setup(data.GetDatastore().DB)
 
-	fileWriter.SetupFileWriterReceiverService(&handler)
+	// Wipe the HLS root once; each channel recreates its own directory.
+	utils.CleanupDirectory(config.HLSStoragePath)
 
-	if err := createInitialOfflineState(); err != nil {
-		log.Error("failed to create the initial offline state")
-		return err
+	// One runtime per channel. Exactly one exists today; this loop is the
+	// multi-channel seam.
+	for _, channel := range channelrepository.ListChannels() {
+		c := newChannelRuntime(channel.ID)
+		_channelsLock.Lock()
+		_channels[channel.ID] = c
+		_channelsLock.Unlock()
+
+		if err := c.start(); err != nil {
+			return err
+		}
 	}
 
+	// Chat is a single global room for now; it becomes per-channel when a
+	// second theater actually exists (docs/design.md §8).
 	if err := chat.Start(GetStatus); err != nil {
 		log.Errorln(err)
 	}
@@ -81,8 +69,36 @@ func Start() error {
 	return nil
 }
 
-func createInitialOfflineState() error {
-	transitionToOfflineVideoStreamContent()
+// start brings one channel's runtime up.
+func (c *ChannelRuntime) start() error {
+	c.resetDirectories()
+
+	if err := c.setupStats(); err != nil {
+		log.Error("failed to setup the stats")
+		return err
+	}
+
+	// The HLS handler takes the written HLS playlists and segments
+	// and makes storage decisions.  It's rather simple right now
+	// but will play more useful when recordings come into play.
+	c.handler = transcoder.HLSHandler{}
+
+	if err := c.setupStorage(); err != nil {
+		log.Errorln("storage error", err)
+	}
+
+	c.fileWriter.SetupFileWriterReceiverService(&c.handler, c.HLSOutputPath)
+
+	if err := c.createInitialOfflineState(); err != nil {
+		log.Error("failed to create the initial offline state")
+		return err
+	}
+
+	return nil
+}
+
+func (c *ChannelRuntime) createInitialOfflineState() error {
+	c.transitionToOfflineVideoStreamContent()
 
 	return nil
 }
@@ -90,13 +106,15 @@ func createInitialOfflineState() error {
 // transitionToOfflineVideoStreamContent will overwrite the current stream with the
 // offline video stream state only.  No live stream HLS segments will continue to be
 // referenced.
-func transitionToOfflineVideoStreamContent() {
+func (c *ChannelRuntime) transitionToOfflineVideoStreamContent() {
 	log.Traceln("Firing transcoder with offline stream state")
 
 	_transcoder := transcoder.NewTranscoder()
 	_transcoder.SetIdentifier("offline")
 	_transcoder.SetLatencyLevel(models.GetLatencyLevel(4))
 	_transcoder.SetIsEvent(true)
+	_transcoder.SetOutputPath(c.HLSOutputPath)
+	_transcoder.SetInternalHTTPPort(c.fileWriter.Port())
 
 	offlineFilePath, err := saveOfflineClipToDisk("offline-v2.ts")
 	if err != nil {
@@ -118,11 +136,11 @@ func transitionToOfflineVideoStreamContent() {
 	_ = os.Remove(path.Join(config.DataDirectory, "preview.gif"))
 }
 
-func resetDirectories() {
+func (c *ChannelRuntime) resetDirectories() {
 	log.Trace("Resetting file directories to a clean slate.")
 
-	// Wipe hls data directory
-	utils.CleanupDirectory(config.HLSStoragePath)
+	// Wipe this channel's hls data directory
+	utils.CleanupDirectory(c.HLSOutputPath)
 
 	// Remove the previous thumbnail
 	configRepository := configrepository.Get()
