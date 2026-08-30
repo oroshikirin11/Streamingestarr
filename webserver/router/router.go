@@ -44,6 +44,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/config/viewerlogin", middleware.RequireAdminAuth(handlers.SetViewerLogin))
 	r.Post("/api/admin/config/chat/namereservationdays", middleware.RequireAdminAuth(handlers.SetChatNameReservationDays))
 	r.Post("/api/admin/config/video/segmentformat", middleware.RequireAdminAuth(handlers.SetVideoSegmentFormat))
+	r.Post("/api/admin/config/srt/enabled", middleware.RequireAdminAuth(handlers.SetSRTEnabled))
+	r.Post("/api/admin/config/srt/port", middleware.RequireAdminAuth(handlers.SetSRTPort))
 
 	addStaticFileEndpoints(r)
 
@@ -62,8 +64,9 @@ func Start(enableVerboseLogging bool) error {
 	// and /t/<channel> is the scoped address the multi-channel future uses.
 	r.HandleFunc("/t/*", handlers.ViewerAppHandler)
 
-	// The admin web app.
-	r.HandleFunc("/admin/*", middleware.RequireAdminAuth(handlers.IndexHandler))
+	// The admin web app (Svelte, same bundle as the viewer).
+	r.HandleFunc("/admin", middleware.RequireAdminAuth(handlers.ViewerAppHandler))
+	r.HandleFunc("/admin/*", middleware.RequireAdminAuth(handlers.ViewerAppHandler))
 
 	// The primary web app — the Svelte viewer, with legacy-bundle fallback
 	// for the admin app's assets.

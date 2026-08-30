@@ -78,6 +78,8 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 		SupportedCodecs:    transcoder.GetCodecs(ffmpeg),
 		VideoCodec:         configRepository.GetVideoCodec(),
 		VideoSegmentFormat: configRepository.GetVideoSegmentFormat(),
+		SRTServerEnabled:   configRepository.GetSRTServerEnabled(),
+		SRTServerPort:      configRepository.GetSRTServerPort(),
 		ForbiddenUsernames: usernameBlocklist,
 		SuggestedUsernames: usernameSuggestions,
 
@@ -106,6 +108,8 @@ type serverConfigAdminResponse struct {
 	WebServerIP               string                  `json:"webServerIP"`
 	VideoCodec                string                  `json:"videoCodec"`
 	VideoSegmentFormat        string                  `json:"videoSegmentFormat"`
+	SRTServerEnabled          bool                    `json:"srtServerEnabled"`
+	SRTServerPort             int                     `json:"srtServerPort"`
 	YP                        legacyYPStub            `json:"yp"`
 	S3                        legacyS3Stub            `json:"s3"`
 	Federation                legacyFederationStub    `json:"federation"`

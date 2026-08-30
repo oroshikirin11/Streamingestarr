@@ -335,6 +335,38 @@ func SetVideoSegmentFormat(w http.ResponseWriter, r *http.Request) {
 	authJSON(w, http.StatusOK, true, "")
 }
 
+// SetSRTEnabled toggles the SRT ingest listener (takes effect on restart).
+func SetSRTEnabled(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Value *bool `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Value == nil {
+		authJSON(w, http.StatusBadRequest, false, "Send {\"value\": true|false}.")
+		return
+	}
+	if err := configrepository.Get().SetSRTServerEnabled(*req.Value); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	authJSON(w, http.StatusOK, true, "Takes effect after a restart.")
+}
+
+// SetSRTPort sets the SRT ingest UDP port (takes effect on restart).
+func SetSRTPort(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Value *int `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Value == nil || *req.Value < 1 || *req.Value > 65535 {
+		authJSON(w, http.StatusBadRequest, false, "Send {\"value\": port}.")
+		return
+	}
+	if err := configrepository.Get().SetSRTServerPort(*req.Value); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	authJSON(w, http.StatusOK, true, "Takes effect after a restart.")
+}
+
 // PostAuthLogout destroys the caller's session.
 func PostAuthLogout(w http.ResponseWriter, r *http.Request) {
 	if token := auth.TokenFromRequest(r); token != "" {

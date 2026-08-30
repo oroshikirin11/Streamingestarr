@@ -16,7 +16,8 @@ import (
 func ViewerAppHandler(w http.ResponseWriter, r *http.Request) {
 	middleware.EnableCors(w)
 
-	isViewerRoute := r.URL.Path == "/" || strings.HasPrefix(r.URL.Path, "/t/")
+	isViewerRoute := r.URL.Path == "/" || strings.HasPrefix(r.URL.Path, "/t/") ||
+		r.URL.Path == "/admin" || strings.HasPrefix(r.URL.Path, "/admin/")
 
 	// Media players pointed at the page get the stream directly.
 	if utils.IsUserAgentAPlayer(r.UserAgent()) && isViewerRoute {
