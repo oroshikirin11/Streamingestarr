@@ -69,8 +69,19 @@ export async function connectChat() {
 		if (Array.isArray(history)) {
 			messages.set(history.map(normalize));
 		}
-	} catch {
-		/* history is a nicety, not a requirement */
+	} catch (e) {
+		if (e?.status === 401) {
+			// Stale device token (e.g. from another instance): register
+			// fresh and start over.
+			localStorage.removeItem(TOKEN_KEY);
+			me.set(null);
+			try {
+				token = await ensureRegistered(true);
+			} catch {
+				return;
+			}
+		}
+		/* otherwise: history is a nicety, not a requirement */
 	}
 
 	const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';

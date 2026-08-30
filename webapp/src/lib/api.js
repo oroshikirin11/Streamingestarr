@@ -4,8 +4,16 @@
 async function request(path, options = {}) {
 	const res = await fetch(path, options);
 	if (res.status === 401) {
-		window.location.href = '/login';
-		throw new Error('not authenticated');
+		// Only the session gate's 401 means "log in again". Other 401s
+		// (e.g. a stale chat access token) are the caller's to handle —
+		// redirecting on those caused a reload loop.
+		const body = await res.text();
+		if (body.includes('not authenticated')) {
+			window.location.href = '/login';
+		}
+		const err = new Error('unauthorized');
+		err.status = 401;
+		throw err;
 	}
 	if (!res.ok) throw new Error(`${path}: ${res.status}`);
 	return res.json();
