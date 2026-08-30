@@ -5,15 +5,37 @@
 	import { dedupeSubtitle } from '../text.js';
 	let { status } = $props();
 
-	// The lobby's copy rotates per visit — the room should not greet a
-	// regular with the same sentence every day.
-	const MOODS = [
-		{ k: 'between showings', h: 'The screen is dark, the seats are warm', s: 'the moment something plays, this page comes alive on its own' },
-		{ k: 'the lights are low', h: 'Nothing playing — yet', s: 'no need to refresh — the room wakes you' },
-		{ k: 'intermission', h: 'The theater keeps your seat', s: 'popcorn optional, patience appreciated' },
-		{ k: 'the projector sleeps', h: 'See you at the next showing', s: 'the doors open when the projector spins up' }
+	// The lobby's copy shuffles per visit — every slot independently, so
+	// the room greets a regular differently almost every time.
+	const pick = (list) => list[Math.floor(Math.random() * list.length)];
+	const KICKERS = [
+		'between showings',
+		'the lights are low',
+		'nothing on the marquee right now',
+		'the projector sleeps',
+		'intermission',
+		'the room is resting'
 	];
-	const mood = MOODS[Math.floor(Math.random() * MOODS.length)];
+	const HEADLINES = [
+		'The screen is dark, the seats are warm',
+		'Nothing playing — yet',
+		'The theater keeps your seat',
+		'Come back when the marquee lights up',
+		'Every good cinema is quiet most of the day',
+		'See you at the next showing'
+	];
+	const SUBLINES = [
+		'the moment something plays, this page comes alive on its own',
+		'no need to refresh — the room wakes you',
+		'popcorn optional, patience appreciated',
+		'the projector warms up faster than you can find snacks',
+		'the doors open when the projector spins up'
+	];
+	const IMMINENT = ['dimming the lights…', 'the projector is spinning up', 'find your seat', 'curtain in moments'];
+	const FOOT_PREFIXES = ['last watched together', 'previously in this room', 'the last picture show', 'still echoing'];
+	const mood = { k: pick(KICKERS), h: pick(HEADLINES), s: pick(SUBLINES) };
+	const imminentLine = pick(IMMINENT);
+	const footPrefix = pick(FOOT_PREFIXES);
 
 	let now = $state(Date.now());
 	$effect(() => {
@@ -62,7 +84,7 @@
 		<div class="ember"></div>
 		<div class="ember"></div>
 		<div class="lobby-card">
-			<div class="z">{countdown?.imminent ? 'dimming the lights…' : mood.k}</div>
+			<div class="z">{countdown?.imminent ? imminentLine : mood.k}</div>
 			{#if nextShowing}
 				{#if nextShowing.artworkId}
 					<img class="poster" src={'/artwork/' + nextShowing.artworkId} alt="" />
@@ -84,11 +106,11 @@
 			{/if}
 			{#if status?.lastPlayed?.title}
 				<div class="foot">
-					last watched together — <b>{status.lastPlayed.title}{dedupeSubtitle(status.lastPlayed.title, status.lastPlayed.subtitle) ? ' · ' + dedupeSubtitle(status.lastPlayed.title, status.lastPlayed.subtitle) : ''}</b>
+					{footPrefix} — <b>{status.lastPlayed.title}{dedupeSubtitle(status.lastPlayed.title, status.lastPlayed.subtitle) ? ' · ' + dedupeSubtitle(status.lastPlayed.title, status.lastPlayed.subtitle) : ''}</b>
 					{#if lastWatched}<span class="dim"> · {lastWatched}</span>{/if}
 				</div>
 			{:else if lastWatched}
-				<div class="foot">last watched together — <b>{lastWatched}</b></div>
+				<div class="foot">{footPrefix} — <b>{lastWatched}</b></div>
 			{/if}
 		</div>
 	</div>
