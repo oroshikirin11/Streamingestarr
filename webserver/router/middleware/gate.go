@@ -22,6 +22,8 @@ var gateExemptPrefixes = []string{
 	"/api/moderation/",   // per-handler moderator-token auth
 	"/admin/",            // admin web app, RequireAdminAuth wrapped
 	"/robots.txt",
+	"/favicon.svg",
+	"/favicon.ico",
 }
 
 // SetupComplete reports whether first-run setup has stored credentials.
