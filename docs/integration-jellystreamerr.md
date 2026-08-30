@@ -58,11 +58,27 @@ there is no need to push progress on a timer.
 ```
 
 - All fields optional except `title`. `channel` defaults to `main`.
+- `paused: true` freezes viewers' extrapolated progress (send on pause,
+  clear on resume).
+- `artworkId` (also on `upNext` and schedule items) references an image
+  pushed via §3a; viewers fetch it at `/artwork/<id>` (session-gated,
+  cached immutable — version the id when art changes, e.g. a hash).
 - `announce: true` posts a system line in chat when title/subtitle changed:
   *Now playing — **Mr. Robot · S1E4***. Send it on clip starts, not seeks.
 - Metadata is cleared automatically when the stream ends.
 - The viewer page renders: title+subtitle in the Now Playing tray cell, a
   true progress ring from position/duration, and an Up Next cell.
+
+## 3a. Artwork — `POST /api/integrations/metadata/artwork`
+
+```json
+{ "id": "mrrobot-s1", "type": "image/jpeg", "data": "<base64>" }
+```
+
+Max 1 MiB decoded; jpeg/png/webp. The receiver keeps a bounded in-memory
+cache (24 entries) — push before referencing, re-push after receiver
+restarts (same trigger as the schedule re-push). Shown as the poster in
+the Now Playing / Up Next / Tonight tray cells and large in the lobby.
 
 ## 3. Schedule — `POST /api/integrations/metadata/schedule`
 
@@ -101,8 +117,6 @@ integration, one extra destination). On enable:
 
 ## Future phases (agreed direction, not yet built)
 
-- **Poster art**: `POST /api/integrations/metadata/nowplaying/poster`
-  (image upload, served to viewers for the tray + lobby). apiVersion bump.
 - **Subtitles as tracks**: sender uploads WebVTT per clip; receiver serves
   it as an HLS subtitle track. Kills the sender's burn-in cost — the
   single biggest win in the hybrid roadmap (design.md §3).

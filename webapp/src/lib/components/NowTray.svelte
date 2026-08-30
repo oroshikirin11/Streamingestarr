@@ -17,6 +17,7 @@
 	// True position: pushed position + time since the push.
 	const position = $derived.by(() => {
 		if (!np?.duration) return null;
+		if (np.paused) return Math.min(np.position, np.duration);
 		const drift = (now - new Date(np.receivedAt).getTime()) / 1000;
 		return Math.min(np.position + Math.max(drift, 0), np.duration);
 	});
@@ -46,7 +47,7 @@
 		const mins = ((now - new Date(status.lastConnectTime).getTime()) / 60000) % 60;
 		return CIRC - (mins / 60) * CIRC;
 	});
-	const ringText = $derived(position != null ? fmt(position) : (elapsedLive ?? ''));
+	const ringText = $derived(np?.paused ? '⏸' : position != null ? fmt(position) : (elapsedLive ?? ''));
 
 	const nextShowing = $derived.by(() => {
 		const item = status?.schedule?.[0];
@@ -63,7 +64,11 @@
 
 <div class="now-tray">
 	<div class="tray-cell now">
-		<div class="vinyl"></div>
+		{#if np?.artworkId}
+			<img class="mini-poster" src={'/artwork/' + np.artworkId} alt="" />
+		{:else}
+			<div class="vinyl"></div>
+		{/if}
 		<div class="txt">
 			<div class="cell-label hot">Now Playing</div>
 			<div class="t">{title}</div>
@@ -90,6 +95,7 @@
 	{#if np?.upNext}
 		<div class="tray-sep"></div>
 		<div class="tray-cell">
+			{#if np.upNext.artworkId}<img class="mini-poster" src={'/artwork/' + np.upNext.artworkId} alt="" />{/if}
 			<div class="txt">
 				<div class="cell-label">Up Next</div>
 				<div class="t">{np.upNext.title}</div>
@@ -100,6 +106,7 @@
 	{#if nextShowing}
 		<div class="tray-sep"></div>
 		<div class="tray-cell">
+			{#if nextShowing.artworkId}<img class="mini-poster" src={'/artwork/' + nextShowing.artworkId} alt="" />{/if}
 			<div class="txt">
 				<div class="cell-label">{nextShowing.label}</div>
 				<div class="t">{nextShowing.title}</div>
@@ -139,6 +146,14 @@
 	.txt {
 		min-width: 0;
 		flex: 1;
+	}
+	.mini-poster {
+		width: 34px;
+		height: 48px;
+		border-radius: 5px;
+		object-fit: cover;
+		flex: none;
+		border: 1px solid var(--border);
 	}
 	.vinyl {
 		width: 44px;

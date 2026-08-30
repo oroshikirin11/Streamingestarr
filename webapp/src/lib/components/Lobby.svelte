@@ -53,6 +53,9 @@
 		<div class="lobby-card">
 			<div class="z">{countdown?.imminent ? 'Starting any moment' : 'The room is resting'}</div>
 			{#if nextShowing}
+				{#if nextShowing.artworkId}
+					<img class="poster" src={'/artwork/' + nextShowing.artworkId} alt="" />
+				{/if}
 				<h2>{nextShowing.title}</h2>
 				<div class="when">{whenLabel}</div>
 				{#if countdown && !countdown.imminent}
@@ -126,6 +129,16 @@
 		letter-spacing: 0.3em;
 		text-transform: uppercase;
 		color: var(--muted);
+	}
+	.poster {
+		width: 108px;
+		height: 156px;
+		object-fit: cover;
+		border-radius: 8px;
+		border: 1px solid var(--border);
+		margin: 18px auto 0;
+		display: block;
+		box-shadow: 0 14px 40px -12px #000;
 	}
 	h2 {
 		font-size: 34px;

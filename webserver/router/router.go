@@ -48,6 +48,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/integrations/metadata/nowplaying", middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.SetNowPlayingMetadata))
 	r.Post("/api/integrations/metadata/schedule", middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.SetScheduleMetadata))
 	r.Get("/api/integrations/capabilities", middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.GetCapabilities))
+	r.Post("/api/integrations/metadata/artwork", middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.SetArtworkMetadata))
+	r.Get("/artwork/*", handlers.GetArtwork)
 	r.Post("/api/admin/config/srt/enabled", middleware.RequireAdminAuth(handlers.SetSRTEnabled))
 	r.Post("/api/admin/config/srt/port", middleware.RequireAdminAuth(handlers.SetSRTPort))
 

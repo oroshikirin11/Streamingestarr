@@ -10,6 +10,9 @@ type NowPlaying struct {
 	Title string `json:"title"`
 	// Subtitle is the specifics: "S1E4 — eps1.3_da3m0ns.mp4".
 	Subtitle string `json:"subtitle,omitempty"`
+	// ArtworkID references an image previously pushed to the artwork
+	// endpoint; viewers fetch it at /artwork/<id>.
+	ArtworkID string `json:"artworkId,omitempty"`
 	// UpNext is what follows, if the sender knows.
 	UpNext *UpNextItem `json:"upNext,omitempty"`
 	// Position/Duration in seconds let the viewer render true progress;
@@ -17,19 +20,23 @@ type NowPlaying struct {
 	Position   float64   `json:"position,omitempty"`
 	Duration   float64   `json:"duration,omitempty"`
 	ReceivedAt time.Time `json:"receivedAt"`
+	// Paused freezes client-side position extrapolation.
+	Paused bool `json:"paused,omitempty"`
 	// Announce asks the receiver to post a system chat line on change.
 	Announce bool `json:"announce,omitempty"`
 }
 
 // UpNextItem describes the next queued item.
 type UpNextItem struct {
-	Title    string `json:"title"`
-	Subtitle string `json:"subtitle,omitempty"`
+	Title     string `json:"title"`
+	Subtitle  string `json:"subtitle,omitempty"`
+	ArtworkID string `json:"artworkId,omitempty"`
 }
 
 // ScheduleItem is one upcoming showing, powering the lobby countdown.
 type ScheduleItem struct {
-	Title    string    `json:"title"`
-	Subtitle string    `json:"subtitle,omitempty"`
-	StartsAt time.Time `json:"startsAt"`
+	Title     string    `json:"title"`
+	Subtitle  string    `json:"subtitle,omitempty"`
+	ArtworkID string    `json:"artworkId,omitempty"`
+	StartsAt  time.Time `json:"startsAt"`
 }

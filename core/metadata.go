@@ -15,7 +15,44 @@ import (
 var (
 	_metadataLock sync.RWMutex
 	_schedule     []models.ScheduleItem
+
+	_artwork      = map[string]artworkEntry{}
+	_artworkOrder []string
 )
+
+type artworkEntry struct {
+	Data        []byte
+	ContentType string
+}
+
+// maxArtworkEntries bounds the in-memory poster cache; senders push a
+// handful of items (now, next, schedule) so two dozen is generous.
+const maxArtworkEntries = 24
+
+// SetArtwork stores an image under the sender-chosen id.
+func SetArtwork(id, contentType string, data []byte) {
+	_metadataLock.Lock()
+	defer _metadataLock.Unlock()
+	if _, exists := _artwork[id]; !exists {
+		_artworkOrder = append(_artworkOrder, id)
+		if len(_artworkOrder) > maxArtworkEntries {
+			delete(_artwork, _artworkOrder[0])
+			_artworkOrder = _artworkOrder[1:]
+		}
+	}
+	_artwork[id] = artworkEntry{Data: data, ContentType: contentType}
+}
+
+// GetArtwork returns a stored image, or nil.
+func GetArtwork(id string) ([]byte, string) {
+	_metadataLock.RLock()
+	defer _metadataLock.RUnlock()
+	entry, ok := _artwork[id]
+	if !ok {
+		return nil, ""
+	}
+	return entry.Data, entry.ContentType
+}
 
 // SetNowPlaying stores pushed metadata on the channel and optionally
 // announces the change in chat.
