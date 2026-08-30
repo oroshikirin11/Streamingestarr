@@ -30,6 +30,19 @@ func Start(enableVerboseLogging bool) error {
 	}
 	r.Use(chiMW.Recoverer)
 
+	// Everything behind the viewer gate — including HLS and the chat
+	// websocket. Must be registered before any routes.
+	r.Use(middleware.RequireViewerAccess)
+
+	// The gate's own surface: login, first-run setup, session management.
+	r.Get("/login", handlers.GetLoginPage)
+	r.Get("/setup", handlers.GetSetupPage)
+	r.Post("/api/auth/login", handlers.PostAuthLogin)
+	r.Post("/api/auth/setup", handlers.PostAuthSetup)
+	r.Post("/api/auth/logout", handlers.PostAuthLogout)
+	r.Get("/api/auth/status", handlers.GetAuthStatus)
+	r.Post("/api/admin/config/viewerlogin", middleware.RequireAdminAuth(handlers.SetViewerLogin))
+
 	addStaticFileEndpoints(r)
 
 	// websocket

@@ -7,6 +7,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	"streamingestarr/auth"
 	"streamingestarr/config"
 	"streamingestarr/core/chat"
 	"streamingestarr/core/data"
@@ -54,6 +55,7 @@ func Start() error {
 	}
 
 	tables.SetupUsers(data.GetDatastore().DB)
+	auth.Setup(data.GetDatastore().DB)
 
 	fileWriter.SetupFileWriterReceiverService(&handler)
 

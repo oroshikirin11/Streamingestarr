@@ -3,6 +3,8 @@ package configrepository
 const (
 	extraContentKey                 = "extra_page_content"
 	streamTitleKey                  = "stream_title"
+	viewerUsernameKey               = "viewer_username"
+	viewerPasswordHashKey           = "viewer_password_hash"
 	adminPasswordKey                = "admin_password_key"
 	logoPathKey                     = "logo_path"
 	logoUniquenessKey               = "logo_uniqueness"

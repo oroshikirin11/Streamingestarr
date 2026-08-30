@@ -99,6 +99,28 @@ func (r *SqlConfigRepository) SetAdminPassword(key string) error {
 	return r.datastore.SetString(adminPasswordKey, hashed_pass)
 }
 
+// GetViewerUsername returns the shared viewer login's username.
+func (r *SqlConfigRepository) GetViewerUsername() string {
+	v, _ := r.datastore.GetString(viewerUsernameKey)
+	return v
+}
+
+// SetViewerUsername sets the shared viewer login's username.
+func (r *SqlConfigRepository) SetViewerUsername(username string) error {
+	return r.datastore.SetString(viewerUsernameKey, username)
+}
+
+// GetViewerPasswordHash returns the stored hash of the shared viewer password.
+func (r *SqlConfigRepository) GetViewerPasswordHash() string {
+	v, _ := r.datastore.GetString(viewerPasswordHashKey)
+	return v
+}
+
+// SetViewerPasswordHash stores the (already hashed) shared viewer password.
+func (r *SqlConfigRepository) SetViewerPasswordHash(hash string) error {
+	return r.datastore.SetString(viewerPasswordHashKey, hash)
+}
+
 // GetLogoPath will return the path for the logo, relative to webroot.
 func (r *SqlConfigRepository) GetLogoPath() string {
 	logo, err := r.datastore.GetString(logoPathKey)

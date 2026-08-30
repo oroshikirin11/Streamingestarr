@@ -14,6 +14,10 @@ type ConfigRepository interface {
 	GetStreamTitle() string
 	SetStreamTitle(title string) error
 	GetAdminPassword() string
+	GetViewerUsername() string
+	SetViewerUsername(username string) error
+	GetViewerPasswordHash() string
+	SetViewerPasswordHash(hash string) error
 	SetAdminPassword(key string) error
 	GetLogoPath() string
 	SetLogoPath(logo string) error

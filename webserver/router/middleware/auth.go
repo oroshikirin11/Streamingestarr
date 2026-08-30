@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/auth"
 	"streamingestarr/models"
 	"streamingestarr/persistence/authrepository"
 	"streamingestarr/persistence/configrepository"
@@ -19,11 +20,17 @@ type ExternalAccessTokenHandlerFunc func(models.ExternalAPIUser, http.ResponseWr
 // UserAccessTokenHandlerFunc is a function that is called after validing user access.
 type UserAccessTokenHandlerFunc func(models.User, http.ResponseWriter, *http.Request)
 
-// RequireAdminAuth wraps a handler requiring HTTP basic auth for it using the given
-// the stream key as the password and and a hardcoded "admin" for username.
+// RequireAdminAuth wraps a handler requiring an admin session cookie, or
+// HTTP basic auth with the admin password and a hardcoded "admin" username
+// (the pre-Svelte admin web app authenticates this way).
 func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 	configRepository := configrepository.Get()
 	return func(w http.ResponseWriter, r *http.Request) {
+		if auth.RequestRole(r) == auth.RoleAdmin {
+			handler(w, r)
+			return
+		}
+
 		username := "admin"
 		password := configRepository.GetAdminPassword()
 		realm := "Streamingestarr Authenticated Request"
@@ -44,7 +51,7 @@ func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 		user, pass, ok := r.BasicAuth()
 
 		// Failed
-		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(username)) != 1 || utils.CompareHash(password, pass) != nil {
+		if !ok || subtle.ConstantTimeCompare([]byte(user), []byte(username)) != 1 || !auth.VerifyPassword(pass, password) {
 			w.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`"`)
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			log.Debugln("Failed admin authentication")

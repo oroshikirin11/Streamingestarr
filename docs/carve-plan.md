@@ -43,13 +43,36 @@ minimal README (with Owncast MIT attribution) and a one-command
 shows Owncast branding until the Svelte UI), owncast.online troubleshooting
 URLs in ffmpeg error hints (still accurate), sqlc-generated `db/` internals.
 
-## Step 3 — Auth gate (design.md §5)
+## Step 3 — Auth gate (design.md §5) — **DONE, 2026-08-30**
 
-New; nothing to carve. Shared viewer login + admin login, argon2id, session
-table in SQLite, per-IP throttle, setup gate. **The serving path changes:**
-HLS playlist/segment handlers and the chat websocket check the session.
-Owncast's admin already has basic auth — replace with the same session
-system, separate role.
+Shipped as the `auth/` package + a router-wide gate middleware:
+
+- **Everything requires a session** — pages, APIs, HLS playlists/segments,
+  the chat websocket. Exempt: the login/setup flow, `/api/admin/*` and
+  `/admin/*` (their own admin auth), `/api/integrations/*` (bearer tokens —
+  Jellystreamerr keeps working untouched), `/robots.txt`.
+- **First-run setup gate**: a fresh instance serves nothing but `/setup`
+  until the shared viewer login + admin password are set; setup then closes
+  permanently. No unconfigured-container exposure window.
+- **Two roles**: shared viewer login (watch + chat) and `admin` (implies
+  viewer). Admin authenticates by session or by the pre-existing basic
+  auth, so the React admin stopgap still works.
+- **argon2id** (OWASP floor, self-describing hash strings) for the viewer
+  password; the admin password stays on Owncast's bcrypt path and both
+  formats verify through one function.
+- **SQLite-backed sessions** (SHA-256 of the token stored, 30-day TTL,
+  hourly sweep) — verified to survive a restart.
+- **Per-IP login throttle** (8 attempts / 15 min, bounded memory).
+- `POST /api/admin/config/viewerlogin` changes the shared login and evicts
+  every session but the caller's — the "clear the room" lever.
+- Login/setup pages are served inline by the binary (dark base, Sunset
+  Coral) — functional until the Svelte UI replaces them.
+
+Verified live with curl: 24 checks across setup, login, roles, HLS/WS
+gating, throttle lockout, restart persistence, and room eviction.
+
+Known consequence: external players (VLC on the HLS URL) need the cookie —
+acceptable for a private cinema; tokenized playback URLs can come later.
 
 ## Step 4 — Channel entity (design.md §8)
 
