@@ -108,7 +108,7 @@ const setupFormHTML = `
   <p class="sub">First run — set the keys to the theater. The room password is shared by everyone who watches; the admin password is yours. At the door, everyone picks their own name.</p>
   <form action="/api/auth/setup" method="post">
     <label for="viewerPassword">Room password</label>
-    <input id="viewerPassword" name="viewerPassword" type="password" autocomplete="new-password" required minlength="8" autofocus>
+    <input id="viewerPassword" name="viewerPassword" type="password" autocomplete="new-password" required autofocus>
     <label for="adminPassword">Admin password</label>
     <input id="adminPassword" name="adminPassword" type="password" autocomplete="new-password" required minlength="8">
     <p class="error"></p>
@@ -234,7 +234,7 @@ func PostAuthSetup(w http.ResponseWriter, r *http.Request) {
 
 	viewerHash, err := auth.HashPassword(req.ViewerPassword)
 	if err != nil {
-		authJSON(w, http.StatusBadRequest, false, "Room password must be at least 8 characters.")
+		authJSON(w, http.StatusBadRequest, false, "Room password cannot be empty.")
 		return
 	}
 	if len(req.AdminPassword) < auth.MinPasswordLength {
@@ -276,7 +276,7 @@ func SetViewerLogin(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := auth.HashPassword(req.ViewerPassword)
 	if err != nil {
-		authJSON(w, http.StatusBadRequest, false, "Room password must be at least 8 characters.")
+		authJSON(w, http.StatusBadRequest, false, "Room password cannot be empty.")
 		return
 	}
 

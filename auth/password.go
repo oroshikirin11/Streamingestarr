@@ -36,10 +36,13 @@ var argonParamsPattern = regexp.MustCompile(`^m=(\d+),t=(\d+),p=(\d+)$`)
 
 // HashPassword hashes a password for storage. The stored string carries its
 // own parameters — "argon2id$m=19456,t=2,p=1$<salt>$<tag>" — so raising them
-// later does not invalidate existing passwords.
+// later does not invalidate existing passwords. Length policy is the
+// caller's: the room password is deliberately unconstrained (operator's
+// choice; the login throttle is the real guard), the admin password keeps
+// a minimum.
 func HashPassword(password string) (string, error) {
-	if len(password) < MinPasswordLength {
-		return "", fmt.Errorf("password must be at least %d characters", MinPasswordLength)
+	if password == "" {
+		return "", fmt.Errorf("password cannot be empty")
 	}
 	salt := make([]byte, argonSaltBytes)
 	if _, err := rand.Read(salt); err != nil {
