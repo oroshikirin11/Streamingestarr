@@ -13,7 +13,16 @@
 
 	const src = () => `/hls/${channelId}/stream.m3u8`;
 
-	onMount(() => {
+	// A fatal hls.js error (e.g. the server restarting under us — often
+	// too fast for the status poll to even flip the page to the lobby)
+	// leaves the instance wedged; the only reliable recovery is a full
+	// teardown and rebuild.
+	let dead = false;
+	let retryTimer;
+
+	function initPlayer() {
+		if (dead) return;
+		hls?.destroy();
 		if (Hls.isSupported()) {
 			hls = new Hls({
 				// The gate rides on the session cookie; same-origin fetches
@@ -28,18 +37,20 @@
 			hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => {}));
 			hls.on(Hls.Events.ERROR, (_e, data) => {
 				if (!data.fatal) return;
-				if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-					// Stream restarts/splices: retry from the top.
-					setTimeout(() => hls?.loadSource(src()), 3000);
-				} else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-					hls.recoverMediaError();
-				}
+				clearTimeout(retryTimer);
+				retryTimer = setTimeout(initPlayer, 3000);
 			});
 		} else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
 			videoEl.src = src();
 			videoEl.play().catch(() => {});
+			videoEl.onerror = () => {
+				clearTimeout(retryTimer);
+				retryTimer = setTimeout(initPlayer, 3000);
+			};
 		}
-	});
+	}
+
+	onMount(initPlayer);
 
 	// Ambilight: the video is drawn tiny (32×18) into a canvas that sits
 	// behind the frame, scaled up and heavily blurred by CSS. Drawing with
@@ -61,6 +72,8 @@
 	});
 
 	onDestroy(() => {
+		dead = true;
+		clearTimeout(retryTimer);
 		hls?.destroy();
 		hls = null;
 	});
