@@ -138,9 +138,19 @@ Keep Owncast's self-picked names, with three changes:
 
 Themed like Jellystreamerr — same design family, dark. Jellystreamerr's dark
 tokens as the starting point: `--bg #17171a`, `--surface #202024`,
-`--surface-2 #2a2a2f`, `--accent #6ba3f0`, soft borders, 8px radius.
-Option on the table: a warmer accent for the viewer side (cinema) vs. the
-panel blue (operations).
+`--surface-2 #2a2a2f`, soft borders, 8px radius.
+
+**Accent (decided 2026-08-30, from mockups): Sunset Coral `#e8846b`** for the
+viewer side — warm cinema tone against the panel's blue. It colours the LIVE
+badge, progress bar, video glow, chat names, and primary buttons.
+
+**Themes are user-selectable later.** The default theme is Sunset Coral on
+the dark base, but viewers should eventually pick their own. Consequence for
+day one: build the UI on **CSS custom properties only** — every colour goes
+through a token (`--accent`, `--bg`, `--surface`, …), no hardcoded hex in
+components — so a theme is just a token set and adding a theme picker later
+is UI work, not a restyle. Store the choice with the same device token that
+remembers the chat name.
 
 Brief: **clean, peak UX, cozy viewing experience.**
 
@@ -197,5 +207,6 @@ only the data shapes and routes are prepared now.
 
 ## 10. Open questions
 
-- Accent colour: shared blue or warmer viewer-side accent — settle in the
-  sample phase.
+- Which additional themes to offer when the theme picker lands (§7) — decide
+  in the design-sample phase; candidates from the accent mockups: Panel Blue
+  `#6ba3f0`, Marquee Amber `#e0a458`, Velvet Violet `#a78bda`.
