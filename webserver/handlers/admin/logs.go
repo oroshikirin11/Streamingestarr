@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/owncast/owncast/logging"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/logging"
 )
 
 // GetLogs will return all logs.

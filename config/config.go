@@ -8,7 +8,7 @@ import (
 // These are runtime-set values used for configuration.
 
 // DatabaseFilePath is the path to the file ot be used as the global database for this run of the application.
-var DatabaseFilePath = "data/owncast.db"
+var DatabaseFilePath = "data/streamingestarr.db"
 
 // LogDirectory is the path to various log files.
 var LogDirectory = "./data/logs"
@@ -22,7 +22,7 @@ var EnableDebugFeatures = false
 // VersionNumber is the current version string.
 var VersionNumber = StaticVersionNumber
 
-// WebServerPort is the port for Owncast's webserver that is used for this execution of the service.
+// WebServerPort is the port for Streamingestarr's webserver that is used for this execution of the service.
 var WebServerPort = 8080
 
 // WebServerIP is the IP address to bind the web server to. All interfaces by default.
@@ -58,7 +58,7 @@ func GetCommit() string {
 
 // DefaultForbiddenUsernames are a list of usernames forbidden from being used in chat.
 var DefaultForbiddenUsernames = []string{
-	"owncast", "operator", "admin", "system",
+	"streamingestarr", "owncast", "operator", "admin", "system",
 }
 
 // MaxSocketPayloadSize is the maximum payload we will allow to to be received via the chat socket.
@@ -70,5 +70,5 @@ func GetReleaseString() string {
 	buildPlatform := BuildPlatform
 	gitCommit := GetCommit()
 
-	return fmt.Sprintf("Owncast v%s-%s (%s)", versionNumber, buildPlatform, gitCommit)
+	return fmt.Sprintf("Streamingestarr v%s-%s (%s)", versionNumber, buildPlatform, gitCommit)
 }

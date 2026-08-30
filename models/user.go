@@ -3,7 +3,7 @@ package models
 import (
 	"time"
 
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/utils"
 )
 
 const (

@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/owncast/owncast/webserver/handlers/generated"
-	"github.com/owncast/owncast/webserver/handlers/moderation"
-	"github.com/owncast/owncast/webserver/router/middleware"
+	"streamingestarr/webserver/handlers/generated"
+	"streamingestarr/webserver/handlers/moderation"
+	"streamingestarr/webserver/router/middleware"
 )
 
 func (*ServerInterfaceImpl) GetUserDetails(w http.ResponseWriter, r *http.Request, userId string, params generated.GetUserDetailsParams) {

@@ -4,11 +4,11 @@ import (
 	"time"
 
 	"github.com/nakabonne/tstorage"
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/core/chat"
-	"github.com/owncast/owncast/persistence/chatmessagerepository"
-	"github.com/owncast/owncast/persistence/userrepository"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/core"
+	"streamingestarr/core/chat"
+	"streamingestarr/persistence/chatmessagerepository"
+	"streamingestarr/persistence/userrepository"
 )
 
 var storage tstorage.Storage

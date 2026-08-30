@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/owncast/owncast/core/data"
-	"github.com/owncast/owncast/models"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/core/data"
+	"streamingestarr/models"
 )
 
 type WebhookRepository interface {

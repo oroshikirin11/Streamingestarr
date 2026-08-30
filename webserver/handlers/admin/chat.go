@@ -8,18 +8,18 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/owncast/owncast/core/chat"
-	"github.com/owncast/owncast/core/chat/events"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/authrepository"
-	"github.com/owncast/owncast/persistence/chatmessagerepository"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/persistence/userrepository"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/handlers/generated"
-	webutils "github.com/owncast/owncast/webserver/utils"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/core/chat"
+	"streamingestarr/core/chat/events"
+	"streamingestarr/models"
+	"streamingestarr/persistence/authrepository"
+	"streamingestarr/persistence/chatmessagerepository"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/userrepository"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/handlers/generated"
+	webutils "streamingestarr/webserver/utils"
 )
 
 // ExternalUpdateMessageVisibility updates an array of message IDs to have the same visiblity.

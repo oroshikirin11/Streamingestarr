@@ -7,9 +7,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/services/geoip"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/services/geoip"
 )
 
 var (

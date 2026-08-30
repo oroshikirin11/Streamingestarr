@@ -386,24 +386,6 @@ type ServerInterface interface {
 
 	// (OPTIONS /admin/status)
 	StatusAdminOptions(w http.ResponseWriter, r *http.Request)
-	// Force quit the server and restart it
-	// (GET /admin/update/forcequit)
-	AutoUpdateForceQuit(w http.ResponseWriter, r *http.Request)
-
-	// (OPTIONS /admin/update/forcequit)
-	AutoUpdateForceQuitOptions(w http.ResponseWriter, r *http.Request)
-	// Return the auto-update features that are supported for this instance
-	// (GET /admin/update/options)
-	AutoUpdateOptions(w http.ResponseWriter, r *http.Request)
-
-	// (OPTIONS /admin/update/options)
-	AutoUpdateOptionsOptions(w http.ResponseWriter, r *http.Request)
-	// Begin the auto-update
-	// (GET /admin/update/start)
-	AutoUpdateStart(w http.ResponseWriter, r *http.Request)
-
-	// (OPTIONS /admin/update/start)
-	AutoUpdateStartOptions(w http.ResponseWriter, r *http.Request)
 	// Get active viewers
 	// (GET /admin/viewers)
 	GetActiveViewers(w http.ResponseWriter, r *http.Request)
@@ -1221,39 +1203,6 @@ func (_ Unimplemented) StatusAdmin(w http.ResponseWriter, r *http.Request) {
 
 // (OPTIONS /admin/status)
 func (_ Unimplemented) StatusAdminOptions(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Force quit the server and restart it
-// (GET /admin/update/forcequit)
-func (_ Unimplemented) AutoUpdateForceQuit(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (OPTIONS /admin/update/forcequit)
-func (_ Unimplemented) AutoUpdateForceQuitOptions(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Return the auto-update features that are supported for this instance
-// (GET /admin/update/options)
-func (_ Unimplemented) AutoUpdateOptions(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (OPTIONS /admin/update/options)
-func (_ Unimplemented) AutoUpdateOptionsOptions(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// Begin the auto-update
-// (GET /admin/update/start)
-func (_ Unimplemented) AutoUpdateStart(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (OPTIONS /admin/update/start)
-func (_ Unimplemented) AutoUpdateStartOptions(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3605,108 +3554,6 @@ func (siw *ServerInterfaceWrapper) StatusAdminOptions(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
-// AutoUpdateForceQuit operation middleware
-func (siw *ServerInterfaceWrapper) AutoUpdateForceQuit(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AutoUpdateForceQuit(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// AutoUpdateForceQuitOptions operation middleware
-func (siw *ServerInterfaceWrapper) AutoUpdateForceQuitOptions(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AutoUpdateForceQuitOptions(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// AutoUpdateOptions operation middleware
-func (siw *ServerInterfaceWrapper) AutoUpdateOptions(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AutoUpdateOptions(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// AutoUpdateOptionsOptions operation middleware
-func (siw *ServerInterfaceWrapper) AutoUpdateOptionsOptions(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AutoUpdateOptionsOptions(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// AutoUpdateStart operation middleware
-func (siw *ServerInterfaceWrapper) AutoUpdateStart(w http.ResponseWriter, r *http.Request) {
-
-	ctx := r.Context()
-
-	ctx = context.WithValue(ctx, BasicAuthScopes, []string{})
-
-	r = r.WithContext(ctx)
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AutoUpdateStart(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
-// AutoUpdateStartOptions operation middleware
-func (siw *ServerInterfaceWrapper) AutoUpdateStartOptions(w http.ResponseWriter, r *http.Request) {
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.AutoUpdateStartOptions(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r)
-}
-
 // GetActiveViewers operation middleware
 func (siw *ServerInterfaceWrapper) GetActiveViewers(w http.ResponseWriter, r *http.Request) {
 
@@ -5050,24 +4897,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Options(options.BaseURL+"/admin/status", wrapper.StatusAdminOptions)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/admin/update/forcequit", wrapper.AutoUpdateForceQuit)
-	})
-	r.Group(func(r chi.Router) {
-		r.Options(options.BaseURL+"/admin/update/forcequit", wrapper.AutoUpdateForceQuitOptions)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/admin/update/options", wrapper.AutoUpdateOptions)
-	})
-	r.Group(func(r chi.Router) {
-		r.Options(options.BaseURL+"/admin/update/options", wrapper.AutoUpdateOptionsOptions)
-	})
-	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/admin/update/start", wrapper.AutoUpdateStart)
-	})
-	r.Group(func(r chi.Router) {
-		r.Options(options.BaseURL+"/admin/update/start", wrapper.AutoUpdateStartOptions)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/admin/viewers", wrapper.GetActiveViewers)

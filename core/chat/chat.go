@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/chat/events"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/chatmessagerepository"
-	"github.com/owncast/owncast/persistence/configrepository"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/config"
+	"streamingestarr/core/chat/events"
+	"streamingestarr/models"
+	"streamingestarr/persistence/chatmessagerepository"
+	"streamingestarr/persistence/configrepository"
 )
 
 var (

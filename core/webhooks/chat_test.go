@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/owncast/owncast/core/chat/events"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/persistence/webhookrepository"
+	"streamingestarr/core/chat/events"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/webhookrepository"
 )
 
 func TestSendChatEvent(t *testing.T) {

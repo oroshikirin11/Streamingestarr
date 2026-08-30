@@ -3,9 +3,9 @@ package webhooks
 import (
 	"time"
 
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
 	"github.com/teris-io/shortid"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
 )
 
 // SendStreamStatusEvent will send all webhook destinations the current stream status.

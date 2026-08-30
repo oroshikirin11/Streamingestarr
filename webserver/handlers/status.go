@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/router/middleware"
-	webutils "github.com/owncast/owncast/webserver/utils"
+	"streamingestarr/core"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/router/middleware"
+	webutils "streamingestarr/webserver/utils"
 )
 
 // GetStatus gets the status of the server.

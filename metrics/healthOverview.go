@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/core"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/utils"
 )
 
 const (
@@ -116,7 +116,7 @@ func networkSpeedHealthOverviewMessage() string {
 }
 
 // wastefulBitrateOverviewMessage attempts to determine if a streamer is sending to
-// Owncast at a bitrate higher than they're streaming to their viewers leading
+// Streamingestarr at a bitrate higher than they're streaming to their viewers leading
 // to wasted CPU by having to compress it.
 func wastefulBitrateOverviewMessage() string {
 	if len(metrics.CPUUtilizations) < 2 {
@@ -186,7 +186,7 @@ func wastefulBitrateOverviewMessage() string {
 
 	maxBitrate := streamSortVariants[0].bitrate
 	if inboundBitrate > maxBitrate {
-		return fmt.Sprintf("You're streaming to Owncast at %dkbps but only broadcasting to your viewers at %dkbps, requiring unnecessary work to be performed and possible excessive CPU use. You may want to decrease what you're sending to Owncast or increase what you send to your viewers so the highest bitrate matches.", inboundBitrate, maxBitrate)
+		return fmt.Sprintf("You're streaming to Streamingestarr at %dkbps but only broadcasting to your viewers at %dkbps, requiring unnecessary work to be performed and possible excessive CPU use. You may want to decrease what you're sending to Streamingestarr or increase what you send to your viewers so the highest bitrate matches.", inboundBitrate, maxBitrate)
 	}
 
 	return ""

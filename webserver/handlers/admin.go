@@ -3,10 +3,10 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/owncast/owncast/core/rtmp"
-	"github.com/owncast/owncast/webserver/handlers/admin"
-	"github.com/owncast/owncast/webserver/handlers/generated"
-	"github.com/owncast/owncast/webserver/router/middleware"
+	"streamingestarr/core/rtmp"
+	"streamingestarr/webserver/handlers/admin"
+	"streamingestarr/webserver/handlers/generated"
+	"streamingestarr/webserver/router/middleware"
 )
 
 func (*ServerInterfaceImpl) StatusAdmin(w http.ResponseWriter, r *http.Request) {
@@ -215,30 +215,6 @@ func (*ServerInterfaceImpl) CreateExternalAPIUser(w http.ResponseWriter, r *http
 
 func (*ServerInterfaceImpl) CreateExternalAPIUserOptions(w http.ResponseWriter, r *http.Request) {
 	middleware.RequireAdminAuth(admin.CreateExternalAPIUser)(w, r)
-}
-
-func (*ServerInterfaceImpl) AutoUpdateOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.AutoUpdateOptions)(w, r)
-}
-
-func (*ServerInterfaceImpl) AutoUpdateOptionsOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.AutoUpdateOptions)(w, r)
-}
-
-func (*ServerInterfaceImpl) AutoUpdateStart(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.AutoUpdateStart)(w, r)
-}
-
-func (*ServerInterfaceImpl) AutoUpdateStartOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.AutoUpdateStart)(w, r)
-}
-
-func (*ServerInterfaceImpl) AutoUpdateForceQuit(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.AutoUpdateForceQuit)(w, r)
-}
-
-func (*ServerInterfaceImpl) AutoUpdateForceQuitOptions(w http.ResponseWriter, r *http.Request) {
-	middleware.RequireAdminAuth(admin.AutoUpdateForceQuit)(w, r)
 }
 
 func (*ServerInterfaceImpl) GetVideoPlaybackMetrics(w http.ResponseWriter, r *http.Request) {

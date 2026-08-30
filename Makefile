@@ -57,7 +57,7 @@ api-generate: $(OAPI_CODEGEN)
 
 ## Build the application
 build:
-	go build -o owncast .
+	go build -o streamingestarr .
 
 ## Run tests
 test:
@@ -66,7 +66,7 @@ test:
 ## Clean build artifacts
 clean:
 	rm -rf bin/
-	rm -f owncast
+	rm -f streamingestarr
 
 ## Show help
 help:

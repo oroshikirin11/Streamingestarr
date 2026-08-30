@@ -1,9 +1,9 @@
 package core
 
 import (
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
+	"streamingestarr/config"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
 )
 
 // GetStatus gets the status of the system.

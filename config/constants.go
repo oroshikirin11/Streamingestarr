@@ -3,8 +3,8 @@ package config
 import "path/filepath"
 
 const (
-	// StaticVersionNumber is the version of Owncast that is used when it's not overwritten via build-time settings.
-	StaticVersionNumber = "0.2.4" // Shown when you build from develop
+	// StaticVersionNumber is the version of Streamingestarr used when not overwritten via build-time settings.
+	StaticVersionNumber = "0.1.0" // Forked from Owncast v0.2.5
 	// FfmpegSuggestedVersion is the version of ffmpeg we suggest.
 	FfmpegSuggestedVersion = "v4.1.5" // Requires the v
 	// DataDirectory is the directory we save data to.

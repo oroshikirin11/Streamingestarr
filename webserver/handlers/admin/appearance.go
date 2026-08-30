@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/webserver/handlers/generated"
-	webutils "github.com/owncast/owncast/webserver/utils"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/webserver/handlers/generated"
+	webutils "streamingestarr/webserver/utils"
 )
 
 // SetCustomColorVariableValues sets the custom color variables.

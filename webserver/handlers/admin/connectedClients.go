@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/owncast/owncast/core/chat"
-	"github.com/owncast/owncast/models"
-	webutils "github.com/owncast/owncast/webserver/utils"
+	"streamingestarr/core/chat"
+	"streamingestarr/models"
+	webutils "streamingestarr/webserver/utils"
 )
 
 // GetConnectedChatClients returns currently connected clients.

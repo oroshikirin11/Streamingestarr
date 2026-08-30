@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/nareix/joy5/format/flv/flvio"
-	"github.com/owncast/owncast/models"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/models"
 )
 
 const unknownString = "Unknown"

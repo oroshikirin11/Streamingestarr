@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/data"
-	"github.com/owncast/owncast/db"
+	"streamingestarr/config"
+	"streamingestarr/core/data"
+	"streamingestarr/db"
 
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/utils"
 	"github.com/pkg/errors"
 	"github.com/teris-io/shortid"
+	"streamingestarr/models"
+	"streamingestarr/utils"
 
 	log "github.com/sirupsen/logrus"
 )

@@ -12,12 +12,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/owncast/owncast/core/chat/events"
-	"github.com/owncast/owncast/core/data"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/persistence/webhookrepository"
 	jsonpatch "gopkg.in/evanphx/json-patch.v5"
+	"streamingestarr/core/chat/events"
+	"streamingestarr/core/data"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/webhookrepository"
 )
 
 func fakeGetStatus() models.Status {
@@ -32,7 +32,7 @@ func fakeGetStatus() models.Status {
 }
 
 func TestMain(m *testing.M) {
-	dbFile, err := os.CreateTemp(os.TempDir(), "owncast-test-db.db")
+	dbFile, err := os.CreateTemp(os.TempDir(), "streamingestarr-test-db.db")
 	if err != nil {
 		panic(err)
 	}

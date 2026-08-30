@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/webserver/router/middleware"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/models"
+	"streamingestarr/webserver/router/middleware"
 )
 
 type J map[string]interface{}

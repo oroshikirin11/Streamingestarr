@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/router/middleware"
-	webutils "github.com/owncast/owncast/webserver/utils"
+	"streamingestarr/config"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/router/middleware"
+	webutils "streamingestarr/webserver/utils"
 )
 
 type webConfigResponse struct {

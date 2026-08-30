@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 
 	"github.com/grafov/m3u8"
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/playlist"
+	"streamingestarr/config"
+	"streamingestarr/core/playlist"
 
 	log "github.com/sirupsen/logrus"
 )

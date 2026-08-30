@@ -11,11 +11,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/owncast/owncast/persistence/tables"
+	"streamingestarr/persistence/tables"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/utils"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/config"
+	"streamingestarr/utils"
 )
 
 const (
@@ -103,7 +103,7 @@ func SetupPersistence(file string) error {
 		version = schemaVersion
 	}
 
-	// is database from a newer Owncast version?
+	// is database from a newer Streamingestarr version?
 	if version > schemaVersion {
 		return fmt.Errorf("incompatible database version %d (versions up to %d are supported)",
 			version, schemaVersion)
@@ -121,7 +121,7 @@ func SetupPersistence(file string) error {
 
 	dbBackupTicker := time.NewTicker(1 * time.Hour)
 	go func() {
-		backupFile := filepath.Join(config.BackupDirectory, "owncastdb.bak")
+		backupFile := filepath.Join(config.BackupDirectory, "streamingestarrdb.bak")
 		for range dbBackupTicker.C {
 			utils.Backup(_db, backupFile)
 		}

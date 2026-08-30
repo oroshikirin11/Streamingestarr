@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/router/middleware"
+	"streamingestarr/config"
+	"streamingestarr/core"
+	"streamingestarr/models"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/router/middleware"
 )
 
 // HandleHLSRequest will manage all requests to HLS content.

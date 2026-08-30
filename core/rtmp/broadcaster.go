@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/nareix/joy5/format/flv/flvio"
-	"github.com/owncast/owncast/models"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/models"
 )
 
 func setCurrentBroadcasterInfo(t flvio.Tag, remoteAddr string) {

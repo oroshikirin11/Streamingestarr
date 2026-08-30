@@ -3,10 +3,10 @@ package models
 import (
 	"time"
 
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/utils"
 )
 
-// Webhook is an event that is sent to 3rd party, external services with details about something that took place within an Owncast server.
+// Webhook is an event that is sent to 3rd party, external services with details about something that took place within an Streamingestarr server.
 type Webhook struct {
 	Timestamp time.Time   `json:"timestamp"`
 	LastUsed  *time.Time  `json:"lastUsed"`

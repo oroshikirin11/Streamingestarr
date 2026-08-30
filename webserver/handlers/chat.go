@@ -4,16 +4,16 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/chatmessagerepository"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/persistence/userrepository"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/handlers/generated"
-	"github.com/owncast/owncast/webserver/router/middleware"
-	webutils "github.com/owncast/owncast/webserver/utils"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/config"
+	"streamingestarr/models"
+	"streamingestarr/persistence/chatmessagerepository"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/userrepository"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/handlers/generated"
+	"streamingestarr/webserver/router/middleware"
+	webutils "streamingestarr/webserver/utils"
 )
 
 // ExternalGetChatMessages gets all of the chat messages.

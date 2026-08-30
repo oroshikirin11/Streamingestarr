@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/data"
-	"github.com/owncast/owncast/webserver/router/middleware"
-	webutils "github.com/owncast/owncast/webserver/utils"
+	"streamingestarr/config"
+	"streamingestarr/core/data"
+	"streamingestarr/webserver/router/middleware"
+	webutils "streamingestarr/webserver/utils"
 )
 
 // GetCustomEmojiList returns a list of emoji via the API.

@@ -19,9 +19,9 @@ import (
 	"github.com/yuin/goldmark/util"
 	"mvdan.cc/xurls/v2"
 
-	"github.com/owncast/owncast/core/data"
-	"github.com/owncast/owncast/models"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/core/data"
+	"streamingestarr/models"
 )
 
 // EventPayload is a generic key/value map for sending out to chat clients.

@@ -9,9 +9,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/config"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/utils"
 )
 
 var _timer *time.Ticker

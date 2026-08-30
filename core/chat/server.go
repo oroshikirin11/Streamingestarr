@@ -11,15 +11,15 @@ import (
 
 	"github.com/gorilla/websocket"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/chat/events"
-	"github.com/owncast/owncast/core/webhooks"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/authrepository"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/persistence/userrepository"
-	"github.com/owncast/owncast/services/geoip"
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/config"
+	"streamingestarr/core/chat/events"
+	"streamingestarr/core/webhooks"
+	"streamingestarr/models"
+	"streamingestarr/persistence/authrepository"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/userrepository"
+	"streamingestarr/services/geoip"
+	"streamingestarr/utils"
 )
 
 var _server *Server

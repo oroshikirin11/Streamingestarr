@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/utils"
 )
 
 // Stats holds the stats for the system.

@@ -3,8 +3,8 @@ package tables
 import (
 	"database/sql"
 
-	"github.com/owncast/owncast/utils"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/utils"
 )
 
 func CreateNotificationsTable(db *sql.DB) {

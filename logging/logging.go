@@ -11,14 +11,14 @@ import (
 	"time"
 
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
-	"github.com/owncast/owncast/utils"
 	"github.com/rifflock/lfshook"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/utils"
 )
 
 const maxLogEntries = 500
 
-// OCLogger represents the owncast internal logging.
+// OCLogger represents the streamingestarr internal logging.
 type OCLogger struct {
 	Entries  []log.Entry
 	Warnings []log.Entry

@@ -29,10 +29,19 @@ stopgap and a donor for reference.
 
 Also: admin UI sections and config APIs for all of the above.
 
-## Step 2 — Rebrand
+## Step 2 — Rebrand — **DONE (Go side), 2026-08-30**
 
-Module path `github.com/owncast/owncast` → ours, binary name, user agent,
-version string, `static/img`, web UI naming. Mechanical; one commit.
+Module path is now plain `streamingestarr` (local-only; becomes a hosted
+path in one sed sweep if the project ever needs `go get`). Binary, Docker
+image/user, Makefile, version string ("Streamingestarr v0.1.0, forked from
+Owncast v0.2.5"), DB filename (`data/streamingestarr.db`), Prometheus metric
+prefix, env vars, auth realm, and defaults all renamed. Upstream release
+infra deleted (Earthfile, crowdin, renovate, lefthook, community docs) along
+with the **auto-updater, which would have installed Owncast over us**. New
+minimal README (with Owncast MIT attribution) and a one-command
+`docker-compose.yml`. Not touched: `web/` + `static/` (React stopgap, still
+shows Owncast branding until the Svelte UI), owncast.online troubleshooting
+URLs in ffmpeg error hints (still accurate), sqlc-generated `db/` internals.
 
 ## Step 3 — Auth gate (design.md §5)
 

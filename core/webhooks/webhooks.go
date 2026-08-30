@@ -4,9 +4,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/persistence/webhookrepository"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/webhookrepository"
 )
 
 // BaseWebhookData contains common fields shared across all webhook event data.

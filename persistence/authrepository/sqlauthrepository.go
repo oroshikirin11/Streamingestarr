@@ -1,7 +1,7 @@
 package authrepository
 
 import (
-	"github.com/owncast/owncast/core/data"
+	"streamingestarr/core/data"
 )
 
 type SqlAuthRepository struct {

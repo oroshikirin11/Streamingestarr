@@ -3,9 +3,9 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/owncast/owncast/webserver/handlers/admin"
-	"github.com/owncast/owncast/webserver/handlers/generated"
-	"github.com/owncast/owncast/webserver/router/middleware"
+	"streamingestarr/webserver/handlers/admin"
+	"streamingestarr/webserver/handlers/generated"
+	"streamingestarr/webserver/router/middleware"
 )
 
 type ServerInterfaceImpl struct{}

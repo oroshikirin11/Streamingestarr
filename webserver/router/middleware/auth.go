@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/authrepository"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/persistence/userrepository"
-	"github.com/owncast/owncast/utils"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/models"
+	"streamingestarr/persistence/authrepository"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/userrepository"
+	"streamingestarr/utils"
 )
 
 // ExternalAccessTokenHandlerFunc is a function that is called after validing access.
@@ -26,9 +26,9 @@ func RequireAdminAuth(handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		username := "admin"
 		password := configRepository.GetAdminPassword()
-		realm := "Owncast Authenticated Request"
+		realm := "Streamingestarr Authenticated Request"
 
-		// Alow CORS only for localhost:3000 to support Owncast development.
+		// Alow CORS only for localhost:3000 to support Streamingestarr development.
 		validAdminHost := "http://localhost:3000"
 		w.Header().Set("Access-Control-Allow-Origin", validAdminHost)
 		w.Header().Set("Access-Control-Allow-Credentials", "true")

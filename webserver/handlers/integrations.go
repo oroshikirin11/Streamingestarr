@@ -3,11 +3,11 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/webserver/handlers/admin"
-	"github.com/owncast/owncast/webserver/handlers/moderation"
-	"github.com/owncast/owncast/webserver/router/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"streamingestarr/models"
+	"streamingestarr/webserver/handlers/admin"
+	"streamingestarr/webserver/handlers/moderation"
+	"streamingestarr/webserver/router/middleware"
 )
 
 func (*ServerInterfaceImpl) SendSystemMessage(w http.ResponseWriter, r *http.Request) {

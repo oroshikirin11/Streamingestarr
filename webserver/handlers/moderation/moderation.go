@@ -6,13 +6,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/owncast/owncast/core/chat"
-	"github.com/owncast/owncast/core/chat/events"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/chatmessagerepository"
-	"github.com/owncast/owncast/persistence/userrepository"
-	"github.com/owncast/owncast/webserver/utils"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/core/chat"
+	"streamingestarr/core/chat/events"
+	"streamingestarr/models"
+	"streamingestarr/persistence/chatmessagerepository"
+	"streamingestarr/persistence/userrepository"
+	"streamingestarr/webserver/utils"
 )
 
 // GetUserDetails returns the details of a chat user for moderators.

@@ -1,7 +1,7 @@
 package events
 
 import (
-	"github.com/owncast/owncast/persistence/configrepository"
+	"streamingestarr/persistence/configrepository"
 )
 
 // SystemMessageEvent is a message displayed in chat on behalf of the server.

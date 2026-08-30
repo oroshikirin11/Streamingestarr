@@ -6,14 +6,14 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/chat"
-	"github.com/owncast/owncast/core/rtmp"
-	"github.com/owncast/owncast/core/transcoder"
-	"github.com/owncast/owncast/core/webhooks"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/config"
+	"streamingestarr/core/chat"
+	"streamingestarr/core/rtmp"
+	"streamingestarr/core/transcoder"
+	"streamingestarr/core/webhooks"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/utils"
 )
 
 // After the stream goes offline this timer fires a full cleanup after N min.

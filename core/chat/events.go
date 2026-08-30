@@ -6,14 +6,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/chat/events"
-	"github.com/owncast/owncast/core/webhooks"
-	"github.com/owncast/owncast/persistence/chatmessagerepository"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/persistence/userrepository"
-	"github.com/owncast/owncast/utils"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/config"
+	"streamingestarr/core/chat/events"
+	"streamingestarr/core/webhooks"
+	"streamingestarr/persistence/chatmessagerepository"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/userrepository"
+	"streamingestarr/utils"
 )
 
 func (s *Server) userNameChanged(eventData chatClientEvent) {

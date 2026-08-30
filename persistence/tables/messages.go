@@ -3,7 +3,7 @@ package tables
 import (
 	"database/sql"
 
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/utils"
 )
 
 // CreateMessagesTable will create the chat messages table if needed.

@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/owncast/owncast/core/storageproviders"
+	"streamingestarr/core/storageproviders"
 )
 
 func setupStorage() error {

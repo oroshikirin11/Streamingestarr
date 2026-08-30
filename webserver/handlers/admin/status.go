@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/metrics"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/webserver/router/middleware"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/core"
+	"streamingestarr/metrics"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/webserver/router/middleware"
 )
 
 // Status gets the details of the inbound broadcaster.

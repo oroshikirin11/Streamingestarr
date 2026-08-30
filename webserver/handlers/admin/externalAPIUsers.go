@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/userrepository"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/handlers/generated"
-	webutils "github.com/owncast/owncast/webserver/utils"
+	"streamingestarr/config"
+	"streamingestarr/models"
+	"streamingestarr/persistence/userrepository"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/handlers/generated"
+	webutils "streamingestarr/webserver/utils"
 )
 
 // CreateExternalAPIUser will generate a 3rd party access token.

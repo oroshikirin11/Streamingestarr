@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/metrics"
-	"github.com/owncast/owncast/persistence/configrepository"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/core"
+	"streamingestarr/metrics"
+	"streamingestarr/persistence/configrepository"
 )
 
 // GetVideoPlaybackMetrics returns video playback metrics.

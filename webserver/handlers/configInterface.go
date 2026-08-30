@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/owncast/owncast/webserver/handlers/admin"
-	"github.com/owncast/owncast/webserver/router/middleware"
+	"streamingestarr/webserver/handlers/admin"
+	"streamingestarr/webserver/router/middleware"
 )
 
 func (*ServerInterfaceImpl) SetAdminPassword(w http.ResponseWriter, r *http.Request) {

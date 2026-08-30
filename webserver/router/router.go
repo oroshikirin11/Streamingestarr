@@ -13,10 +13,10 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/chat"
-	"github.com/owncast/owncast/webserver/handlers"
-	"github.com/owncast/owncast/webserver/router/middleware"
+	"streamingestarr/config"
+	"streamingestarr/core/chat"
+	"streamingestarr/webserver/handlers"
+	"streamingestarr/webserver/router/middleware"
 )
 
 // Start starts the router for the http, ws, and rtmp.

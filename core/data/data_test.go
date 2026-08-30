@@ -5,11 +5,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/owncast/owncast/models"
+	"streamingestarr/models"
 )
 
 func TestMain(m *testing.M) {
-	dbFile, err := os.CreateTemp(os.TempDir(), "owncast-test-db.db")
+	dbFile, err := os.CreateTemp(os.TempDir(), "streamingestarr-test-db.db")
 	if err != nil {
 		panic(err)
 	}

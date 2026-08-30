@@ -4,8 +4,8 @@ import (
 	"math"
 	"time"
 
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/core"
+	"streamingestarr/utils"
 )
 
 // Playback error counts reported since the last time we collected metrics.

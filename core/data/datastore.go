@@ -8,9 +8,9 @@ import (
 
 	// sqlite requires a blank import.
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/owncast/owncast/db"
-	"github.com/owncast/owncast/models"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/db"
+	"streamingestarr/models"
 )
 
 // Datastore is the global key/value store for configuration values.
@@ -129,7 +129,7 @@ func (ds *Datastore) Reset() {
 	}
 }
 
-// GetDatastore returns the shared instance of the owncast datastore.
+// GetDatastore returns the shared instance of the streamingestarr datastore.
 func GetDatastore() *Datastore {
 	return _datastore
 }

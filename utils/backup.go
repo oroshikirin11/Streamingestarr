@@ -106,5 +106,5 @@ func Backup(db *sql.DB, backupFile string) {
 }
 
 func handleError(err error) {
-	log.Errorln("unable to backup owncast database to file", err)
+	log.Errorln("unable to backup streamingestarr database to file", err)
 }

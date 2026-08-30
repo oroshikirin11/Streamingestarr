@@ -3,8 +3,8 @@ package config
 import (
 	"time"
 
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/webserver/handlers/generated"
+	"streamingestarr/models"
+	"streamingestarr/webserver/handlers/generated"
 )
 
 // Defaults will hold default configuration values.
@@ -44,8 +44,8 @@ func GetDefaults() Defaults {
 	defaultStreamKey := "abc123"
 	defaultStreamKeyComment := "Default stream key"
 	return Defaults{
-		Name:                 "New Owncast Server",
-		Summary:              "This is a new live video streaming server powered by Owncast.",
+		Name:                 "New Streamingestarr Theater",
+		Summary:              "A private cinema powered by Streamingestarr.",
 		ServerWelcomeMessage: "",
 		Logo:                 "logo.svg",
 		AdminPassword:        "abc123",
@@ -53,27 +53,17 @@ func GetDefaults() Defaults {
 			{Key: &defaultStreamKey, Comment: &defaultStreamKeyComment},
 		},
 		Tags: []string{
-			"owncast",
+			"streamingestarr",
 			"streaming",
 		},
 
 		PageBodyContent: `
-# Welcome to Owncast!
+# Welcome to Streamingestarr!
 
-- This is a live stream powered by [Owncast](https://owncast.online), a free and open source live streaming server.
-
-- To discover more examples of streams, visit [Owncast's directory](https://owncast.directory).
-
-- If you're the owner of this server you should visit the admin and customize the content on this page.
-
-<hr/>
-
-<video id="video" controls preload="metadata" style="width: 60vw; max-width: 600px; min-width: 200px;" poster="https://videos.owncast.online/t/xaJ3xNn9Y6pWTdB25m9ai3">
-  <source src="https://assets.owncast.tv/video/owncast-embed.mp4" type="video/mp4" />
-</video>
+If you're the owner of this server, visit the admin panel to customize this page.
 	`,
 
-		DatabaseFilePath: "data/owncast.db",
+		DatabaseFilePath: "data/streamingestarr.db",
 
 		YPEnabled: false,
 		YPServer:  "https://owncast.directory",

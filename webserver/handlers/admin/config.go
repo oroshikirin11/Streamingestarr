@@ -13,16 +13,16 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/core/chat"
-	"github.com/owncast/owncast/core/webhooks"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/handlers/generated"
-	webutils "github.com/owncast/owncast/webserver/utils"
 	log "github.com/sirupsen/logrus"
 	"github.com/teris-io/shortid"
+	"streamingestarr/core"
+	"streamingestarr/core/chat"
+	"streamingestarr/core/webhooks"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/handlers/generated"
+	webutils "streamingestarr/webserver/utils"
 )
 
 // ConfigValue is a container object that holds a value, is encoded, and saved to the database.

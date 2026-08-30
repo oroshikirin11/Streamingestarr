@@ -3,7 +3,7 @@ package logging
 import (
 	"path/filepath"
 
-	"github.com/owncast/owncast/config"
+	"streamingestarr/config"
 )
 
 // GetTranscoderLogFilePath returns the logging path for the transcoder log output.

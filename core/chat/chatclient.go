@@ -11,11 +11,11 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/gorilla/websocket"
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/chat/events"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/services/geoip"
+	"streamingestarr/config"
+	"streamingestarr/core/chat/events"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/services/geoip"
 )
 
 // Client represents a single chat client.

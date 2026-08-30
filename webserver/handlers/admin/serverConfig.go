@@ -4,14 +4,14 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/transcoder"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/handlers/generated"
-	"github.com/owncast/owncast/webserver/router/middleware"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/config"
+	"streamingestarr/core/transcoder"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/handlers/generated"
+	"streamingestarr/webserver/router/middleware"
 )
 
 // GetServerConfig gets the config details of the server.

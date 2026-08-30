@@ -4,9 +4,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
+	"streamingestarr/config"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
 )
 
 // How often we poll for updates.

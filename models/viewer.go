@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/owncast/owncast/services/geoip"
-	"github.com/owncast/owncast/utils"
+	"streamingestarr/services/geoip"
+	"streamingestarr/utils"
 )
 
 // Viewer represents a single video viewer.

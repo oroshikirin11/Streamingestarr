@@ -9,8 +9,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/webhookrepository"
+	"streamingestarr/models"
+	"streamingestarr/persistence/webhookrepository"
 )
 
 // webhookWorkerPoolSize defines the number of concurrent HTTP webhook requests.

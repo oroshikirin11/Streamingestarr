@@ -6,16 +6,16 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/owncast/owncast/logging"
-	"github.com/owncast/owncast/persistence/configrepository"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/logging"
+	"streamingestarr/persistence/configrepository"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/core/data"
-	"github.com/owncast/owncast/metrics"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/router"
+	"streamingestarr/config"
+	"streamingestarr/core"
+	"streamingestarr/core/data"
+	"streamingestarr/metrics"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/router"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 	backupDirectory                = flag.String("backupdir", "", "Directory where backups will be written to")
 	enableDebugOptions             = flag.Bool("enableDebugFeatures", false, "Enable additional debugging options.")
 	enableVerboseLogging           = flag.Bool("enableVerboseLogging", false, "Enable additional logging.")
-	restoreDatabaseFile            = flag.String("restoreDatabase", "", "Restore an Owncast database backup")
+	restoreDatabaseFile            = flag.String("restoreDatabase", "", "Restore a Streamingestarr database backup")
 	newAdminPassword               = flag.String("adminpassword", "", "Set your admin password")
 	newStreamKey                   = flag.String("streamkey", "", "Set a temporary stream key for this session")
 	webServerPortOverride          = flag.String("webserverport", "", "Force the web server to listen on a specific port")
@@ -85,7 +85,7 @@ func main() {
 			log.Fatalln(err)
 		}
 
-		log.Println("Database has been restored.  Restart Owncast.")
+		log.Println("Database has been restored.  Restart Streamingestarr.")
 		log.Exit(0)
 	}
 

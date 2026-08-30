@@ -3,9 +3,9 @@ package chat
 import (
 	"time"
 
-	"github.com/owncast/owncast/core/data"
-	"github.com/owncast/owncast/persistence/authrepository"
-	"github.com/owncast/owncast/persistence/tables"
+	"streamingestarr/core/data"
+	"streamingestarr/persistence/authrepository"
+	"streamingestarr/persistence/tables"
 )
 
 var _datastore *data.Datastore

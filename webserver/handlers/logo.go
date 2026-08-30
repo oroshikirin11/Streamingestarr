@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/static"
-	"github.com/owncast/owncast/utils"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/config"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/static"
+	"streamingestarr/utils"
 )
 
 var _hasWarnedSVGLogo = false

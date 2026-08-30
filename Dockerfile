@@ -19,19 +19,19 @@ ENV GIT_COMMIT=${GIT_COMMIT}
 ARG NAME=docker
 ENV NAME=${NAME}
 
-RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags "-extldflags \"-static\" -s -w -X github.com/owncast/owncast/config.GitCommit=$GIT_COMMIT -X github.com/owncast/owncast/config.VersionNumber=$VERSION -X github.com/owncast/owncast/config.BuildPlatform=$NAME" -o owncast .
+RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags "-extldflags \"-static\" -s -w -X streamingestarr/config.GitCommit=$GIT_COMMIT -X streamingestarr/config.VersionNumber=$VERSION -X streamingestarr/config.BuildPlatform=$NAME" -o streamingestarr .
 
 # Create the image by copying the result of the build into a new alpine image
 FROM alpine:3.23.3
 RUN apk update && apk add --no-cache ffmpeg ffmpeg-libs ca-certificates && update-ca-certificates
 
-RUN addgroup -g 101 -S owncast && adduser -u 101 -S owncast -G owncast
+RUN addgroup -g 101 -S streamingestarr && adduser -u 101 -S streamingestarr -G streamingestarr
 
-# Copy owncast assets
+# Copy app assets
 WORKDIR /app
-COPY --from=build /build/owncast /app/owncast
+COPY --from=build /build/streamingestarr /app/streamingestarr
 RUN mkdir /app/data
-RUN chown -R owncast:owncast /app
-USER owncast
-ENTRYPOINT ["/app/owncast"]
+RUN chown -R streamingestarr:streamingestarr /app
+USER streamingestarr
+ENTRYPOINT ["/app/streamingestarr"]
 EXPOSE 8080 1935

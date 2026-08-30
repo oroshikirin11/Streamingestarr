@@ -3,7 +3,7 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/owncast/owncast/persistence/configrepository"
+	"streamingestarr/persistence/configrepository"
 )
 
 // ServeCustomJavascript will serve optional custom Javascript.

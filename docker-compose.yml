@@ -1,0 +1,10 @@
+services:
+  streamingestarr:
+    build: .
+    container_name: streamingestarr
+    restart: unless-stopped
+    ports:
+      - "8080:8080"   # web + API
+      - "1935:1935"   # RTMP ingest
+    volumes:
+      - ./data:/app/data

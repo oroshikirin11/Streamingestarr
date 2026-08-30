@@ -7,14 +7,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core/data"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/static"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/handlers/generated"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/config"
+	"streamingestarr/core/data"
+	"streamingestarr/models"
+	"streamingestarr/static"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/handlers/generated"
 )
 
 type SqlConfigRepository struct {

@@ -1,16 +1,11 @@
-module github.com/owncast/owncast
+module streamingestarr
 
 go 1.25.0
 
 require (
 	github.com/CAFxX/httpcompression v0.0.9
-	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/TwiN/go-away v1.8.1
-	github.com/andybalholm/cascadia v1.3.3
-	github.com/aws/aws-sdk-go v1.55.8
 	github.com/go-chi/chi/v5 v5.2.3
-	github.com/go-fed/activity v1.0.1-0.20220119073622-b14b50eecad0
-	github.com/go-fed/httpsig v1.1.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafov/m3u8 v0.12.1
 	github.com/hashicorp/go-retryablehttp v0.7.8
@@ -50,11 +45,9 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/lestrrat-go/strftime v1.1.1 // indirect
@@ -76,5 +69,3 @@ require (
 	google.golang.org/protobuf v1.36.8 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/go-fed/activity => github.com/owncast/activity v1.0.1-0.20260122170223-675f6eb53e71

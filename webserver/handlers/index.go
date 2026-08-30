@@ -11,15 +11,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/owncast/owncast/config"
-	"github.com/owncast/owncast/core"
-	"github.com/owncast/owncast/core/cache"
-	"github.com/owncast/owncast/models"
-	"github.com/owncast/owncast/persistence/configrepository"
-	"github.com/owncast/owncast/static"
-	"github.com/owncast/owncast/utils"
-	"github.com/owncast/owncast/webserver/router/middleware"
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/config"
+	"streamingestarr/core"
+	"streamingestarr/core/cache"
+	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
+	"streamingestarr/static"
+	"streamingestarr/utils"
+	"streamingestarr/webserver/router/middleware"
 )
 
 var gc = cache.GetGlobalCache()

@@ -16,20 +16,20 @@ var (
 	insecureSkipVerifyOnce sync.Once
 )
 
-// IsInsecureSkipVerifyEnabled returns true if the OWNCAST_INSECURE_SKIP_VERIFY
+// IsInsecureSkipVerifyEnabled returns true if the STREAMINGESTARR_INSECURE_SKIP_VERIFY
 // environment variable is set to "true". This is intended for testing only.
 func IsInsecureSkipVerifyEnabled() bool {
 	insecureSkipVerifyOnce.Do(func() {
-		insecureSkipVerify = os.Getenv("OWNCAST_INSECURE_SKIP_VERIFY") == "true"
+		insecureSkipVerify = os.Getenv("STREAMINGESTARR_INSECURE_SKIP_VERIFY") == "true"
 		if insecureSkipVerify {
-			log.Warnln("OWNCAST_INSECURE_SKIP_VERIFY is enabled - TLS certificate verification disabled (testing only)")
+			log.Warnln("STREAMINGESTARR_INSECURE_SKIP_VERIFY is enabled - TLS certificate verification disabled (testing only)")
 		}
 	})
 	return insecureSkipVerify
 }
 
 // GetTLSConfig returns a TLS config that optionally skips certificate verification
-// based on the OWNCAST_INSECURE_SKIP_VERIFY environment variable.
+// based on the STREAMINGESTARR_INSECURE_SKIP_VERIFY environment variable.
 func GetTLSConfig() *tls.Config {
 	if IsInsecureSkipVerifyEnabled() {
 		return &tls.Config{
@@ -40,7 +40,7 @@ func GetTLSConfig() *tls.Config {
 }
 
 // GetHTTPTransportWithTLS returns an http.Transport configured with TLS settings.
-// If OWNCAST_INSECURE_SKIP_VERIFY is set, certificate verification is skipped.
+// If STREAMINGESTARR_INSECURE_SKIP_VERIFY is set, certificate verification is skipped.
 func GetHTTPTransportWithTLS(baseTransport *http.Transport) *http.Transport {
 	if baseTransport == nil {
 		baseTransport = &http.Transport{}
