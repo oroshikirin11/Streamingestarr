@@ -194,8 +194,9 @@ is unreachable.
 Still open for later sessions:
 - **Delete the React donor**: `web/` + `static/web` (~55 MB) and the
   legacy Index/bot-metadata machinery — nothing routes there anymore
-- Admin gaps vs. the old panel: custom-emoji management, log viewer,
-  viewer metrics graphs, IP-ban list UI
+- Admin gaps: log viewer DONE, IP-ban list DONE (2026-08-30);
+  custom-emoji management explicitly NOT wanted; viewer metrics graphs
+  remain optional
 - Tray schedule cells + lobby countdown light up when the structured
   metadata channel from Jellystreamerr exists (design.md §3)
 - Theme picker (tokens are ready), mobile layout pass

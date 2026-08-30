@@ -26,6 +26,10 @@
 	let newRoomPw = $state('');
 	let messages = $state([]);
 	let disabledUsers = $state([]);
+	let ipBans = $state([]);
+	let newBanIP = $state('');
+	let logs = $state([]);
+	let logFilter = $state('warnings');
 
 	function toast(text, ok = true) {
 		const id = crypto.randomUUID();
@@ -87,13 +91,30 @@
 		try {
 			messages = ((await api.getChatMessages()) ?? []).slice(-60).reverse();
 			disabledUsers = (await api.getDisabledUsers()) ?? [];
+			ipBans = (await api.getIPBans()) ?? [];
+		} catch {}
+	}
+
+	async function loadLogs() {
+		try {
+			const list = logFilter === 'all' ? await api.getLogs() : await api.getWarnings();
+			logs = (list ?? []).slice(0, 200);
 		} catch {}
 	}
 
 	function pick(s) {
 		section = s;
 		if (s === 'chat') loadModeration();
+		if (s === 'logs') loadLogs();
 	}
+
+	$effect(() => {
+		if (section !== 'logs') return;
+		logFilter;
+		loadLogs();
+		const t = setInterval(loadLogs, 10000);
+		return () => clearInterval(t);
+	});
 
 	const host = typeof location !== 'undefined' ? location.hostname : 'localhost';
 	const rtmpURL = $derived(`rtmp://${host}:${cfg?.rtmpServerPort ?? 1935}/live/${keys[0]?.key ?? ''}`);
@@ -111,6 +132,7 @@
 		['stream', 'Stream'],
 		['video', 'Video'],
 		['chat', 'Chat'],
+		['logs', 'Logs'],
 		['settings', 'Settings']
 	];
 </script>
@@ -305,6 +327,47 @@
 						</div>
 					{/each}
 				{/if}
+			</div>
+
+			<div class="card">
+				<header><h2>IP bans</h2><p>Blocked addresses cannot connect to chat at all.</p></header>
+				{#if ipBans.length === 0}<p class="empty">No addresses banned.</p>{/if}
+				{#each ipBans as b (b.ipAddress)}
+					<div class="msgrow">
+						<span class="who mono-text">{b.ipAddress}</span>
+						<span class="body dim">{b.createdAt ? new Date(b.createdAt).toLocaleDateString() : ''}</span>
+						<span class="actions"><button class="ghost tiny" onclick={() => run(async () => { const r = await api.unbanIP(b.ipAddress); ipBans = ipBans.filter((x) => x.ipAddress !== b.ipAddress); return r; }, 'Address unbanned')}>Unban</button></span>
+					</div>
+				{/each}
+				<div class="field-row">
+					<div class="field compact"><label for="banip">Address</label><input id="banip" bind:value={newBanIP} placeholder="203.0.113.7" /></div>
+				</div>
+				<footer>
+					<button disabled={!newBanIP.trim()} onclick={() => run(async () => { const r = await api.banIP(newBanIP.trim()); newBanIP = ''; loadModeration(); return r; }, 'Address banned')}>Ban address</button>
+				</footer>
+			</div>
+
+		{:else if section === 'logs'}
+			<hgroup><h1>Logs</h1><p>What the server has been saying. Refreshes while you watch.</p></hgroup>
+
+			<div class="card wide">
+				<header class="logbar">
+					<div class="seg">
+						<button class:on={logFilter === 'warnings'} onclick={() => (logFilter = 'warnings')}>Warnings</button>
+						<button class:on={logFilter === 'all'} onclick={() => (logFilter = 'all')}>Everything</button>
+					</div>
+					<button class="ghost tiny" onclick={loadLogs}>Refresh</button>
+				</header>
+				{#if logs.length === 0}<p class="empty">Nothing logged{logFilter === 'warnings' ? ' — no warnings is good news' : ''}.</p>{/if}
+				<div class="loglist">
+					{#each logs as l, i (i)}
+						<div class="logrow">
+							<span class="ltime">{new Date(l.time).toLocaleTimeString()}</span>
+							<span class="lvl {l.level}">{l.level}</span>
+							<span class="lmsg">{l.message}</span>
+						</div>
+					{/each}
+				</div>
 			</div>
 
 		{:else if section === 'settings'}
@@ -509,6 +572,33 @@
 	.msgrow:hover .actions { opacity: 1; }
 	.msgrow.hidden-msg .body { opacity: 0.35; text-decoration: line-through; }
 	.msgrow.hidden-msg .actions { opacity: 1; }
+
+	/* ---------- logs ---------- */
+	.card.wide { max-width: 980px; }
+	.logbar { display: flex; align-items: center; justify-content: space-between; }
+	.seg { display: flex; gap: 2px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+	.seg button {
+		background: transparent; color: var(--muted); font-weight: 500;
+		padding: 5px 14px; border-radius: 6px; font-size: 12.5px;
+	}
+	.seg button.on { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-weight: 600; }
+	.loglist { max-height: 64vh; overflow-y: auto; font-size: 12.5px; }
+	.logrow {
+		display: flex; gap: 12px; padding: 6px 2px; align-items: baseline;
+		border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent);
+	}
+	.logrow:last-child { border-bottom: 0; }
+	.ltime { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; width: 74px; }
+	.lvl {
+		flex: none; width: 62px; text-align: center; font-size: 10.5px; font-weight: 700;
+		text-transform: uppercase; letter-spacing: 0.06em; border-radius: 5px; padding: 2px 0;
+		background: var(--surface-2); color: var(--muted);
+	}
+	.lvl.warning { background: color-mix(in srgb, #d9b06a 18%, transparent); color: #d9b06a; }
+	.lvl.error, .lvl.fatal { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+	.lmsg { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+	.mono-text { font-family: ui-monospace, monospace; font-size: 12.5px; }
+	.dim { color: var(--muted); font-size: 12px; }
 
 	/* ---------- toasts ---------- */
 	.toasts {

@@ -42,3 +42,8 @@ export const setUserEnabled = (userId, enabled) =>
 	post('/api/admin/chat/users/setenabled', { userId, enabled });
 export const setSRTEnabled = (value) => post('/api/admin/config/srt/enabled', { value });
 export const setSRTPort = (value) => post('/api/admin/config/srt/port', { value });
+export const getLogs = () => req('/api/admin/logs');
+export const getWarnings = () => req('/api/admin/logs/warnings');
+export const getIPBans = () => req('/api/admin/chat/users/ipbans');
+export const banIP = (ip) => post('/api/admin/chat/users/ipbans/create', { value: ip });
+export const unbanIP = (ip) => post('/api/admin/chat/users/ipbans/remove', { value: ip });
