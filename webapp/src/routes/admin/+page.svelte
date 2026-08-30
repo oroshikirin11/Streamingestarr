@@ -30,6 +30,7 @@
 	let newBanIP = $state('');
 	let logs = $state([]);
 	let logFilter = $state('warnings');
+	let hw = $state(null);
 
 	function toast(text, ok = true) {
 		const id = crypto.randomUUID();
@@ -68,8 +69,15 @@
 	async function refreshStatus() {
 		try {
 			status = await api.getAdminStatus();
+			if (section === 'status') hw = await api.getHardwareStats();
 		} catch {}
 	}
+
+	const latest = (series) => {
+		const v = series?.[series.length - 1]?.value;
+		return typeof v === 'number' ? Math.round(v) : null;
+	};
+	const kbps = (n) => (n ? `${n} kbps` : null);
 
 	onMount(() => {
 		loadConfig().catch(() => {});
@@ -122,7 +130,7 @@
 
 	const uptime = $derived.by(() => {
 		const t = status?.broadcaster?.time;
-		if (!t || !status?.broadcastActive) return null;
+		if (!t) return null;
 		const mins = Math.floor((Date.now() - new Date(t).getTime()) / 60000);
 		return mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h ${mins % 60}m`;
 	});
@@ -169,17 +177,42 @@
 			</div>
 
 			{#if status?.broadcaster}
+				{@const d = status.broadcaster.streamDetails ?? {}}
 				<div class="card">
 					<header><h2>Broadcaster</h2></header>
 					<dl>
 						<div><dt>Source</dt><dd>{status.broadcaster.remoteAddr}</dd></div>
-						<div><dt>Encoder</dt><dd>{status.broadcaster.streamDetails?.encoder || '—'}</dd></div>
-						<div><dt>Video</dt><dd>{status.broadcaster.streamDetails?.videoCodec || '—'}{status.broadcaster.streamDetails?.width ? ` · ${status.broadcaster.streamDetails.width}×${status.broadcaster.streamDetails.height}` : ''}</dd></div>
-						<div><dt>Audio</dt><dd>{status.broadcaster.streamDetails?.audioCodec || '—'}</dd></div>
+						<div><dt>Connected</dt><dd>{uptime ?? '—'}{uptime ? ' ago' : ''}</dd></div>
+						<div><dt>Encoder</dt><dd>{d.encoder || '—'}</dd></div>
+						<div><dt>Video</dt><dd>{[d.videoCodec, d.width ? `${d.width}×${d.height}` : null, d.framerate ? `${d.framerate} fps` : null, kbps(d.videoBitrate)].filter(Boolean).join(' · ') || '—'}</dd></div>
+						<div><dt>Audio</dt><dd>{d.videoOnly ? 'none — video only' : [d.audioCodec, kbps(d.audioBitrate)].filter(Boolean).join(' · ') || '—'}</dd></div>
 					</dl>
 					<footer>
 						<button class="danger" onclick={() => run(api.disconnectStream, 'Stream disconnected')}>Disconnect the stream</button>
 					</footer>
+				</div>
+			{/if}
+
+			<div class="card">
+				<header><h2>Viewers</h2></header>
+				<div class="tiles">
+					<div class="tile"><span class="num">{status?.viewerCount ?? 0}</span><span class="lab">right now</span></div>
+					<div class="tile"><span class="num">{status?.sessionPeakViewerCount ?? 0}</span><span class="lab">session peak</span></div>
+					<div class="tile"><span class="num">{status?.overallPeakViewerCount ?? 0}</span><span class="lab">all-time peak</span></div>
+				</div>
+			</div>
+
+			{#if hw}
+				<div class="card">
+					<header><h2>Server health</h2></header>
+					<div class="tiles">
+						<div class="tile"><span class="num">{latest(hw.cpu) ?? '—'}<small>%</small></span><span class="lab">cpu</span></div>
+						<div class="tile"><span class="num">{latest(hw.memory) ?? '—'}<small>%</small></span><span class="lab">memory</span></div>
+						<div class="tile"><span class="num">{latest(hw.disk) ?? '—'}<small>%</small></span><span class="lab">disk</span></div>
+					</div>
+					{#if status?.health?.message}
+						<p class="hint">{status.health.message}</p>
+					{/if}
 				</div>
 			{/if}
 
@@ -572,6 +605,18 @@
 	.msgrow:hover .actions { opacity: 1; }
 	.msgrow.hidden-msg .body { opacity: 0.35; text-decoration: line-through; }
 	.msgrow.hidden-msg .actions { opacity: 1; }
+
+	/* ---------- stat tiles ---------- */
+	.tiles { display: flex; gap: 12px; }
+	.tile {
+		flex: 1; display: flex; flex-direction: column; gap: 3px;
+		background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+		border: 1px solid var(--border); border-radius: 10px;
+		padding: 12px 16px;
+	}
+	.tile .num { font-size: 22px; font-weight: 650; font-variant-numeric: tabular-nums; }
+	.tile .num small { font-size: 13px; color: var(--muted); font-weight: 400; }
+	.tile .lab { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
 
 	/* ---------- logs ---------- */
 	.card.wide { max-width: 980px; }

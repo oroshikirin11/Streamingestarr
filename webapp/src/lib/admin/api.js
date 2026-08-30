@@ -47,3 +47,4 @@ export const getWarnings = () => req('/api/admin/logs/warnings');
 export const getIPBans = () => req('/api/admin/chat/users/ipbans');
 export const banIP = (ip) => post('/api/admin/chat/users/ipbans/create', { value: ip });
 export const unbanIP = (ip) => post('/api/admin/chat/users/ipbans/remove', { value: ip });
+export const getHardwareStats = () => req('/api/admin/hardwarestats');
