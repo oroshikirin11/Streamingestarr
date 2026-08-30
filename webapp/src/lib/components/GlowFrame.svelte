@@ -20,6 +20,16 @@
 	let dead = false;
 	let retryTimer;
 
+	// Touch devices have no hover: a tap on the frame reveals the
+	// controls, which then fade after a few seconds of stillness.
+	let uiVisible = $state(false);
+	let uiTimer;
+	function pokeUI() {
+		uiVisible = true;
+		clearTimeout(uiTimer);
+		uiTimer = setTimeout(() => (uiVisible = false), 3000);
+	}
+
 	function initPlayer() {
 		if (dead) return;
 		hls?.destroy();
@@ -115,7 +125,7 @@
 
 <div class="frame-wrap">
 	<canvas class="ambilight" bind:this={ambiEl} width="32" height="18"></canvas>
-	<div class="glow-frame" bind:this={frameEl}>
+	<div class="glow-frame" class:show-ui={uiVisible} bind:this={frameEl} onpointerup={pokeUI}>
 		<!-- svelte-ignore a11y_media_has_caption -->
 		<video bind:this={videoEl} playsinline muted={muted}></video>
 	<div class="sound">
@@ -181,7 +191,12 @@
 		opacity: 0;
 		transition: 0.2s;
 	}
-	.glow-frame:hover .sound {
+	@media (hover: hover) {
+		.glow-frame:hover .sound {
+			opacity: 1;
+		}
+	}
+	.glow-frame.show-ui .sound {
 		opacity: 1;
 	}
 	.snd-btn {
@@ -244,7 +259,12 @@
 		cursor: pointer;
 		backdrop-filter: blur(6px);
 	}
-	.glow-frame:hover .frame-fs {
+	@media (hover: hover) {
+		.glow-frame:hover .frame-fs {
+			opacity: 1;
+		}
+	}
+	.glow-frame.show-ui .frame-fs {
 		opacity: 1;
 	}
 	.frame-fs:hover {
