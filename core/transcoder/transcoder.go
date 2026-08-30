@@ -294,6 +294,14 @@ func getVariantFromConfigQuality(quality models.StreamOutputVariant, index int) 
 	variant.isAudioPassthrough = quality.IsAudioPassthrough
 	variant.isVideoPassthrough = quality.IsVideoPassthrough
 
+	// Never transcode HDR. Every encoder here targets 8-bit yuv420p, which
+	// would clip PQ/HLG to washed-out SDR with no tone-mapping. Force
+	// passthrough so the HDR bitstream is copied through intact.
+	if !variant.isVideoPassthrough && config.GetInboundVideoRange() != config.VideoRangeSDR {
+		log.Warnf("inbound stream is HDR (%s); forcing video passthrough for variant %d to preserve it", config.GetInboundVideoRange(), index)
+		variant.isVideoPassthrough = true
+	}
+
 	// If no audio bitrate is specified then we pass through original audio
 	if quality.AudioBitrate == 0 {
 		variant.isAudioPassthrough = true

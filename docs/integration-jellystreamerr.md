@@ -27,7 +27,8 @@ configure itself instead of asking the operator:
   },
   "segmentFormat": "ts",
   "channels": ["main"],
-  "metadata": { "nowPlaying": true, "schedule": true }
+  "metadata": { "nowPlaying": true, "schedule": true, "artwork": true, "videoRange": true },
+  "videoRange": { "accepts": ["sdr", "pq", "hlg"] }
 }
 ```
 
@@ -53,11 +54,22 @@ there is no need to push progress on a timer.
   "duration": 3492.0,
   "upNext": { "title": "S1E5", "subtitle": "eps1.4_3xpl0its.wmv" },
   "announce": true,
+  "videoRange": "pq",
   "channel": "main"
 }
 ```
 
 - All fields optional except `title`. `channel` defaults to `main`.
+- `videoRange` declares the broadcast's colour range: `pq` (HDR10/PQ),
+  `hlg` (HLG), or `sdr`. Send it on broadcast start (with the first
+  nowplaying push), before or as the stream connects. The receiver adds
+  `VIDEO-RANGE=PQ|HLG` to the HLS master playlist — without it Safari/native
+  HLS renders HDR as washed-out SDR — and **forces passthrough** for HDR, so
+  push the original 10-bit HEVC/AV1 bitstream and disable any transcode
+  ladder (the receiver's encoders are 8-bit yuv420p and would clip HDR).
+  Omit or send `sdr` for standard content. Reset to SDR automatically when
+  the stream ends. Aliases accepted: `hdr10`/`smpte2084`→`pq`,
+  `arib-std-b67`→`hlg`.
 - `paused: true` freezes viewers' extrapolated progress (send on pause,
   clear on resume).
 - `artworkId` (also on `upNext` and schedule items) references an image
@@ -111,7 +123,9 @@ integration, one extra destination). On enable:
 1. `GET capabilities` — validate the token, pick ingest protocol/container
    per codec, warn on segment-format mismatch for AV1.
 2. Push `nowplaying` on clip start / seek / queue change (it already knows
-   all of this — it drives the Owncast title sync today).
+   all of this — it drives the Owncast title sync today). Include
+   `videoRange` on the broadcast's first push when the source is HDR, and
+   send passthrough (no transcode) for that broadcast.
 3. Push `schedule` from its scheduled starts.
 4. Optionally keep the plain title sync for non-Streamingestarr receivers.
 

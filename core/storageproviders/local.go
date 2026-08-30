@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+	"streamingestarr/config"
 	"streamingestarr/persistence/configrepository"
 )
 
@@ -61,15 +62,41 @@ func (s *LocalStorage) MasterPlaylistWritten(localFilePath string) {
 	}
 }
 
+// RepairMasterPlaylist re-applies the master-playlist fixes below to an
+// already-written master. core calls it when the inbound video range changes
+// mid-broadcast, after ffmpeg has already written the master once.
+func RepairMasterPlaylist(localFilePath string) {
+	fixDegenerateMasterPlaylist(localFilePath)
+}
+
 // fixDegenerateMasterPlaylist repairs a master playlist that carries no
-// variant entries. ffmpeg 9's hls muxer writes the master before the codec
+// variant entries and, for HDR broadcasts, ensures every variant advertises
+// VIDEO-RANGE. ffmpeg 9's hls muxer writes the master before the codec
 // parameters of copied streams are known (observed with AV1) and only
 // rewrites it when the stream ends — useless for live viewers. The CODECS
 // attribute is optional in HLS (players derive codecs from the fMP4 init
 // segment), so entries with just a bandwidth are valid and sufficient.
 func fixDegenerateMasterPlaylist(localFilePath string) {
 	contents, err := os.ReadFile(localFilePath) // nolint: gosec
-	if err != nil || strings.Contains(string(contents), "#EXT-X-STREAM-INF") {
+	if err != nil {
+		return
+	}
+	text := string(contents)
+	videoRange := config.HLSVideoRangeToken()
+
+	// ffmpeg wrote a real master. Nothing to synthesize, but an HDR broadcast
+	// still needs VIDEO-RANGE on each variant or HDR-capable players treat it
+	// as SDR. Inject it if missing.
+	if strings.Contains(text, "#EXT-X-STREAM-INF") {
+		if videoRange == "" || strings.Contains(text, "VIDEO-RANGE=") {
+			return
+		}
+		patched := injectVideoRange(text, videoRange)
+		if patched != text {
+			if err := os.WriteFile(localFilePath, []byte(patched), 0o644); err != nil { // nolint: gosec
+				log.Warnln("unable to add VIDEO-RANGE to master playlist:", err)
+			}
+		}
 		return
 	}
 
@@ -77,7 +104,7 @@ func fixDegenerateMasterPlaylist(localFilePath string) {
 	variants := configRepository.GetStreamOutputVariants()
 
 	var b strings.Builder
-	b.Write(contents)
+	b.WriteString(text)
 	for index, variant := range variants {
 		bandwidth := (variant.VideoBitrate + variant.AudioBitrate) * 1000
 		if bandwidth == 0 {
@@ -85,7 +112,11 @@ func fixDegenerateMasterPlaylist(localFilePath string) {
 			// estimate keeps players from refusing the entry.
 			bandwidth = 6_000_000
 		}
-		fmt.Fprintf(&b, "#EXT-X-STREAM-INF:BANDWIDTH=%d\n%d/stream.m3u8\n", bandwidth, index)
+		attrs := fmt.Sprintf("BANDWIDTH=%d", bandwidth)
+		if videoRange != "" {
+			attrs += ",VIDEO-RANGE=" + videoRange
+		}
+		fmt.Fprintf(&b, "#EXT-X-STREAM-INF:%s\n%d/stream.m3u8\n", attrs, index)
 	}
 
 	if err := os.WriteFile(localFilePath, []byte(b.String()), 0o644); err != nil { // nolint: gosec
@@ -93,6 +124,18 @@ func fixDegenerateMasterPlaylist(localFilePath string) {
 		return
 	}
 	log.Traceln("repaired master playlist that was missing variant entries")
+}
+
+// injectVideoRange appends VIDEO-RANGE=<token> to every EXT-X-STREAM-INF line
+// that does not already carry it.
+func injectVideoRange(playlist, token string) string {
+	lines := strings.Split(playlist, "\n")
+	for i, line := range lines {
+		if strings.HasPrefix(line, "#EXT-X-STREAM-INF:") && !strings.Contains(line, "VIDEO-RANGE=") {
+			lines[i] = line + ",VIDEO-RANGE=" + token
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // Save will save a local filepath using the storage provider.

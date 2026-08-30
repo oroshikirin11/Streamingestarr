@@ -23,6 +23,10 @@ func SetNowPlayingMetadata(integration models.ExternalAPIUser, w http.ResponseWr
 	var payload struct {
 		models.NowPlaying
 		Channel string `json:"channel,omitempty"`
+		// VideoRange declares the broadcast's colour range (sdr|pq|hlg) so the
+		// receiver can signal HDR in the HLS master playlist and never
+		// transcode it to 8-bit. Optional; absent means unchanged.
+		VideoRange string `json:"videoRange,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		webutils.BadRequestHandler(w, err)
@@ -36,6 +40,9 @@ func SetNowPlayingMetadata(integration models.ExternalAPIUser, w http.ResponseWr
 	if channel == nil {
 		webutils.WriteSimpleResponse(w, false, "unknown channel")
 		return
+	}
+	if payload.VideoRange != "" {
+		channel.SetVideoRange(payload.VideoRange)
 	}
 	channel.SetNowPlaying(payload.NowPlaying)
 	webutils.WriteSimpleResponse(w, true, "now playing updated")
@@ -78,6 +85,14 @@ func GetCapabilities(integration models.ExternalAPIUser, w http.ResponseWriter, 
 			"nowPlaying": true,
 			"schedule":   true,
 			"artwork":    true,
+			"videoRange": true,
+		},
+		// HDR: declare "videoRange" on the nowPlaying push. pq = HDR10/PQ,
+		// hlg = HLG; anything else is treated as SDR. HDR forces passthrough,
+		// so send the original 10-bit HEVC/AV1 bitstream (over Matroska/fMP4
+		// for AV1 — mpegts can't carry it) and disable any transcode ladder.
+		"videoRange": map[string]interface{}{
+			"accepts": []string{"sdr", "pq", "hlg"},
 		},
 	}
 	w.Header().Set("Content-Type", "application/json")
