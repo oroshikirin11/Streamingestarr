@@ -1,0 +1,13 @@
+import { Meta, IconItem, IconGallery } from '@storybook/addon-docs/blocks';
+
+<Meta title="{{category}}" parameters=\{{previewTabs: { canvas: { hidden: true } }, chromatic: { disableSnapshot: true }}} />
+
+# {{capitalize title}}
+
+    	<IconGallery>
+    		{{#each images}}
+    			<IconItem name="{{this.name}}">
+    				<img src="{{this.src}}" />
+    			</IconItem>
+    		{{/each}}
+    	</IconGallery>
