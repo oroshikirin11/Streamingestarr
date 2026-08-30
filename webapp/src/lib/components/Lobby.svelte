@@ -4,6 +4,16 @@
 	// without, the room simply rests with the last-watched note.
 	let { status } = $props();
 
+	// The lobby's copy rotates per visit — the room should not greet a
+	// regular with the same sentence every day.
+	const MOODS = [
+		{ k: 'between showings', h: 'The screen is dark, the seats are warm', s: 'the moment something plays, this page comes alive on its own' },
+		{ k: 'the lights are low', h: 'Nothing playing — yet', s: 'no need to refresh — the room wakes you' },
+		{ k: 'intermission', h: 'The theater keeps your seat', s: 'popcorn optional, patience appreciated' },
+		{ k: 'the projector sleeps', h: 'See you at the next showing', s: 'the doors open when the projector spins up' }
+	];
+	const mood = MOODS[Math.floor(Math.random() * MOODS.length)];
+
 	let now = $state(Date.now());
 	$effect(() => {
 		const t = setInterval(() => (now = Date.now()), 1000);
@@ -51,7 +61,7 @@
 		<div class="ember"></div>
 		<div class="ember"></div>
 		<div class="lobby-card">
-			<div class="z">{countdown?.imminent ? 'Starting any moment' : 'The room is resting'}</div>
+			<div class="z">{countdown?.imminent ? 'dimming the lights…' : mood.k}</div>
 			{#if nextShowing}
 				{#if nextShowing.artworkId}
 					<img class="poster" src={'/artwork/' + nextShowing.artworkId} alt="" />
@@ -68,14 +78,16 @@
 					</div>
 				{/if}
 			{:else}
-				<h2>See you at the next showing</h2>
-				<div class="when">the doors open when the projector spins up</div>
+				<h2>{mood.h}</h2>
+				<div class="when">{mood.s}</div>
 			{/if}
-			{#if lastWatched}
+			{#if status?.lastPlayed?.title}
 				<div class="foot">
-					last watched together — <b>{status.streamTitle || lastWatched}</b>
-					{#if status.streamTitle}<span class="dim"> · {lastWatched}</span>{/if}
+					last watched together — <b>{status.lastPlayed.title}{status.lastPlayed.subtitle ? ' · ' + status.lastPlayed.subtitle : ''}</b>
+					{#if lastWatched}<span class="dim"> · {lastWatched}</span>{/if}
 				</div>
+			{:else if lastWatched}
+				<div class="foot">last watched together — <b>{lastWatched}</b></div>
 			{/if}
 		</div>
 	</div>

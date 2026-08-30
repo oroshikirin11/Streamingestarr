@@ -23,6 +23,7 @@ import (
 var (
 	_metadataLock sync.RWMutex
 	_schedule     []models.ScheduleItem
+	_lastPlayed   *models.LastPlayed
 
 	_artwork      = map[string]artworkEntry{}
 	_artworkOrder []string
@@ -99,12 +100,27 @@ func (c *ChannelRuntime) GetNowPlaying() *models.NowPlaying {
 	return c.nowPlaying
 }
 
-// clearNowPlaying drops metadata when the stream ends.
+// clearNowPlaying drops metadata when the stream ends, remembering the
+// title for the lobby's "last watched together" line.
 func (c *ChannelRuntime) clearNowPlaying() {
 	_metadataLock.Lock()
+	if c.nowPlaying != nil && c.nowPlaying.Title != "" {
+		_lastPlayed = &models.LastPlayed{
+			Title:    c.nowPlaying.Title,
+			Subtitle: c.nowPlaying.Subtitle,
+			EndedAt:  time.Now(),
+		}
+	}
 	c.nowPlaying = nil
 	_metadataLock.Unlock()
 	persistMetadata()
+}
+
+// GetLastPlayed returns what the room watched most recently, or nil.
+func GetLastPlayed() *models.LastPlayed {
+	_metadataLock.RLock()
+	defer _metadataLock.RUnlock()
+	return _lastPlayed
 }
 
 // SetSchedule replaces the upcoming-showings list.
@@ -131,6 +147,7 @@ func GetSchedule() []models.ScheduleItem {
 // ---------- persistence ----------
 
 type persistedMetadata struct {
+	LastPlayed *models.LastPlayed            `json:"lastPlayed,omitempty"`
 	Schedule   []models.ScheduleItem         `json:"schedule,omitempty"`
 	NowPlaying map[string]*models.NowPlaying `json:"nowPlaying,omitempty"`
 	Artwork    map[string]string             `json:"artwork,omitempty"` // id -> content type
@@ -149,6 +166,7 @@ func artworkFilePath(id string) string {
 func persistMetadata() {
 	_metadataLock.RLock()
 	state := persistedMetadata{
+		LastPlayed: _lastPlayed,
 		Schedule:   _schedule,
 		NowPlaying: map[string]*models.NowPlaying{},
 		Artwork:    map[string]string{},
@@ -190,6 +208,7 @@ func loadMetadata() {
 	}
 
 	_metadataLock.Lock()
+	_lastPlayed = state.LastPlayed
 	_schedule = state.Schedule
 	for id, contentType := range state.Artwork {
 		bytes, err := os.ReadFile(artworkFilePath(id))

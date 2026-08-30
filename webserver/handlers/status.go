@@ -29,6 +29,7 @@ func getStatusResponse() webStatusResponse {
 	status := core.GetStatus()
 	response := webStatusResponse{
 		NowPlaying:         core.Default().GetNowPlaying(),
+		LastPlayed:         core.GetLastPlayed(),
 		Schedule:           core.GetSchedule(),
 		ChannelID:          status.ChannelID,
 		Online:             status.Online,
@@ -51,6 +52,7 @@ type webStatusResponse struct {
 	LastDisconnectTime *utils.NullTime `json:"lastDisconnectTime"`
 
 	NowPlaying    *models.NowPlaying    `json:"nowPlaying,omitempty"`
+	LastPlayed    *models.LastPlayed    `json:"lastPlayed,omitempty"`
 	Schedule      []models.ScheduleItem `json:"schedule,omitempty"`
 	ChannelID     string                `json:"channelId"`
 	VersionNumber string                `json:"versionNumber"`

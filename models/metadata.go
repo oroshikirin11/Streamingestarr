@@ -26,6 +26,14 @@ type NowPlaying struct {
 	Announce bool `json:"announce,omitempty"`
 }
 
+// LastPlayed remembers what the room watched most recently — shown in
+// the lobby after the stream ends.
+type LastPlayed struct {
+	Title    string    `json:"title"`
+	Subtitle string    `json:"subtitle,omitempty"`
+	EndedAt  time.Time `json:"endedAt"`
+}
+
 // UpNextItem describes the next queued item.
 type UpNextItem struct {
 	Title     string `json:"title"`
