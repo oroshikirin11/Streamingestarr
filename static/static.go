@@ -2,29 +2,11 @@ package static
 
 import (
 	"embed"
-	"html/template"
 	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
-
-	"github.com/pkg/errors"
 )
-
-// The 'all:' prefix is used to include all files and subdirectories under 'web/'.
-// This avoids errors if optional subdirectories (e.g., 'web/_next') are missing.
-//
-//go:embed all:web/*
-var webFiles embed.FS
-
-// GetWeb will return an embedded filesystem reference to the admin web app.
-func GetWeb() fs.FS {
-	wf, err := fs.Sub(webFiles, "web")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return wf
-}
 
 //go:embed all:webapp/*
 var webAppFiles embed.FS
@@ -48,19 +30,6 @@ func GetEmoji() fs.FS {
 		log.Fatal(err)
 	}
 	return ef
-}
-
-// GetWebIndexTemplate will return the bot/scraper metadata template.
-func GetWebIndexTemplate() (*template.Template, error) {
-	webFiles := GetWeb()
-	name := "index.html"
-	t, err := template.ParseFS(webFiles, name)
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to open index.html template")
-	}
-
-	tmpl := template.Must(t, err)
-	return tmpl, err
 }
 
 //go:embed offline-v2.ts
@@ -95,15 +64,4 @@ func getFileSystemStaticFileOrDefault(path string, defaultData []byte) []byte {
 	}
 
 	return data
-}
-
-//go:embed metadata.html.tmpl
-var botMetadataTemplate embed.FS
-
-// GetBotMetadataTemplate will return the bot/scraper metadata template.
-func GetBotMetadataTemplate() (*template.Template, error) {
-	name := "metadata.html.tmpl"
-	t, err := template.ParseFS(botMetadataTemplate, name)
-	tmpl := template.Must(t, err)
-	return tmpl, err
 }
