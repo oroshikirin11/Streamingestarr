@@ -60,13 +60,14 @@ func Start(enableVerboseLogging bool) error {
 
 	// Channel-scoped viewer pages. One theater today: the root serves it,
 	// and /t/<channel> is the scoped address the multi-channel future uses.
-	r.HandleFunc("/t/*", handlers.IndexHandler)
+	r.HandleFunc("/t/*", handlers.ViewerAppHandler)
 
 	// The admin web app.
 	r.HandleFunc("/admin/*", middleware.RequireAdminAuth(handlers.IndexHandler))
 
-	// The primary web app.
-	r.HandleFunc("/*", handlers.IndexHandler)
+	// The primary web app — the Svelte viewer, with legacy-bundle fallback
+	// for the admin app's assets.
+	r.HandleFunc("/*", handlers.ViewerAppHandler)
 
 	// mount the api
 	r.Mount("/api/", handlers.New().Handler())

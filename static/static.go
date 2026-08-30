@@ -26,6 +26,18 @@ func GetWeb() fs.FS {
 	return wf
 }
 
+//go:embed all:webapp/*
+var webAppFiles embed.FS
+
+// GetWebApp returns the embedded Svelte viewer app.
+func GetWebApp() fs.FS {
+	wf, err := fs.Sub(webAppFiles, "webapp")
+	if err != nil {
+		log.Fatal(err)
+	}
+	return wf
+}
+
 //go:embed img/emoji/*
 var emojiFiles embed.FS
 
