@@ -3,6 +3,7 @@ package configrepository
 const (
 	extraContentKey                 = "extra_page_content"
 	streamTitleKey                  = "stream_title"
+	chatNameReservationDaysKey      = "chat_name_reservation_days"
 	viewerUsernameKey               = "viewer_username"
 	viewerPasswordHashKey           = "viewer_password_hash"
 	adminPasswordKey                = "admin_password_key"

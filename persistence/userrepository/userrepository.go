@@ -33,6 +33,8 @@ type UserRepository interface {
 	GetUserByToken(token string) *models.User
 	InsertExternalAPIUser(token string, name string, color int, scopes []string) error
 	IsDisplayNameAvailable(displayName string) (bool, error)
+	IsDisplayNameAvailableToUser(displayName, forUserID string, reservationDays int) (bool, error)
+	SetUserLastUsed(userID string) error
 	SetAccessTokenToOwner(token, userID string) error
 	SetEnabled(userID string, enabled bool) error
 	SetModerator(userID string, isModerator bool) error
@@ -117,6 +119,33 @@ func (r *SqlUserRepository) IsDisplayNameAvailable(displayName string) (bool, er
 	}
 
 	return true, nil
+}
+
+// IsDisplayNameAvailableToUser checks whether a chat name can be used by the
+// given user. A name is reserved while its current holder has been seen
+// within reservationDays (each visit refreshes the clock); API users' names
+// never expire. reservationDays <= 0 means reservations never expire.
+// Comparison is case-insensitive. An empty forUserID checks availability
+// for a brand-new user.
+func (r *SqlUserRepository) IsDisplayNameAvailableToUser(displayName, forUserID string, reservationDays int) (bool, error) {
+	query := `SELECT count(*) FROM users
+		WHERE LOWER(display_name) = LOWER(?)
+		AND id != ?
+		AND disabled_at IS NULL
+		AND (type = 'API' OR ? <= 0 OR last_used > datetime('now', '-' || ? || ' days'))`
+	var count int
+	row := r.datastore.DB.QueryRow(query, displayName, forUserID, reservationDays, reservationDays)
+	if err := row.Scan(&count); err != nil {
+		return false, errors.Wrap(err, "unable to check if display name is available")
+	}
+	return count == 0, nil
+}
+
+// SetUserLastUsed marks a user as seen now, refreshing their chat-name
+// reservation.
+func (r *SqlUserRepository) SetUserLastUsed(userID string) error {
+	_, err := r.datastore.DB.Exec("UPDATE users SET last_used = CURRENT_TIMESTAMP WHERE id = ?", userID)
+	return err
 }
 
 // ChangeUsername will change the user associated to userID from one display name to another.

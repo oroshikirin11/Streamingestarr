@@ -42,6 +42,7 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/auth/logout", handlers.PostAuthLogout)
 	r.Get("/api/auth/status", handlers.GetAuthStatus)
 	r.Post("/api/admin/config/viewerlogin", middleware.RequireAdminAuth(handlers.SetViewerLogin))
+	r.Post("/api/admin/config/chat/namereservationdays", middleware.RequireAdminAuth(handlers.SetChatNameReservationDays))
 
 	addStaticFileEndpoints(r)
 

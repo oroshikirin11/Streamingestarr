@@ -63,12 +63,14 @@ func (s *Server) userNameChanged(eventData chatClientEvent) {
 
 	userRepository := userrepository.Get()
 
-	// Check if the name is not already assigned to a registered user.
-	if available, err := userRepository.IsDisplayNameAvailable(proposedUsername); err != nil {
+	// A name stays reserved for its holder while they keep visiting; the
+	// reservation window is admin-configurable (design.md §6).
+	reservationDays := configRepository.GetChatNameReservationDays()
+	if available, err := userRepository.IsDisplayNameAvailableToUser(proposedUsername, eventData.client.User.ID, reservationDays); err != nil {
 		log.Errorln("error checking if name is available", err)
 		return
 	} else if !available {
-		message := fmt.Sprintf("The name **%s** has already been registered. If this is your name, please authenticate.", proposedUsername)
+		message := fmt.Sprintf("The name **%s** is taken.", proposedUsername)
 		s.sendActionToClient(eventData.client, message)
 
 		// Resend the client's user so their username is in sync.

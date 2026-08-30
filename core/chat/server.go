@@ -262,6 +262,11 @@ func (s *Server) HandleClientConnection(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Seeing the user refreshes their chat-name reservation clock.
+	if err := userRepository.SetUserLastUsed(user.ID); err != nil {
+		log.Debugln("unable to update user last_used timestamp", err)
+	}
+
 	// User is disabled therefore we should disconnect.
 	if user.DisabledAt != nil {
 		log.Traceln("Disabled user", user.ID, user.DisplayName, "rejected")

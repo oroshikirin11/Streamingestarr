@@ -105,11 +105,28 @@ Verified live end to end: RTMP ingest → segments under `data/hls/main/` →
 playback on both scoped and legacy URLs → disconnect → offline playlist
 appended. Full test suite green.
 
-## Step 5 — Chat identity changes (design.md §6)
+## Step 5 — Chat identity changes (design.md §6) — **DONE, 2026-08-30**
 
-Owncast already has anonymous pick-a-name with device tokens
-(`persistence/userrepository/`). Add: uniqueness registry, 30-day
-last-seen expiry, rename-releases-name.
+Built on Owncast's existing device tokens and `last_used` column — no new
+table needed; a name is "reserved" exactly while its holder's `last_used`
+is inside the window:
+
+- **Names are unique, case-insensitively.** Enforced at registration
+  (409 "That name is taken.") and at rename over the websocket (same
+  repository check, action message to the client). Generated names retry
+  until free. Renaming releases the old name automatically.
+- **Reservations expire after N days unseen** — every chat connect
+  refreshes `last_used`, so regulars keep their names indefinitely.
+- **N is admin-adjustable**: `POST /api/admin/config/chat/namereservationdays`
+  `{"value": days}`, 0 = never expire, max 3650; default 30. Exposed as
+  `chatNameReservationDays` in the admin server-config response for the
+  future Svelte admin UI. (Stored as -1 for "never" since 0 means unset in
+  the datastore.)
+- API users' names never expire regardless of the setting.
+
+Verified live: duplicate and case-variant registration rejected, 1-day
+window + backdated `last_used` frees a name, never-expire honors a 2-year
+absence, validation rejects bad values, config readback correct.
 
 ## Step 6 — SRT/mpegts ingest
 

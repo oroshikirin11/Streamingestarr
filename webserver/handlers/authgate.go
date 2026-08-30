@@ -302,6 +302,32 @@ func SetViewerLogin(w http.ResponseWriter, r *http.Request) {
 	authJSON(w, http.StatusOK, true, "")
 }
 
+// SetChatNameReservationDays lets the admin adjust how long an unseen chat
+// name stays reserved. Body: {"value": <days>}; 0 disables expiry.
+func SetChatNameReservationDays(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Value *int `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Value == nil {
+		authJSON(w, http.StatusBadRequest, false, "Invalid request; send {\"value\": days}.")
+		return
+	}
+	days := *req.Value
+	if days < 0 || days > 3650 {
+		authJSON(w, http.StatusBadRequest, false, "Days must be between 0 (never expire) and 3650.")
+		return
+	}
+	stored := days
+	if days == 0 {
+		stored = -1 // 0 in the datastore means "unset"; -1 encodes "never expire".
+	}
+	if err := configrepository.Get().SetChatNameReservationDays(stored); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	authJSON(w, http.StatusOK, true, "")
+}
+
 // PostAuthLogout destroys the caller's session.
 func PostAuthLogout(w http.ResponseWriter, r *http.Request) {
 	if token := auth.TokenFromRequest(r); token != "" {

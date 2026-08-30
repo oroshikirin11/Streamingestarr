@@ -78,15 +78,36 @@ func RegisterAnonymousChatUser(w http.ResponseWriter, r *http.Request) {
 		// this is fine. register a new user anyway.
 	}
 
+	configRepository := configrepository.Get()
+	reservationDays := configRepository.GetChatNameReservationDays()
+
 	proposedNewDisplayName := r.Header.Get("X-Forwarded-User")
 	if proposedNewDisplayName == "" && request.DisplayName != nil {
 		proposedNewDisplayName = *request.DisplayName
 	}
-	if proposedNewDisplayName == "" {
-		proposedNewDisplayName = generateDisplayName()
-	}
 
-	proposedNewDisplayName = utils.MakeSafeStringOfLength(proposedNewDisplayName, config.MaxChatDisplayNameLength)
+	if proposedNewDisplayName != "" {
+		// A requested name must not collide with a live reservation.
+		proposedNewDisplayName = utils.MakeSafeStringOfLength(proposedNewDisplayName, config.MaxChatDisplayNameLength)
+		if available, err := userRepository.IsDisplayNameAvailableToUser(proposedNewDisplayName, "", reservationDays); err != nil || !available {
+			w.WriteHeader(http.StatusConflict)
+			webutils.WriteSimpleResponse(w, false, "That name is taken.")
+			return
+		}
+	} else {
+		// Generated names can collide too; try a handful of times.
+		for i := 0; i < 10; i++ {
+			candidate := utils.MakeSafeStringOfLength(generateDisplayName(), config.MaxChatDisplayNameLength)
+			if available, _ := userRepository.IsDisplayNameAvailableToUser(candidate, "", reservationDays); available {
+				proposedNewDisplayName = candidate
+				break
+			}
+		}
+		if proposedNewDisplayName == "" {
+			webutils.WriteSimpleResponse(w, false, "unable to generate an available name, try again")
+			return
+		}
+	}
 	newUser, accessToken, err := userRepository.CreateAnonymousUser(proposedNewDisplayName)
 	if err != nil {
 		webutils.WriteSimpleResponse(w, false, err.Error())

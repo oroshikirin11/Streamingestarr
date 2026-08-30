@@ -68,6 +68,7 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 		ChatSlurFilterEnabled:     configRepository.GetChatSlurFilterEnabled(),
 		ChatRequireAuthentication: configRepository.GetChatRequireAuthentication(),
 		HideViewerCount:           configRepository.GetHideViewerCount(),
+		ChatNameReservationDays:   configRepository.GetChatNameReservationDays(),
 		DisableSearchIndexing:     configRepository.GetDisableSearchIndexing(),
 		VideoSettings: videoSettings{
 			VideoQualityVariants: videoQualityVariants,
@@ -104,6 +105,7 @@ type serverConfigAdminResponse struct {
 	VideoSettings             videoSettings           `json:"videoSettings"`
 	RTMPServerPort            int                     `json:"rtmpServerPort"`
 	WebServerPort             int                     `json:"webServerPort"`
+	ChatNameReservationDays   int                     `json:"chatNameReservationDays"`
 	ChatDisabled              bool                    `json:"chatDisabled"`
 	ChatJoinMessagesEnabled   bool                    `json:"chatJoinMessagesEnabled"`
 	ChatEstablishedUserMode   bool                    `json:"chatEstablishedUserMode"`

@@ -15,6 +15,8 @@ type ConfigRepository interface {
 	SetStreamTitle(title string) error
 	GetAdminPassword() string
 	GetViewerUsername() string
+	GetChatNameReservationDays() int
+	SetChatNameReservationDays(days int) error
 	SetViewerUsername(username string) error
 	GetViewerPasswordHash() string
 	SetViewerPasswordHash(hash string) error

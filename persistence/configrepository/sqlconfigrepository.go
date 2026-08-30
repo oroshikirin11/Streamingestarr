@@ -99,6 +99,26 @@ func (r *SqlConfigRepository) SetAdminPassword(key string) error {
 	return r.datastore.SetString(adminPasswordKey, hashed_pass)
 }
 
+// GetChatNameReservationDays returns how many days an unseen chat name
+// stays reserved before it can be claimed by someone else. 0 disables
+// expiry (names stay reserved forever). Every visit refreshes the clock.
+func (r *SqlConfigRepository) GetChatNameReservationDays() int {
+	days, err := r.datastore.GetNumber(chatNameReservationDaysKey)
+	if err != nil || days == 0 {
+		return 30
+	}
+	if days < 0 {
+		return 0
+	}
+	return int(days)
+}
+
+// SetChatNameReservationDays sets the chat-name reservation window in days.
+// Store -1 to disable expiry.
+func (r *SqlConfigRepository) SetChatNameReservationDays(days int) error {
+	return r.datastore.SetNumber(chatNameReservationDaysKey, float64(days))
+}
+
 // GetViewerUsername returns the shared viewer login's username.
 func (r *SqlConfigRepository) GetViewerUsername() string {
 	v, _ := r.datastore.GetString(viewerUsernameKey)
