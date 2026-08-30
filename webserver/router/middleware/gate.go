@@ -23,6 +23,7 @@ var gateExemptPrefixes = []string{
 	"/admin/",            // admin web app, RequireAdminAuth wrapped
 	"/robots.txt",
 	"/favicon.svg",
+	"/favicon-live.svg",
 	"/favicon.ico",
 }
 

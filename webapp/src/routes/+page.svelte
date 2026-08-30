@@ -13,10 +13,17 @@
 	const live = $derived($status?.online === true);
 	const viewers = $derived($status?.viewerCount ?? 0);
 	const theaterName = $derived($config?.name || 'Main Theater');
+
+	const tabTitle = $derived.by(() => {
+		const np = $status?.nowPlaying;
+		if (live && np?.title) return np.subtitle ? `${np.title} — ${np.subtitle}` : np.title;
+		return theaterName + (live ? ' · live' : '');
+	});
 </script>
 
 <svelte:head>
-	<title>{theaterName}{live ? ' · live' : ''}</title>
+	<title>{tabTitle}</title>
+	<link rel="icon" href={live ? '/favicon-live.svg' : '/favicon.svg'} type="image/svg+xml" />
 </svelte:head>
 
 <div class="room">
