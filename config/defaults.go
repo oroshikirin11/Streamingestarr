@@ -76,9 +76,12 @@ If you're the owner of this server, visit the admin panel to customize this page
 
 		StreamVariants: []models.StreamOutputVariant{
 			{
+				// Passthrough by default (design.md §2): our sender controls
+				// its own encode, and re-encoding is what the inherited
+				// 1.2 Mbps default did to an 11.7 Mbps stream — grain.
+				Name:               "passthrough",
+				IsVideoPassthrough: true,
 				IsAudioPassthrough: true,
-				VideoBitrate:       1200,
-				Framerate:          24,
 				CPUUsageLevel:      2,
 			},
 		},

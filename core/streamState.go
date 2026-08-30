@@ -75,6 +75,7 @@ func (c *ChannelRuntime) SetStreamAsDisconnected() {
 	c.stats.LastDisconnectTime = &now
 	c.stats.LastConnectTime = nil
 	c.broadcaster = nil
+	c.clearNowPlaying()
 
 	offlineFilename := "offline-v2.ts"
 

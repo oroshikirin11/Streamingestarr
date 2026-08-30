@@ -45,13 +45,6 @@
 		hls = null;
 	});
 
-	function unmute() {
-		muted = false;
-		videoEl.muted = false;
-		videoEl.volume = volume;
-		videoEl.play().catch(() => {});
-	}
-
 	function toggleMute() {
 		muted = !muted;
 		videoEl.muted = muted;
@@ -81,10 +74,6 @@
 	<div class="lamp"></div>
 	<!-- svelte-ignore a11y_media_has_caption -->
 	<video bind:this={videoEl} playsinline muted={muted}></video>
-	<div class="soft-badge"><span class="dot"></span> showing now</div>
-	{#if muted}
-		<button class="unmute" onclick={unmute}>tap for sound</button>
-	{/if}
 	<div class="sound">
 		<button class="snd-btn" title={muted ? 'Unmute' : 'Mute'} aria-label={muted ? 'Unmute' : 'Mute'} onclick={toggleMute}>
 			{#if muted || volume === 0}
@@ -129,52 +118,6 @@
 			color-mix(in srgb, var(--accent) 7%, transparent),
 			transparent 55%
 		);
-	}
-	.soft-badge {
-		position: absolute;
-		top: 18px;
-		left: 20px;
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		font-size: 11.5px;
-		color: #e9c9bf;
-		letter-spacing: 0.06em;
-		background: #00000070;
-		padding: 7px 14px;
-		border-radius: 99px;
-		backdrop-filter: blur(6px);
-	}
-	.soft-badge .dot {
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		background: var(--accent);
-		box-shadow: 0 0 10px var(--accent);
-		animation: breathe 2.4s infinite;
-	}
-	@keyframes breathe {
-		50% {
-			opacity: 0.4;
-		}
-	}
-	.unmute {
-		position: absolute;
-		bottom: 18px;
-		left: 50%;
-		transform: translateX(-50%);
-		background: #000000a0;
-		border: 1px solid #ffffff22;
-		color: #eee;
-		border-radius: 99px;
-		padding: 8px 18px;
-		font-size: 12.5px;
-		cursor: pointer;
-		backdrop-filter: blur(6px);
-	}
-	.unmute:hover {
-		border-color: var(--accent);
-		color: var(--accent);
 	}
 	.sound {
 		position: absolute;

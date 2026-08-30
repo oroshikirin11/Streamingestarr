@@ -1,8 +1,37 @@
 <script>
 	// The offline state — the reason to come back (docs/design.md §7).
-	// Schedule/countdown light up once the metadata channel provides them;
-	// until then the room rests with the last-watched note.
+	// With a pushed schedule the lobby shows the next showing + countdown;
+	// without, the room simply rests with the last-watched note.
 	let { status } = $props();
+
+	let now = $state(Date.now());
+	$effect(() => {
+		const t = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(t);
+	});
+
+	const nextShowing = $derived(status?.schedule?.[0] ?? null);
+
+	const countdown = $derived.by(() => {
+		if (!nextShowing) return null;
+		let s = Math.floor((new Date(nextShowing.startsAt).getTime() - now) / 1000);
+		if (s <= 0) return { h: '00', m: '00', s: '00', imminent: true };
+		return {
+			h: String(Math.floor(s / 3600)).padStart(2, '0'),
+			m: String(Math.floor((s % 3600) / 60)).padStart(2, '0'),
+			s: String(s % 60).padStart(2, '0'),
+			imminent: false
+		};
+	});
+
+	const whenLabel = $derived.by(() => {
+		if (!nextShowing) return '';
+		const d = new Date(nextShowing.startsAt);
+		const sameDay = d.toDateString() === new Date(now).toDateString();
+		const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+		return (sameDay ? 'Tonight at ' : d.toLocaleDateString(undefined, { weekday: 'long' }) + ' at ') + time +
+			(nextShowing.subtitle ? ' · ' + nextShowing.subtitle : '');
+	});
 
 	const lastWatched = $derived.by(() => {
 		const t = status?.lastDisconnectTime;
@@ -22,10 +51,19 @@
 		<div class="ember"></div>
 		<div class="ember"></div>
 		<div class="lobby-card">
-			<div class="z">The room is resting</div>
-			{#if status?.schedule}
-				<h2>{status.schedule.title}</h2>
-				<div class="when">{status.schedule.when}</div>
+			<div class="z">{countdown?.imminent ? 'Starting any moment' : 'The room is resting'}</div>
+			{#if nextShowing}
+				<h2>{nextShowing.title}</h2>
+				<div class="when">{whenLabel}</div>
+				{#if countdown && !countdown.imminent}
+					<div class="cd">
+						<div class="cell"><div class="num">{countdown.h}</div><div class="lab">hrs</div></div>
+						<div class="sep">:</div>
+						<div class="cell"><div class="num">{countdown.m}</div><div class="lab">min</div></div>
+						<div class="sep">:</div>
+						<div class="cell"><div class="num">{countdown.s}</div><div class="lab">sec</div></div>
+					</div>
+				{/if}
 			{:else}
 				<h2>See you at the next showing</h2>
 				<div class="when">the doors open when the projector spins up</div>
@@ -97,6 +135,35 @@
 	.when {
 		font-size: 13.5px;
 		color: var(--muted);
+	}
+	.cd {
+		display: inline-flex;
+		gap: 14px;
+		margin-top: 26px;
+		background: #00000055;
+		border: 1px solid var(--border);
+		border-radius: 16px;
+		padding: 16px 26px;
+	}
+	.cd .cell {
+		text-align: center;
+	}
+	.cd .num {
+		font-size: 28px;
+		font-weight: 250;
+		font-variant-numeric: tabular-nums;
+	}
+	.cd .lab {
+		font-size: 9.5px;
+		letter-spacing: 0.2em;
+		color: var(--muted);
+		text-transform: uppercase;
+		margin-top: 3px;
+	}
+	.cd .sep {
+		font-size: 28px;
+		font-weight: 200;
+		color: var(--accent);
 	}
 	.foot {
 		margin-top: 30px;

@@ -1,7 +1,7 @@
 <script>
-	// The bottom tray: Now Playing (with elapsed ring), and — once the
-	// structured metadata channel exists — Up Next and Tonight cells.
-	// Until then those cells only render when data is present.
+	// The bottom tray. With sender metadata (status.nowPlaying/schedule) it
+	// shows the real film, true progress, up next and tonight's showing;
+	// without, it falls back to the stream title and time-live.
 	let { status } = $props();
 
 	let now = $state(Date.now());
@@ -10,26 +10,55 @@
 		return () => clearInterval(t);
 	});
 
-	const elapsed = $derived.by(() => {
+	const np = $derived(status?.nowPlaying ?? null);
+	const title = $derived(np?.title || status?.streamTitle || 'Live');
+	const subtitle = $derived(np?.subtitle ?? '');
+
+	// True position: pushed position + time since the push.
+	const position = $derived.by(() => {
+		if (!np?.duration) return null;
+		const drift = (now - new Date(np.receivedAt).getTime()) / 1000;
+		return Math.min(np.position + Math.max(drift, 0), np.duration);
+	});
+
+	const fmt = (s) => {
+		if (s == null) return '';
+		s = Math.floor(s);
+		const h = Math.floor(s / 3600);
+		const m = Math.floor((s % 3600) / 60);
+		const sec = s % 60;
+		return h > 0
+			? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+			: `${m}:${String(sec).padStart(2, '0')}`;
+	};
+
+	const elapsedLive = $derived.by(() => {
 		if (!status?.lastConnectTime) return null;
 		const ms = now - new Date(status.lastConnectTime).getTime();
-		if (ms < 0) return null;
-		const h = Math.floor(ms / 3600000);
-		const m = Math.floor((ms % 3600000) / 60000);
-		const s = Math.floor((ms % 60000) / 1000);
-		return h > 0
-			? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-			: `${m}:${String(s).padStart(2, '0')}`;
+		return ms >= 0 ? fmt(ms / 1000) : null;
 	});
 
-	// Ring sweeps once per hour — an ambient clock, not a progress claim.
+	// Ring: real clip progress when known; otherwise an ambient hour-sweep.
+	const CIRC = 119.4;
 	const ringOffset = $derived.by(() => {
-		if (!status?.lastConnectTime) return 119.4;
+		if (position != null && np?.duration) return CIRC - (position / np.duration) * CIRC;
+		if (!status?.lastConnectTime) return CIRC;
 		const mins = ((now - new Date(status.lastConnectTime).getTime()) / 60000) % 60;
-		return 119.4 - (mins / 60) * 119.4;
+		return CIRC - (mins / 60) * CIRC;
 	});
+	const ringText = $derived(position != null ? fmt(position) : (elapsedLive ?? ''));
 
-	const title = $derived(status?.streamTitle || 'Live');
+	const nextShowing = $derived.by(() => {
+		const item = status?.schedule?.[0];
+		if (!item) return null;
+		const when = new Date(item.startsAt);
+		const sameDay = when.toDateString() === new Date(now).toDateString();
+		return {
+			...item,
+			label: (sameDay ? 'Tonight' : when.toLocaleDateString(undefined, { weekday: 'long' })) +
+				' · ' + when.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+		};
+	});
 </script>
 
 <div class="now-tray">
@@ -38,6 +67,7 @@
 		<div class="txt">
 			<div class="cell-label hot">Now Playing</div>
 			<div class="t">{title}</div>
+			{#if subtitle}<div class="s">{subtitle}</div>{/if}
 		</div>
 		<div class="ring">
 			<svg width="46" height="46">
@@ -50,28 +80,30 @@
 					stroke="var(--accent)"
 					stroke-width="3"
 					stroke-linecap="round"
-					stroke-dasharray="119.4"
+					stroke-dasharray={CIRC}
 					stroke-dashoffset={ringOffset}
 				/>
 			</svg>
-			<div class="pct">{elapsed ?? ''}</div>
+			<div class="pct">{ringText}</div>
 		</div>
 	</div>
-	{#if status?.upNext}
+	{#if np?.upNext}
 		<div class="tray-sep"></div>
 		<div class="tray-cell">
 			<div class="txt">
 				<div class="cell-label">Up Next</div>
-				<div class="t">{status.upNext}</div>
+				<div class="t">{np.upNext.title}</div>
+				{#if np.upNext.subtitle}<div class="s">{np.upNext.subtitle}</div>{/if}
 			</div>
 		</div>
 	{/if}
-	{#if status?.schedule}
+	{#if nextShowing}
 		<div class="tray-sep"></div>
 		<div class="tray-cell">
 			<div class="txt">
-				<div class="cell-label">{status.schedule.when}</div>
-				<div class="t">{status.schedule.title}</div>
+				<div class="cell-label">{nextShowing.label}</div>
+				<div class="t">{nextShowing.title}</div>
+				{#if nextShowing.subtitle}<div class="s">{nextShowing.subtitle}</div>{/if}
 			</div>
 		</div>
 	{/if}
@@ -151,6 +183,9 @@
 		font-size: 11.5px;
 		color: var(--muted);
 		margin-top: 2px;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.ring {
 		position: relative;

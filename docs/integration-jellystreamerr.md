@@ -1,0 +1,112 @@
+# Sender integration — the Jellystreamerr contract
+
+How a sender (Jellystreamerr's "Streamingestarr mode") talks to this
+receiver beyond the video stream itself. This document is the authority;
+Jellystreamerr's `docs/streamingestarr-mode.md` mirrors it from the sender
+side.
+
+Everything uses the Owncast-compatible integrations mechanism: the admin
+creates an **access token** (Admin API `POST /api/admin/accesstokens/create`
+with scope `CAN_SEND_SYSTEM_MESSAGES`), and the sender sends it as
+`Authorization: Bearer <token>`. One token unlocks all of the below.
+
+## 1. Discovery — `GET /api/integrations/capabilities`
+
+The sender's first call. Answers what this receiver accepts so the mode can
+configure itself instead of asking the operator:
+
+```json
+{
+  "service": "streamingestarr",
+  "apiVersion": 1,
+  "ingest": {
+    "rtmpPort": 1935,
+    "srtEnabled": true,
+    "srtPort": 9710,
+    "srtContainers": ["mpegts", "matroska", "mp4"]
+  },
+  "segmentFormat": "ts",
+  "channels": ["main"],
+  "metadata": { "nowPlaying": true, "schedule": true }
+}
+```
+
+Rules a sender should apply:
+- H.264 → RTMP or SRT/mpegts, either is fine.
+- **AV1 → SRT with `-f matroska`** (or fragmented MP4). mpegts cannot carry
+  AV1 (measured; it demuxes as `bin_data`). If `segmentFormat` is still
+  `ts`, AV1 will not reach viewers — prompt the operator or flip it via the
+  admin API before going live with AV1.
+- The stream key doubles as the SRT `streamid`.
+
+## 2. Now playing — `POST /api/integrations/metadata/nowplaying`
+
+Send on: clip start, seek, pause/resume, and queue changes (upNext). The
+receiver stamps `receivedAt`; viewers extrapolate position client-side, so
+there is no need to push progress on a timer.
+
+```json
+{
+  "title": "Mr. Robot",
+  "subtitle": "S1E4 — eps1.3_da3m0ns.mp4",
+  "position": 1961.5,
+  "duration": 3492.0,
+  "upNext": { "title": "S1E5", "subtitle": "eps1.4_3xpl0its.wmv" },
+  "announce": true,
+  "channel": "main"
+}
+```
+
+- All fields optional except `title`. `channel` defaults to `main`.
+- `announce: true` posts a system line in chat when title/subtitle changed:
+  *Now playing — **Mr. Robot · S1E4***. Send it on clip starts, not seeks.
+- Metadata is cleared automatically when the stream ends.
+- The viewer page renders: title+subtitle in the Now Playing tray cell, a
+  true progress ring from position/duration, and an Up Next cell.
+
+## 3. Schedule — `POST /api/integrations/metadata/schedule`
+
+Send whenever scheduled starts change. Replaces the whole list.
+
+```json
+{ "items": [
+  { "title": "Apocalypto", "subtitle": "Movie Night",
+    "startsAt": "2026-08-30T20:00:00+02:00" }
+] }
+```
+
+Powers the lobby (next showing + live countdown) and the tray's
+"Tonight" cell while streaming. Past items are dropped server-side.
+The list lives in memory — re-push after a receiver restart (listening to
+the `STREAM_STARTED` webhook or simply re-pushing on the sender's own
+schedule ticks both work).
+
+## 4. Stream title — `POST /api/integrations/streamtitle`
+
+The inherited Owncast API still works and remains the fallback shown when
+no structured metadata has arrived. A Streamingestarr-mode sender should
+prefer §2 and may skip this entirely.
+
+## What "Streamingestarr mode" needs on the sender (Jellystreamerr)
+
+Settings: receiver URL + access token (exactly like its Owncast
+integration, one extra destination). On enable:
+
+1. `GET capabilities` — validate the token, pick ingest protocol/container
+   per codec, warn on segment-format mismatch for AV1.
+2. Push `nowplaying` on clip start / seek / queue change (it already knows
+   all of this — it drives the Owncast title sync today).
+3. Push `schedule` from its scheduled starts.
+4. Optionally keep the plain title sync for non-Streamingestarr receivers.
+
+## Future phases (agreed direction, not yet built)
+
+- **Poster art**: `POST /api/integrations/metadata/nowplaying/poster`
+  (image upload, served to viewers for the tray + lobby). apiVersion bump.
+- **Subtitles as tracks**: sender uploads WebVTT per clip; receiver serves
+  it as an HLS subtitle track. Kills the sender's burn-in cost — the
+  single biggest win in the hybrid roadmap (design.md §3).
+- **DVR window**, **VPS-side ABR ladder**, **VPS-side thumbnails** —
+  design.md §3.
+
+Versioning: breaking changes bump `apiVersion`; senders should check it.

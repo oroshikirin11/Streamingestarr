@@ -26,6 +26,7 @@ type ChannelRuntime struct {
 	transcoder       *transcoder.Transcoder
 	broadcaster      *models.Broadcaster
 	currentBroadcast *models.CurrentBroadcast
+	nowPlaying       *models.NowPlaying
 
 	offlineCleanupTimer *time.Timer
 	onlineCleanupTicker *time.Ticker

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"streamingestarr/core"
+	"streamingestarr/models"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/utils"
 	"streamingestarr/webserver/router/middleware"
@@ -27,6 +28,8 @@ func GetStatus(w http.ResponseWriter, r *http.Request) {
 func getStatusResponse() webStatusResponse {
 	status := core.GetStatus()
 	response := webStatusResponse{
+		NowPlaying:         core.Default().GetNowPlaying(),
+		Schedule:           core.GetSchedule(),
 		ChannelID:          status.ChannelID,
 		Online:             status.Online,
 		ServerTime:         time.Now(),
@@ -47,9 +50,11 @@ type webStatusResponse struct {
 	LastConnectTime    *utils.NullTime `json:"lastConnectTime"`
 	LastDisconnectTime *utils.NullTime `json:"lastDisconnectTime"`
 
-	ChannelID     string `json:"channelId"`
-	VersionNumber string `json:"versionNumber"`
-	StreamTitle   string `json:"streamTitle"`
-	ViewerCount   int    `json:"viewerCount,omitempty"`
-	Online        bool   `json:"online"`
+	NowPlaying    *models.NowPlaying    `json:"nowPlaying,omitempty"`
+	Schedule      []models.ScheduleItem `json:"schedule,omitempty"`
+	ChannelID     string                `json:"channelId"`
+	VersionNumber string                `json:"versionNumber"`
+	StreamTitle   string                `json:"streamTitle"`
+	ViewerCount   int                   `json:"viewerCount,omitempty"`
+	Online        bool                  `json:"online"`
 }
