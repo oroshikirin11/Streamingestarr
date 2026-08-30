@@ -51,6 +51,8 @@ func Start() error {
 		}
 	}
 
+	loadMetadata()
+
 	// Chat is a single global room for now; it becomes per-channel when a
 	// second theater actually exists (docs/design.md §8).
 	if err := chat.Start(GetStatus); err != nil {
