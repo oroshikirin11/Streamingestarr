@@ -184,12 +184,21 @@ to the theater on stream start → hls.js playback of the gated fMP4 HLS
 rename through the reservation system → chat hide + fullscreen → back to
 the lobby with "last watched together" when the stream ends.
 
+**Admin UI in Svelte: DONE (2026-08-30)** — /admin now serves a dense
+sidebar panel in the shared theme (ops-blue accent): status/broadcaster,
+ingest URLs + SRT settings + key editor, video variants + segment format +
+latency, chat config + message moderation + bans, theater/access settings
+incl. room-password change. Zero legacy Owncast surface. The React admin
+is unreachable.
+
 Still open for later sessions:
-- Admin UI in Svelte (React admin remains the stopgap)
+- **Delete the React donor**: `web/` + `static/web` (~55 MB) and the
+  legacy Index/bot-metadata machinery — nothing routes there anymore
+- Admin gaps vs. the old panel: custom-emoji management, log viewer,
+  viewer metrics graphs, IP-ban list UI
 - Tray schedule cells + lobby countdown light up when the structured
   metadata channel from Jellystreamerr exists (design.md §3)
-- Theme picker (tokens are ready), mobile layout pass, custom emoji picker
-- Retire the React viewer/`web/` donor once admin is rebuilt
+- Theme picker (tokens are ready), mobile layout pass
 
 ---
 
