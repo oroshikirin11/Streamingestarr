@@ -38,7 +38,6 @@
 		<div class="txt">
 			<div class="cell-label hot">Now Playing</div>
 			<div class="t">{title}</div>
-			{#if elapsed}<div class="s">live for {elapsed}</div>{/if}
 		</div>
 		<div class="ring">
 			<svg width="46" height="46">
