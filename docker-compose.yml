@@ -3,9 +3,16 @@ services:
     build: .
     container_name: streamingestarr
     restart: unless-stopped
+    # Nothing is published to the public internet. Caddy terminates TLS on the
+    # host and proxies to 127.0.0.1:8080; the metadata channel and the RTMP/SRT
+    # ingests are reachable only over the tailnet. TAILNET_IP must be set in
+    # .env to this host's tailscale address (e.g. TAILNET_IP=100.124.204.59) —
+    # if it is missing, compose refuses to start rather than falling back to a
+    # public bind.
     ports:
-      - "8080:8080"   # web + API
-      - "1935:1935"       # RTMP ingest
-      - "9710:9710/udp"   # SRT ingest
+      - "127.0.0.1:8080:8080"                 # web + API — Caddy proxies here
+      - "${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}:8080:8080"      # metadata channel, tailnet only
+      - "${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}:1935:1935"      # RTMP ingest, tailnet only
+      - "${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}:9710:9710/udp"  # SRT ingest, tailnet only
     volumes:
       - ./data:/app/data

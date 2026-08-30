@@ -34,9 +34,56 @@ Caddy terminates TLS and sets `X-Forwarded-Proto: https`, which flips the
 session cookie to `Secure` automatically — no config needed. The chat
 websocket proxies through `reverse_proxy` as-is.
 
-RTMP/SRT are not HTTP — they bypass Caddy. Open them on the VPS firewall
-(`1935/tcp`, `9710/udp`) or, since the only sender is Jellystreamerr, keep
-them closed publicly and ingest over Tailscale.
+RTMP/SRT are not HTTP — they bypass Caddy. Since the only sender is
+Jellystreamerr, keep them closed publicly and ingest over Tailscale.
+
+### Bind everything but Caddy to the tailnet
+
+The compose file publishes the web port only to `127.0.0.1` (for Caddy) and
+the metadata/RTMP/SRT ports only to this host's tailscale address. Set it in
+`.env`:
+
+```sh
+echo "TAILNET_IP=$(tailscale ip -4)" > .env   # e.g. 100.124.204.59
+```
+
+`TAILNET_IP` is **required** — compose refuses to start without it rather
+than falling back to a public bind. Verify nothing leaked to the internet:
+
+```sh
+ss -tlnp | grep -E ':8080|:1935'   # should show 127.0.0.1 and the tailnet IP only
+```
+
+If you deployed an earlier compose that published `0.0.0.0:8080/1935`, the
+Go server, RTMP and SRT were internet-facing — re-deploy with this file and
+re-check.
+
+### Retire Owncast completely
+
+Caddy must reverse-proxy the domain to Streamingestarr, not Owncast. As long
+as the old container answers, scanners see Owncast's Next.js frontend
+(`/_next/...`, `/admin/config-federation`, `/api/remotefollow` SSRF, an API
+key baked into a JS chunk). None of that exists in Streamingestarr — it all
+comes from the donor app. After cutover:
+
+```sh
+docker rm -f owncast-owncast-1 && docker rmi owncast/owncast:latest
+curl -sI https://<domain>/_next/... # 401/404, never 200 with Next.js content
+```
+
+### Response headers (optional)
+
+Add to the Caddy site block to clear the "missing security headers / weak
+CSP" scanner notes (the weak CSP was Owncast's; Streamingestarr sets none):
+
+```
+header {
+  Strict-Transport-Security "max-age=31536000"
+  X-Content-Type-Options "nosniff"
+  Referrer-Policy "same-origin"
+  -Server
+}
+```
 
 ## 3. First run
 
