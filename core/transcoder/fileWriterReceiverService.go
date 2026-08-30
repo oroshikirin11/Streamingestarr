@@ -73,15 +73,30 @@ func (s *FileWriterReceiverService) uploadHandler(w http.ResponseWriter, r *http
 
 	path := r.URL.Path
 	writePath := filepath.Join(s.basePath, path)
-	f, err := os.Create(writePath) //nolint: gosec
+
+	// Write to a temp file and rename: playlists are rewritten every
+	// segment while players poll them, and an in-place truncating write
+	// hands a torn playlist to anyone reading mid-write.
+	f, err := os.CreateTemp(filepath.Dir(writePath), "."+filepath.Base(writePath)+".*")
 	if err != nil {
 		returnError(err, w)
 		return
 	}
-
-	defer f.Close()
+	tmpName := f.Name()
 
 	if _, err := io.Copy(f, r.Body); err != nil {
+		_ = f.Close()
+		_ = os.Remove(tmpName)
+		returnError(err, w)
+		return
+	}
+	if err := f.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		returnError(err, w)
+		return
+	}
+	if err := os.Rename(tmpName, writePath); err != nil {
+		_ = os.Remove(tmpName)
 		returnError(err, w)
 		return
 	}
@@ -93,7 +108,7 @@ func (s *FileWriterReceiverService) uploadHandler(w http.ResponseWriter, r *http
 func (s *FileWriterReceiverService) fileWritten(path string) {
 	if path == filepath.Join(s.basePath, "stream.m3u8") {
 		s.callbacks.MasterPlaylistWritten(path)
-	} else if strings.HasSuffix(path, ".ts") {
+	} else if strings.HasSuffix(path, ".ts") || strings.HasSuffix(path, ".m4s") || strings.HasSuffix(path, ".mp4") {
 		s.callbacks.SegmentWritten(path)
 	} else if strings.HasSuffix(path, ".m3u8") {
 		s.callbacks.VariantPlaylistWritten(path)

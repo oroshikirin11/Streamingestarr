@@ -8,6 +8,7 @@ import (
 
 	"streamingestarr/core/chat"
 	"streamingestarr/core/rtmp"
+	"streamingestarr/core/srt"
 	"streamingestarr/core/transcoder"
 	"streamingestarr/core/webhooks"
 	"streamingestarr/models"
@@ -85,6 +86,7 @@ func (c *ChannelRuntime) SetStreamAsDisconnected() {
 
 	transcoder.StopThumbnailGenerator()
 	rtmp.Disconnect()
+	srt.Disconnect()
 
 	// If there is no current broadcast available the previous stream
 	// likely failed for some reason. Don't try to append to it.
@@ -93,6 +95,18 @@ func (c *ChannelRuntime) SetStreamAsDisconnected() {
 		c.stopOnlineCleanupTimer()
 		c.transitionToOfflineVideoStreamContent()
 		log.Errorln("unexpected nil _currentBroadcast")
+		return
+	}
+
+	if configrepository.Get().GetVideoSegmentFormat() == "fmp4" {
+		// The offline clip is an mpegts segment; appending it to an fMP4
+		// playlist is invalid. Transition straight to the offline state
+		// instead, which re-runs the transcoder in the configured format.
+		c.stopOnlineCleanupTimer()
+		c.transitionToOfflineVideoStreamContent()
+		c.StartOfflineCleanupTimer()
+		c.saveStats()
+		go webhooks.SendStreamStatusEvent(models.StreamStopped, c.ID)
 		return
 	}
 

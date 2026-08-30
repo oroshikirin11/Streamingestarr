@@ -27,14 +27,16 @@ var (
 var (
 	_setStreamAsConnected func(*io.PipeReader, string)
 	_setBroadcaster       func(models.Broadcaster, string)
+	_isStreamBusy         func(string) bool
 )
 
 // Start starts the rtmp service, listening on specified RTMP port. The
 // callbacks receive the matched stream key so the core can resolve which
 // channel the inbound stream feeds.
-func Start(setStreamAsConnected func(*io.PipeReader, string), setBroadcaster func(models.Broadcaster, string)) {
+func Start(setStreamAsConnected func(*io.PipeReader, string), setBroadcaster func(models.Broadcaster, string), isStreamBusy func(string) bool) {
 	_setStreamAsConnected = setStreamAsConnected
 	_setBroadcaster = setBroadcaster
+	_isStreamBusy = isStreamBusy
 
 	configRepository := configrepository.Get()
 
@@ -98,6 +100,13 @@ func HandleConn(c *rtmp.Conn, nc net.Conn) {
 
 	if !accessGranted {
 		log.Errorln("invalid streaming key; rejecting incoming stream from", nc.RemoteAddr().String())
+		_ = nc.Close()
+		return
+	}
+
+	// The channel may already be fed over another protocol (SRT).
+	if _isStreamBusy != nil && _isStreamBusy(streamKey) {
+		log.Errorln("stream already running; rejecting incoming stream from", nc.RemoteAddr().String())
 		_ = nc.Close()
 		return
 	}

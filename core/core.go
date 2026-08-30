@@ -12,6 +12,7 @@ import (
 	"streamingestarr/core/chat"
 	"streamingestarr/core/data"
 	"streamingestarr/core/rtmp"
+	"streamingestarr/core/srt"
 	"streamingestarr/core/transcoder"
 	"streamingestarr/core/webhooks"
 	"streamingestarr/models"
@@ -57,11 +58,17 @@ func Start() error {
 	}
 
 	// start the rtmp server
-	go rtmp.Start(setStreamAsConnected, setBroadcaster)
+	go rtmp.Start(setStreamAsConnected, setBroadcaster, isStreamKeyBusy)
 
 	rtmpPort := configRepository.GetRTMPPortNumber()
 	if rtmpPort != 1935 {
 		log.Infof("RTMP is accepting inbound streams on port %d.", rtmpPort)
+	}
+
+	// start the SRT/mpegts server — the preferred ingest path
+	go srt.Start(setStreamAsConnected, setBroadcaster, isStreamKeyBusy)
+	if configRepository.GetSRTServerEnabled() {
+		log.Infof("SRT is accepting inbound streams on udp port %d.", configRepository.GetSRTServerPort())
 	}
 
 	webhooks.SetupWebhooks(GetStatus)

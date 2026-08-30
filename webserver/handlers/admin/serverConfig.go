@@ -77,6 +77,7 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 		ExternalActions:    configRepository.GetExternalActions(),
 		SupportedCodecs:    transcoder.GetCodecs(ffmpeg),
 		VideoCodec:         configRepository.GetVideoCodec(),
+		VideoSegmentFormat: configRepository.GetVideoSegmentFormat(),
 		ForbiddenUsernames: usernameBlocklist,
 		SuggestedUsernames: usernameSuggestions,
 	}
@@ -96,6 +97,7 @@ type serverConfigAdminResponse struct {
 	SocketHostOverride        string                  `json:"socketHostOverride,omitempty"`
 	WebServerIP               string                  `json:"webServerIP"`
 	VideoCodec                string                  `json:"videoCodec"`
+	VideoSegmentFormat        string                  `json:"videoSegmentFormat"`
 	VideoServingEndpoint      string                  `json:"videoServingEndpoint"`
 	SupportedCodecs           []string                `json:"supportedCodecs"`
 	ExternalActions           []models.ExternalAction `json:"externalActions"`

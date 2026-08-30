@@ -99,6 +99,50 @@ func (r *SqlConfigRepository) SetAdminPassword(key string) error {
 	return r.datastore.SetString(adminPasswordKey, hashed_pass)
 }
 
+// GetSRTServerEnabled reports whether the SRT/mpegts ingest listener runs.
+// Enabled by default — it is the preferred ingest path.
+func (r *SqlConfigRepository) GetSRTServerEnabled() bool {
+	enabled, err := r.datastore.GetBool(srtServerEnabledKey)
+	if err != nil {
+		return true
+	}
+	return enabled
+}
+
+// SetSRTServerEnabled toggles the SRT ingest listener (effective on restart).
+func (r *SqlConfigRepository) SetSRTServerEnabled(enabled bool) error {
+	return r.datastore.SetBool(srtServerEnabledKey, enabled)
+}
+
+// GetSRTServerPort returns the UDP port the SRT ingest listens on.
+func (r *SqlConfigRepository) GetSRTServerPort() int {
+	port, err := r.datastore.GetNumber(srtServerPortKey)
+	if err != nil || port == 0 {
+		return 9710
+	}
+	return int(port)
+}
+
+// SetSRTServerPort sets the SRT ingest UDP port (effective on restart).
+func (r *SqlConfigRepository) SetSRTServerPort(port int) error {
+	return r.datastore.SetNumber(srtServerPortKey, float64(port))
+}
+
+// GetVideoSegmentFormat returns the HLS segment container: "ts" (default)
+// or "fmp4". fMP4/CMAF is required to carry AV1 (and HEVC) in HLS.
+func (r *SqlConfigRepository) GetVideoSegmentFormat() string {
+	format, err := r.datastore.GetString(videoSegmentFormatKey)
+	if err != nil || format != "fmp4" {
+		return "ts"
+	}
+	return format
+}
+
+// SetVideoSegmentFormat sets the HLS segment container ("ts" or "fmp4").
+func (r *SqlConfigRepository) SetVideoSegmentFormat(format string) error {
+	return r.datastore.SetString(videoSegmentFormatKey, format)
+}
+
 // GetChatNameReservationDays returns how many days an unseen chat name
 // stays reserved before it can be claimed by someone else. 0 disables
 // expiry (names stay reserved forever). Every visit refreshes the clock.

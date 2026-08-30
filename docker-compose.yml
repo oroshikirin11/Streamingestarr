@@ -5,6 +5,7 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"   # web + API
-      - "1935:1935"   # RTMP ingest
+      - "1935:1935"       # RTMP ingest
+      - "9710:9710/udp"   # SRT ingest
     volumes:
       - ./data:/app/data

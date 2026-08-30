@@ -61,6 +61,14 @@ func GetChannelRuntime(id string) *ChannelRuntime {
 	return _channels[id]
 }
 
+// isStreamKeyBusy reports whether the channel a stream key feeds already
+// has a live inbound stream — shared by the RTMP and SRT listeners so the
+// two protocols cannot overtake each other.
+func isStreamKeyBusy(streamKey string) bool {
+	c := ChannelRuntimeForStreamKey(streamKey)
+	return c != nil && c.stats != nil && c.stats.StreamConnected
+}
+
 // ChannelRuntimeForStreamKey resolves which channel an inbound stream with
 // the given key feeds. Stream keys are a single global list today, so every
 // key feeds the default channel; when keys grow a channel column this is

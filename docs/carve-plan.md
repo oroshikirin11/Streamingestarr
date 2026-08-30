@@ -128,11 +128,47 @@ Verified live: duplicate and case-variant registration rejected, 1-day
 window + backdated `last_used` frees a name, never-expire honors a 2-year
 absence, validation rejects bad values, config readback correct.
 
-## Step 6 — SRT/mpegts ingest
+## Step 6 — SRT ingest + fMP4 packaging — **DONE, 2026-08-30**
 
-New listener beside `core/rtmp/`. Both feed the same transcoder/passthrough
-pipeline. fMP4/CMAF segment support in `core/playlist`/`core/transcoder`
-for AV1-in-HLS.
+**AV1 is now unblocked end to end**, verified live: SVT-AV1 encode →
+Matroska over SRT → key-validated ingest → passthrough copy → fMP4 HLS →
+ffprobe identifies genuine `av1` video through the served playlists.
+
+What shipped:
+
+- **fMP4/CMAF segments** as an admin-switchable HLS container:
+  `POST /api/admin/config/video/segmentformat` `{"value":"ts"|"fmp4"}`,
+  default ts, exposed as `videoSegmentFormat`. Covers: init segments,
+  `.m4s` serving + caching, thumbnails (init+segment concat), and the
+  offline transition (which cannot append the mpegts offline clip to an
+  fMP4 playlist — it re-runs the offline transcoder instead).
+- **SRT listener** (`core/srt/`, pure-Go datarhei/gosrt) on udp 9710
+  (config keys `srt_server_enabled`/`srt_server_port`, on by default).
+  The SRT `streamid` carries the stream key (optional `publish:`/`publish/`
+  prefix); the same key list guards both protocols, and a shared busy-check
+  stops RTMP and SRT from overtaking each other's live stream.
+- The ingest is **container-agnostic**: bytes go straight into ffmpeg's
+  probe. mpegts, Matroska and fragmented MP4 all work over SRT.
+
+**Design correction, measured not assumed:** the roadmap's premise "mpegts
+carries AV1 natively" is FALSE in practice — ffmpeg has no usable
+AV1-in-mpegts mapping (the stream demuxes as `bin_data`). **AV1 over SRT
+must ride Matroska or fragmented MP4** (both verified). H.264/HEVC over
+SRT/mpegts work as expected. Jellystreamerr's AV1 sender should use
+`-f matroska` over its SRT output.
+
+Bugs found and fixed on the way, live-verified:
+- Copying ADTS AAC (mpegts sources, the offline clip) into fMP4 requires
+  `-bsf:a aac_adtstoasc` — without it the transcode dies after one frame.
+  Verified harmless for FLV/ASC input and re-encodes.
+- ffmpeg 9 writes the master playlist BEFORE copied-AV1 codec parameters
+  exist and only rewrites it at stream end (`hls_master_pl_publish_rate`
+  was removed in ffmpeg 9) — live viewers would get a master with no
+  variants. The storage callback now repairs degenerate masters from the
+  variant config; CODECS attributes are optional in HLS, players derive
+  codecs from the init segment.
+- Playlist writes are now atomic (temp + rename) — the in-place truncating
+  write inherited from upstream hands torn playlists to polling players.
 
 ## Step 7 — Viewer UI rebuild
 

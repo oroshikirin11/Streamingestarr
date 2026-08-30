@@ -1,9 +1,11 @@
 package storageproviders
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"streamingestarr/persistence/configrepository"
@@ -45,6 +47,8 @@ func (s *LocalStorage) VariantPlaylistWritten(localFilePath string) {
 
 // MasterPlaylistWritten is called when the master hls playlist is written.
 func (s *LocalStorage) MasterPlaylistWritten(localFilePath string) {
+	fixDegenerateMasterPlaylist(localFilePath)
+
 	// If we're using a remote serving endpoint, we need to rewrite the master playlist
 	if s.host != "" {
 		if err := rewritePlaylistLocations(localFilePath, s.host, "", s.baseDir); err != nil {
@@ -55,6 +59,40 @@ func (s *LocalStorage) MasterPlaylistWritten(localFilePath string) {
 			log.Warnln(err)
 		}
 	}
+}
+
+// fixDegenerateMasterPlaylist repairs a master playlist that carries no
+// variant entries. ffmpeg 9's hls muxer writes the master before the codec
+// parameters of copied streams are known (observed with AV1) and only
+// rewrites it when the stream ends — useless for live viewers. The CODECS
+// attribute is optional in HLS (players derive codecs from the fMP4 init
+// segment), so entries with just a bandwidth are valid and sufficient.
+func fixDegenerateMasterPlaylist(localFilePath string) {
+	contents, err := os.ReadFile(localFilePath) // nolint: gosec
+	if err != nil || strings.Contains(string(contents), "#EXT-X-STREAM-INF") {
+		return
+	}
+
+	configRepository := configrepository.Get()
+	variants := configRepository.GetStreamOutputVariants()
+
+	var b strings.Builder
+	b.Write(contents)
+	for index, variant := range variants {
+		bandwidth := (variant.VideoBitrate + variant.AudioBitrate) * 1000
+		if bandwidth == 0 {
+			// Passthrough variants have no configured bitrate; a generous
+			// estimate keeps players from refusing the entry.
+			bandwidth = 6_000_000
+		}
+		fmt.Fprintf(&b, "#EXT-X-STREAM-INF:BANDWIDTH=%d\n%d/stream.m3u8\n", bandwidth, index)
+	}
+
+	if err := os.WriteFile(localFilePath, []byte(b.String()), 0o644); err != nil { // nolint: gosec
+		log.Warnln("unable to repair master playlist:", err)
+		return
+	}
+	log.Traceln("repaired master playlist that was missing variant entries")
 }
 
 // Save will save a local filepath using the storage provider.

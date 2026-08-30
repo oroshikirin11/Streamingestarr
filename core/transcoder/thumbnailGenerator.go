@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -63,8 +64,13 @@ func fireThumbnailGenerator(segmentPath string, variantIndex int) error {
 
 	var modTime time.Time
 	var names []string
+	initSegment := ""
 	for _, f := range files {
-		if path.Ext(f.Name()) != ".ts" {
+		if strings.HasPrefix(f.Name(), "init-") && path.Ext(f.Name()) == ".mp4" {
+			initSegment = f.Name()
+			continue
+		}
+		if path.Ext(f.Name()) != ".ts" && path.Ext(f.Name()) != ".m4s" {
 			continue
 		}
 
@@ -89,6 +95,14 @@ func fireThumbnailGenerator(segmentPath string, variantIndex int) error {
 	}
 	configRepository := configrepository.Get()
 	mostRecentFile := path.Join(framePath, names[0])
+	// An fMP4 media segment cannot be decoded on its own — prepend the
+	// variant's init segment via ffmpeg's concat protocol.
+	if path.Ext(mostRecentFile) == ".m4s" {
+		if initSegment == "" {
+			return nil
+		}
+		mostRecentFile = "concat:" + path.Join(framePath, initSegment) + "|" + mostRecentFile
+	}
 	ffmpegPath := utils.ValidatedFfmpegPath(configRepository.GetFfMpegPath())
 	outputFileTemp := path.Join(config.TempDir, "tempthumbnail.jpg")
 

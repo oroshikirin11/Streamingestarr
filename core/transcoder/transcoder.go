@@ -39,6 +39,7 @@ type Transcoder struct {
 
 	TranscoderCompleted  func(error)
 	playlistOutputPath   string
+	segmentFormat        string
 	ffmpegPath           string
 	segmentIdentifier    string
 	internalListenerPort string
@@ -244,9 +245,24 @@ func (t *Transcoder) getFlags() *execInfo {
 	}...)
 	ffmpegFlags = append(ffmpegFlags, hlsOptionsString...)
 	ffmpegFlags = append(ffmpegFlags, hlsEventString...)
-	ffmpegFlags = append(ffmpegFlags, []string{
-		"-segment_format_options", "mpegts_flags=mpegts_copyts=1",
-	}...)
+	segmentExtension := ".ts"
+	if t.segmentFormat == "fmp4" {
+		// fMP4/CMAF segments — the container that carries AV1 and HEVC
+		// in HLS, which mpegts segments cannot.
+		segmentExtension = ".m4s"
+		ffmpegFlags = append(ffmpegFlags, []string{
+			"-hls_segment_type", "fmp4",
+			"-hls_fmp4_init_filename", "init-" + t.segmentIdentifier + ".mp4",
+			// mpegts sources (SRT ingest, the offline clip) carry AAC as
+			// ADTS, which cannot be copied into fMP4 without this filter.
+			// Verified harmless for ASC input (RTMP/FLV) and re-encodes.
+			"-bsf:a", "aac_adtstoasc",
+		}...)
+	} else {
+		ffmpegFlags = append(ffmpegFlags, []string{
+			"-segment_format_options", "mpegts_flags=mpegts_copyts=1",
+		}...)
+	}
 	ffmpegFlags = append(ffmpegFlags, t.codec.ExtraArguments()...)
 
 	ffmpegFlags = append(ffmpegFlags, []string{
@@ -257,7 +273,7 @@ func (t *Transcoder) getFlags() *execInfo {
 		// Filenames
 		"-master_pl_name", "stream.m3u8",
 
-		"-hls_segment_filename", localListenerAddress + "/%v/stream-" + t.segmentIdentifier + "-%d.ts", // Send HLS segments back to us over HTTP
+		"-hls_segment_filename", localListenerAddress + "/%v/stream-" + t.segmentIdentifier + "-%d" + segmentExtension, // Send HLS segments back to us over HTTP
 		"-max_muxing_queue_size", "400", // Workaround for Too many packets error: https://trac.ffmpeg.org/ticket/6375?cversion=0
 
 		"-method", "PUT", // HLS results sent back to us will be over PUTs
@@ -321,6 +337,7 @@ func NewTranscoder() *Transcoder {
 	transcoder.codec = getCodec(configRepository.GetVideoCodec())
 	transcoder.segmentOutputPath = config.HLSStoragePath
 	transcoder.playlistOutputPath = config.HLSStoragePath
+	transcoder.segmentFormat = configRepository.GetVideoSegmentFormat()
 
 	transcoder.input = "pipe:0" // stdin
 
@@ -494,6 +511,11 @@ func (t *Transcoder) SetIdentifier(output string) {
 // SetInternalHTTPPort will set the port to be used for internal communication.
 func (t *Transcoder) SetInternalHTTPPort(port string) {
 	t.internalListenerPort = port
+}
+
+// SetSegmentFormat overrides the HLS segment container ("ts" or "fmp4").
+func (t *Transcoder) SetSegmentFormat(format string) {
+	t.segmentFormat = format
 }
 
 // SetCodec will set the codec to be used for the transocder.

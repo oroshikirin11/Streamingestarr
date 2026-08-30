@@ -34,11 +34,19 @@ RTMP-silence hard-drop that the sender has had to design around.
 
 ## 2. Ingest & transcoding
 
-- **Add an SRT/mpegts listener** beside RTMP. RTMP stays for compatibility;
-  SRT/mpegts is the preferred path (AV1/HEVC native, no FLV).
+- **SRT listener beside RTMP** (built): udp 9710, streamid = stream key.
+  RTMP stays for compatibility. The SRT ingest is container-agnostic —
+  mpegts, Matroska, or fragmented MP4.
+- **Correction (measured 2026-08-30):** mpegts does NOT carry AV1 in
+  practice — ffmpeg has no usable AV1-in-mpegts mapping. **AV1 rides SRT in
+  Matroska or fMP4** (both verified live, end to end). H.264/HEVC over
+  SRT/mpegts work as expected. Jellystreamerr's AV1 output should be
+  `-f matroska` over SRT.
 - **Keep the transcoding ladder, but passthrough is the default.** The ladder
   exists for publishers that don't control their GOP and for future variant
   needs; our own sender never needs it.
+- **fMP4/CMAF segments** (built, admin-switchable) — required for AV1 in
+  HLS; default stays ts until the sender side goes AV1.
 
 ## 3. Hybrid dynamics (medium term)
 

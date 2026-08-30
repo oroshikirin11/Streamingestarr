@@ -328,6 +328,24 @@ func SetChatNameReservationDays(w http.ResponseWriter, r *http.Request) {
 	authJSON(w, http.StatusOK, true, "")
 }
 
+// SetVideoSegmentFormat lets the admin switch the HLS segment container.
+// Body: {"value": "ts"|"fmp4"}. fMP4 is required for AV1/HEVC delivery.
+// Takes effect on the next stream (and next offline transition).
+func SetVideoSegmentFormat(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Value string `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || (req.Value != "ts" && req.Value != "fmp4") {
+		authJSON(w, http.StatusBadRequest, false, "Send {\"value\": \"ts\"} or {\"value\": \"fmp4\"}.")
+		return
+	}
+	if err := configrepository.Get().SetVideoSegmentFormat(req.Value); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	authJSON(w, http.StatusOK, true, "")
+}
+
 // PostAuthLogout destroys the caller's session.
 func PostAuthLogout(w http.ResponseWriter, r *http.Request) {
 	if token := auth.TokenFromRequest(r); token != "" {

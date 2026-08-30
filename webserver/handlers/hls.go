@@ -22,7 +22,8 @@ import (
 // those arrive unscoped too).
 func HandleHLSRequest(w http.ResponseWriter, r *http.Request) {
 	// Sanity check to limit requests to HLS file types.
-	if filepath.Ext(r.URL.Path) != ".m3u8" && filepath.Ext(r.URL.Path) != ".ts" {
+	ext := filepath.Ext(r.URL.Path)
+	if ext != ".m3u8" && ext != ".ts" && ext != ".m4s" && ext != ".mp4" {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}

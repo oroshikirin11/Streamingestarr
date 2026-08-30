@@ -16,6 +16,12 @@ type ConfigRepository interface {
 	GetAdminPassword() string
 	GetViewerUsername() string
 	GetChatNameReservationDays() int
+	GetVideoSegmentFormat() string
+	GetSRTServerEnabled() bool
+	SetSRTServerEnabled(enabled bool) error
+	GetSRTServerPort() int
+	SetSRTServerPort(port int) error
+	SetVideoSegmentFormat(format string) error
 	SetChatNameReservationDays(days int) error
 	SetViewerUsername(username string) error
 	GetViewerPasswordHash() string
