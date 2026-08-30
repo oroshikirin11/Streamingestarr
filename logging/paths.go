@@ -12,5 +12,5 @@ func GetTranscoderLogFilePath() string {
 }
 
 func getLogFilePath() string {
-	return filepath.Join(config.LogDirectory, "owncast.log")
+	return filepath.Join(config.LogDirectory, "streamingestarr.log")
 }
