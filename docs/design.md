@@ -187,6 +187,15 @@ system carry between the two projects.
 viewer page in both states (live + lobby) and pick the winner; the admin UI
 derives from it.
 
+**WINNER (decided 2026-08-30): Velvet Lounge** —
+`docs/design-samples/05-velvet-lounge-final.html`, chosen from four
+candidates as 04 + elements of 03: ambient glowing screen, avatar chat
+with fading history, presence faces, ember-lit lobby with countdown — plus
+a three-cell bottom tray (Now Playing with vinyl + progress ring · Up
+Next · Tonight's schedule), a chat hide/show toggle that lets the screen
+stretch, and fullscreen on the player (header button + hover affordance on
+the frame). This file is the blueprint for the Svelte viewer app.
+
 ## 7b. Deployment
 
 **Docker-first, one command (decided 2026-08-30).** Setup should feel like
