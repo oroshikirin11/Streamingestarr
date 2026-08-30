@@ -31,6 +31,8 @@
 	let logs = $state([]);
 	let logFilter = $state('warnings');
 	let hw = $state(null);
+	let tokens = $state([]);
+	let newTokenName = $state('');
 
 	function toast(text, ok = true) {
 		const id = crypto.randomUUID();
@@ -110,10 +112,17 @@
 		} catch {}
 	}
 
+	async function loadTokens() {
+		try {
+			tokens = (await api.getAccessTokens()) ?? [];
+		} catch {}
+	}
+
 	function pick(s) {
 		section = s;
 		if (s === 'chat') loadModeration();
 		if (s === 'logs') loadLogs();
+		if (s === 'stream') loadTokens();
 	}
 
 	$effect(() => {
@@ -255,6 +264,27 @@
 				<footer>
 					<button class="ghost" onclick={() => (keys = [...keys, { key: randomKey(), comment: '' }])}>Add a key</button>
 					<button onclick={() => run(() => api.setStreamKeys(keys.filter((k) => k.key)))}>Save</button>
+				</footer>
+			</div>
+
+			<div class="card">
+				<header><h2>Access tokens</h2><p>For integrations that push metadata or chat lines — Jellystreamerr's Streamingestarr mode uses one. Not the same as a stream key.</p></header>
+				{#if tokens.length === 0}<p class="empty">No tokens yet.</p>{/if}
+				{#each tokens as t (t.accessToken)}
+					<div class="msgrow">
+						<span class="who">{t.displayName}</span>
+						<span class="body mono-text dim">{t.accessToken}</span>
+						<span class="actions">
+							<button class="ghost tiny" onclick={() => copy(t.accessToken)}>Copy</button>
+							<button class="ghost tiny danger-text" onclick={() => run(async () => { const r = await api.deleteAccessToken(t.accessToken); tokens = tokens.filter((x) => x.accessToken !== t.accessToken); return r; }, 'Token revoked')}>Revoke</button>
+						</span>
+					</div>
+				{/each}
+				<div class="field-row">
+					<div class="field compact"><label for="tokname">Name</label><input id="tokname" bind:value={newTokenName} placeholder="jellystreamerr" /></div>
+				</div>
+				<footer>
+					<button disabled={!newTokenName.trim()} onclick={() => run(async () => { const r = await api.createAccessToken(newTokenName.trim()); newTokenName = ''; await loadTokens(); return r; }, 'Token created — copy it from the list')}>Create token</button>
 				</footer>
 			</div>
 

@@ -48,3 +48,7 @@ export const getIPBans = () => req('/api/admin/chat/users/ipbans');
 export const banIP = (ip) => post('/api/admin/chat/users/ipbans/create', { value: ip });
 export const unbanIP = (ip) => post('/api/admin/chat/users/ipbans/remove', { value: ip });
 export const getHardwareStats = () => req('/api/admin/hardwarestats');
+export const getAccessTokens = () => req('/api/admin/accesstokens');
+export const createAccessToken = (name) =>
+	post('/api/admin/accesstokens/create', { name, scopes: ['CAN_SEND_SYSTEM_MESSAGES'] });
+export const deleteAccessToken = (token) => post('/api/admin/accesstokens/delete', { token });
