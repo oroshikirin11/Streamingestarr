@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample 01 — Screening Room</title>
+<style>
+  :root {
+    --bg: #101013; --surface: #17171a; --surface-2: #202024;
+    --text: #ececeb; --muted: #8a8a86; --border: #2b2b30;
+    --accent: #e8846b; --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+  }
+
+  /* ---------- demo control ---------- */
+  .demo-toggle {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 99; display: flex; gap: 2px; padding: 3px;
+    background: #000a; border: 1px solid var(--border); border-radius: 99px;
+    backdrop-filter: blur(8px); font-size: 11px;
+  }
+  .demo-toggle button {
+    border: 0; background: transparent; color: var(--muted);
+    padding: 4px 14px; border-radius: 99px; cursor: pointer; font-size: 11px;
+    letter-spacing: .08em; text-transform: uppercase;
+  }
+  .demo-toggle button.on { background: var(--accent); color: #141416; font-weight: 700; }
+
+  /* ---------- live: the screen is the page ---------- */
+  .stage {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    transition: margin-right .35s ease;
+  }
+  body.chat-open .stage { margin-right: 340px; }
+
+  .screen {
+    flex: 1; position: relative; display: flex;
+    align-items: center; justify-content: center;
+    background:
+      radial-gradient(ellipse 90% 70% at 50% 45%, #1c1d24 0%, #0b0b0e 75%);
+  }
+  .screen::after { /* projector vignette */
+    content: ""; position: absolute; inset: 0;
+    box-shadow: inset 0 0 180px 60px #000;
+    pointer-events: none;
+  }
+  .frame {
+    width: min(92%, calc((100vh - 160px) * 16 / 9)); aspect-ratio: 16/9;
+    background:
+      linear-gradient(160deg, #23242c 0%, #15161b 55%, #101116 100%);
+    border-radius: 6px; position: relative; overflow: hidden;
+    box-shadow:
+      0 0 120px 10px color-mix(in srgb, var(--accent) 14%, transparent),
+      0 30px 80px -20px #000;
+  }
+  .frame .scene { /* fake picture */
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 68% 38%, #3a3c4c 0, transparent 34%),
+      radial-gradient(circle at 30% 70%, #2c2331 0, transparent 45%),
+      linear-gradient(180deg, #191a21, #101014);
+  }
+  .frame .scene::after {
+    content: ""; position: absolute; left: 12%; bottom: 18%;
+    width: 90px; height: 150px; border-radius: 4px 4px 0 0;
+    background: linear-gradient(180deg, #464a5c, #23252e);
+    box-shadow: 220px 30px 0 -10px #383b49, 460px -8px 0 4px #2c2e3a;
+    opacity: .8;
+  }
+
+  /* auto-hiding chrome over the frame */
+  .chrome {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 44px 22px 14px;
+    background: linear-gradient(transparent, #000c);
+    display: flex; align-items: flex-end; gap: 16px;
+    opacity: 0; transition: opacity .25s;
+  }
+  .frame:hover .chrome, body.wake .chrome { opacity: 1; }
+  .np { flex: 1; min-width: 0; }
+  .np .title { font-size: 15px; font-weight: 650; letter-spacing: .01em; }
+  .np .ep { font-size: 12px; color: #bdbdb9; margin-top: 2px; }
+  .progress { margin-top: 10px; height: 3px; border-radius: 99px; background: #ffffff22; }
+  .progress i { display: block; height: 100%; width: 56%; border-radius: 99px; background: var(--accent); }
+  .times { display: flex; justify-content: space-between; font-size: 10.5px; color: #a9a9a5; margin-top: 5px; font-variant-numeric: tabular-nums; }
+
+  .topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 22px;
+    background: linear-gradient(#000a, transparent);
+    opacity: 0; transition: opacity .25s;
+  }
+  .screen:hover .topbar, body.wake .topbar { opacity: 1; }
+  .brand { font-size: 12px; font-weight: 700; letter-spacing: .22em; color: #c9c9c5; }
+  .brand b { color: var(--accent); }
+  .top-right { display: flex; align-items: center; gap: 14px; }
+  .live-pill {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10.5px; font-weight: 800; letter-spacing: .1em;
+    background: var(--accent); color: #141416; padding: 4px 11px; border-radius: 99px;
+  }
+  .live-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #141416; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .viewers { font-size: 12px; color: #bdbdb9; }
+  .chat-btn {
+    border: 1px solid #ffffff2e; background: #0006; color: #ddd;
+    font-size: 12px; padding: 6px 14px; border-radius: 99px; cursor: pointer;
+  }
+  .chat-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ---------- chat drawer ---------- */
+  .chat {
+    position: absolute; top: 0; right: -340px; bottom: 0; width: 340px;
+    background: var(--surface); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; transition: right .35s ease;
+  }
+  body.chat-open .chat { right: 0; }
+  .chat header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+    font-size: 12px; letter-spacing: .14em; color: var(--muted); font-weight: 700;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .chat header button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; }
+  .msgs { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { font-size: 13.5px; line-height: 1.5; }
+  .msg .who { font-weight: 700; color: var(--accent); margin-right: 6px; }
+  .msg.old { opacity: .45; }
+  .msg.sys { color: color-mix(in srgb, var(--accent) 60%, var(--muted)); font-size: 12px; text-align: center; padding: 4px 0; }
+  .compose { padding: 14px 18px 18px; border-top: 1px solid var(--border); }
+  .compose input {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 99px; padding: 10px 16px; font-size: 13px;
+  }
+  .compose input:focus { outline: 0; border-color: var(--accent); }
+
+  /* ---------- lobby ---------- */
+  .lobby {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center; flex-direction: column;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 30%, #1b1720 0%, var(--bg) 70%);
+  }
+  body.state-lobby .lobby { display: flex; }
+  body.state-lobby .stage, body.state-lobby .chat { display: none; }
+  .lobby .brand2 { font-size: 12px; font-weight: 700; letter-spacing: .3em; color: var(--muted); margin-bottom: 48px; }
+  .lobby .brand2 b { color: var(--accent); }
+  .doors { font-size: 13px; letter-spacing: .28em; color: var(--muted); text-transform: uppercase; }
+  .count { font-size: clamp(64px, 12vw, 128px); font-weight: 200; letter-spacing: .04em; font-variant-numeric: tabular-nums; margin: 10px 0 6px; }
+  .count b { color: var(--accent); font-weight: 200; }
+  .next-title { font-size: 20px; font-weight: 650; margin-top: 26px; }
+  .next-sub { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .lastplayed { position: absolute; bottom: 34px; font-size: 12px; color: #5c5c58; }
+  .lastplayed b { color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body class="state-live chat-open wake">
+
+<div class="demo-toggle">
+  <button class="on" onclick="setState('live',this)">Live</button>
+  <button onclick="setState('lobby',this)">Lobby</button>
+</div>
+
+<!-- LIVE -->
+<div class="stage">
+  <div class="screen">
+    <div class="topbar">
+      <div class="brand"><b>●</b> STREAMINGESTARR</div>
+      <div class="top-right">
+        <span class="live-pill">LIVE</span>
+        <span class="viewers">7 watching</span>
+        <button class="chat-btn" onclick="document.body.classList.toggle('chat-open')">Chat</button>
+      </div>
+    </div>
+    <div class="frame">
+      <div class="scene"></div>
+      <div class="chrome">
+        <div class="np">
+          <div class="title">Mr. Robot</div>
+          <div class="ep">S1E4 · eps1.3_da3m0ns.mp4 · up next: S1E5</div>
+          <div class="progress"><i></i></div>
+          <div class="times"><span>32:41</span><span>58:12</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<aside class="chat">
+  <header>ROOM <button onclick="document.body.classList.remove('chat-open')">✕</button></header>
+  <div class="msgs">
+    <div class="msg old"><span class="who">PopcornGuy</span>evening everyone</div>
+    <div class="msg old"><span class="who">couchgoblin</span>made it just in time</div>
+    <div class="msg sys">— S1E4 starting —</div>
+    <div class="msg"><span class="who">alex</span>settle in, double feature tonight</div>
+    <div class="msg"><span class="who">couchgoblin</span>this episode is so good</div>
+    <div class="msg"><span class="who">MovieFan</span>no spoilers!!</div>
+  </div>
+  <div class="compose"><input placeholder="Say something…"></div>
+</aside>
+
+<!-- LOBBY -->
+<div class="lobby">
+  <div class="brand2"><b>●</b> STREAMINGESTARR</div>
+  <div class="doors">Doors open in</div>
+  <div class="count">2<b>:</b>14<b>:</b>09</div>
+  <div class="next-title">Apocalypto</div>
+  <div class="next-sub">Tonight at 20:00 · Movie Night</div>
+  <div class="lastplayed">Last played · <b>Mr. Robot S1E4</b></div>
+</div>
+
+<script>
+let wakeTimer = setTimeout(() => document.body.classList.remove('wake'), 3000);
+addEventListener('mousemove', () => {
+  document.body.classList.add('wake');
+  clearTimeout(wakeTimer);
+  wakeTimer = setTimeout(() => document.body.classList.remove('wake'), 3000);
+});
+
+function setState(s, btn) {
+  document.body.classList.toggle('state-lobby', s === 'lobby');
+  document.body.classList.toggle('state-live', s === 'live');
+  document.querySelectorAll('.demo-toggle button').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+}
+</script>
+</body>
+</html>

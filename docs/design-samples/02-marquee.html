@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample 02 — Marquee</title>
+<style>
+  :root {
+    --bg: #17171a; --surface: #202024; --surface-2: #2a2a2f;
+    --text: #ececeb; --muted: #9a9a95; --border: #34343a;
+    --accent: #e8846b; --gold: #d9b06a; --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: Georgia, 'Times New Roman', serif;
+    min-height: 100vh;
+  }
+  .sans { font-family: system-ui, sans-serif; }
+
+  .demo-toggle {
+    position: fixed; top: 14px; right: 14px; z-index: 99; display: flex; gap: 2px; padding: 3px;
+    background: #000c; border: 1px solid var(--border); border-radius: 99px; font-size: 11px;
+  }
+  .demo-toggle button {
+    border: 0; background: transparent; color: var(--muted); font-family: system-ui, sans-serif;
+    padding: 4px 14px; border-radius: 99px; cursor: pointer; font-size: 11px;
+    letter-spacing: .08em; text-transform: uppercase;
+  }
+  .demo-toggle button.on { background: var(--accent); color: #141416; font-weight: 700; }
+
+  /* ---------- marquee header ---------- */
+  header.marquee {
+    text-align: center; padding: 26px 20px 22px;
+    border-bottom: 1px solid var(--border);
+    background:
+      radial-gradient(ellipse 60% 130% at 50% -30%, color-mix(in srgb, var(--accent) 13%, transparent), transparent 70%);
+    position: relative;
+  }
+  .bulbs { letter-spacing: 14px; color: var(--gold); font-size: 9px; opacity: .85; }
+  .bulbs.dim { opacity: .3; }
+  h1.theater {
+    font-size: 30px; font-weight: 500; letter-spacing: .12em; margin: 10px 0 8px;
+  }
+  h1.theater b { color: var(--accent); font-weight: 500; }
+  .tagline { font-size: 12px; color: var(--muted); letter-spacing: .3em; text-transform: uppercase; }
+
+  main { max-width: 1240px; margin: 0 auto; padding: 28px 24px 40px; }
+
+  /* ---------- live ---------- */
+  .live-grid { display: grid; grid-template-columns: 1fr 330px; gap: 24px; align-items: start; }
+
+  .player-card { border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--surface); }
+  .video {
+    aspect-ratio: 16/9; position: relative;
+    background:
+      radial-gradient(circle at 62% 40%, #363848 0, transparent 40%),
+      radial-gradient(circle at 25% 75%, #2e2434 0, transparent 45%),
+      linear-gradient(180deg, #1c1d24, #121317);
+  }
+  .video .ticket {
+    position: absolute; top: 14px; left: 14px;
+    display: flex; align-items: center; gap: 8px;
+    background: #000a; border: 1px solid #ffffff22; border-radius: 6px;
+    padding: 6px 12px; font-size: 11px; letter-spacing: .12em; font-weight: 700;
+  }
+  .ticket .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+
+  .billing {
+    display: flex; gap: 18px; padding: 18px 20px; align-items: center;
+  }
+  .poster {
+    width: 58px; height: 84px; flex: none; border-radius: 5px;
+    background: linear-gradient(160deg, #3d2b33, #1c151c 70%);
+    border: 1px solid var(--border); position: relative; overflow: hidden;
+  }
+  .poster::after {
+    content: "MR ROBOT"; position: absolute; inset: auto 0 8px 0; text-align: center;
+    font-size: 6.5px; letter-spacing: .18em; color: #cfa9a0;
+  }
+  .billing .info { flex: 1; }
+  .billing .now { font-size: 10.5px; letter-spacing: .3em; color: var(--accent); text-transform: uppercase; margin-bottom: 6px; }
+  .billing h2 { font-size: 21px; font-weight: 500; }
+  .billing .ep { font-size: 13px; color: var(--muted); margin-top: 4px; font-style: italic; }
+  .billing .meta { text-align: right; }
+  .billing .meta .clock { font-size: 15px; font-variant-numeric: tabular-nums; }
+  .billing .meta .aud { font-size: 12px; color: var(--muted); margin-top: 5px; }
+  .strip { height: 3px; background: var(--surface-2); }
+  .strip i { display: block; height: 100%; width: 56%; background: linear-gradient(90deg, var(--accent), var(--gold)); }
+
+  .upnext { margin-top: 16px; font-size: 13px; color: var(--muted); text-align: center; font-style: italic; }
+  .upnext b { color: var(--text); font-weight: 500; }
+
+  /* chat column */
+  .chat-card {
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); display: flex; flex-direction: column; height: 560px;
+  }
+  .chat-card header {
+    border-bottom: 1px solid var(--border); padding: 13px 18px; text-align: center;
+    font-size: 11px; letter-spacing: .3em; color: var(--muted); background: none;
+  }
+  .msgs { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  .bubble {
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 12px 12px 12px 3px; padding: 8px 12px; max-width: 88%;
+    font-size: 13px; line-height: 1.45; font-family: system-ui, sans-serif;
+  }
+  .bubble .who { display: block; font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 2px; }
+  .bubble.mine { align-self: flex-end; border-radius: 12px 12px 3px 12px; background: color-mix(in srgb, var(--accent) 14%, var(--surface-2)); }
+  .sys { text-align: center; font-size: 11.5px; color: var(--gold); font-style: italic; padding: 2px 0; }
+  .compose { border-top: 1px solid var(--border); padding: 12px 14px; }
+  .compose input {
+    width: 100%; background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 9px 13px; font-size: 13px; font-family: system-ui, sans-serif;
+  }
+  .compose input:focus { outline: 0; border-color: var(--accent); }
+
+  /* ---------- lobby ---------- */
+  .lobby { display: none; text-align: center; padding-top: 12px; }
+  body.state-lobby .lobby { display: block; }
+  body.state-lobby .live-grid { display: none; }
+
+  .lobby .card {
+    max-width: 560px; margin: 26px auto 0; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--surface); overflow: hidden;
+    box-shadow: 0 0 80px -20px color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+  .lobby .card .head {
+    padding: 10px; font-size: 10.5px; letter-spacing: .34em; color: #141416;
+    background: linear-gradient(90deg, var(--accent), var(--gold)); font-weight: 700;
+    font-family: system-ui, sans-serif;
+  }
+  .feature { display: flex; gap: 22px; padding: 26px; text-align: left; align-items: center; }
+  .poster.big { width: 110px; height: 160px; }
+  .poster.big::after { content: "APOCALYPTO"; font-size: 8px; }
+  .feature h2 { font-size: 26px; font-weight: 500; }
+  .feature .when { color: var(--gold); font-size: 14px; margin-top: 8px; font-style: italic; }
+  .feature .countdown { font-size: 30px; font-variant-numeric: tabular-nums; margin-top: 14px; letter-spacing: .06em; }
+  .feature .label { font-size: 10px; letter-spacing: .3em; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+  .prev { margin-top: 30px; font-size: 12.5px; color: var(--muted); font-style: italic; }
+  .prev b { color: var(--text); font-weight: 500; }
+</style>
+</head>
+<body class="state-live">
+
+<div class="demo-toggle">
+  <button class="on" onclick="setState('live',this)">Live</button>
+  <button onclick="setState('lobby',this)">Lobby</button>
+</div>
+
+<header class="marquee">
+  <div class="bulbs" id="bulbs">• • • • • • • • • • • • • •</div>
+  <h1 class="theater">MAIN <b>THEATER</b></h1>
+  <div class="tagline">A Streamingestarr Cinema</div>
+</header>
+
+<main>
+  <!-- LIVE -->
+  <div class="live-grid">
+    <div>
+      <div class="player-card">
+        <div class="video">
+          <div class="ticket sans"><span class="dot"></span> NOW SHOWING · 7 SEATED</div>
+        </div>
+        <div class="strip"><i></i></div>
+        <div class="billing">
+          <div class="poster"></div>
+          <div class="info">
+            <div class="now sans">Now Playing</div>
+            <h2>Mr. Robot</h2>
+            <div class="ep">Season 1, Episode 4 — “eps1.3_da3m0ns.mp4”</div>
+          </div>
+          <div class="meta sans">
+            <div class="clock">32:41 / 58:12</div>
+            <div class="aud">7 in the audience</div>
+          </div>
+        </div>
+      </div>
+      <div class="upnext">Up next — <b>S1E5 “eps1.4_3xpl0its.wmv”</b></div>
+    </div>
+
+    <div class="chat-card">
+      <header>THE BALCONY</header>
+      <div class="msgs">
+        <div class="bubble"><span class="who">PopcornGuy</span>evening everyone 🍿</div>
+        <div class="bubble"><span class="who">couchgoblin</span>made it just in time</div>
+        <div class="sys">— the curtain rises on S1E4 —</div>
+        <div class="bubble mine"><span class="who">alex</span>settle in, double feature tonight</div>
+        <div class="bubble"><span class="who">MovieFan</span>no spoilers!!</div>
+      </div>
+      <div class="compose"><input placeholder="Whisper to the balcony…"></div>
+    </div>
+  </div>
+
+  <!-- LOBBY -->
+  <div class="lobby">
+    <div class="card">
+      <div class="head">COMING ATTRACTION</div>
+      <div class="feature">
+        <div class="poster big"></div>
+        <div>
+          <h2>Apocalypto</h2>
+          <div class="when">Tonight at 20:00 — Movie Night</div>
+          <div class="countdown sans">2:14:09</div>
+          <div class="label sans">until doors open</div>
+        </div>
+      </div>
+    </div>
+    <div class="prev">Previously screened — <b>Mr. Robot, Season 1</b></div>
+  </div>
+</main>
+
+<script>
+function setState(s, btn) {
+  document.body.classList.toggle('state-lobby', s === 'lobby');
+  document.querySelectorAll('.demo-toggle button').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById('bulbs').classList.toggle('dim', s === 'lobby');
+}
+</script>
+</body>
+</html>
