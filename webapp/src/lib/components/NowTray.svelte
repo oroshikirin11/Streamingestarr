@@ -2,6 +2,7 @@
 	// The bottom tray. With sender metadata (status.nowPlaying/schedule) it
 	// shows the real film, true progress, up next and tonight's showing;
 	// without, it falls back to the stream title and time-live.
+	import { dedupeSubtitle } from '../text.js';
 	let { status } = $props();
 
 	let now = $state(Date.now());
@@ -12,7 +13,7 @@
 
 	const np = $derived(status?.nowPlaying ?? null);
 	const title = $derived(np?.title || status?.streamTitle || 'Live');
-	const subtitle = $derived(np?.subtitle ?? '');
+	const subtitle = $derived(dedupeSubtitle(np?.title, np?.subtitle));
 
 	// True position: pushed position + time since the push.
 	const position = $derived.by(() => {
@@ -103,7 +104,7 @@
 			<div class="txt">
 				<div class="cell-label">Up Next</div>
 				<div class="t">{np.upNext.title}</div>
-				{#if np.upNext.subtitle}<div class="s">{np.upNext.subtitle}</div>{/if}
+				{#if np.upNext.subtitle}<div class="s">{dedupeSubtitle(np.upNext.title, np.upNext.subtitle)}</div>{/if}
 			</div>
 		</div>
 	{/if}

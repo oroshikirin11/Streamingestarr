@@ -2,6 +2,7 @@
 	// The offline state — the reason to come back (docs/design.md §7).
 	// With a pushed schedule the lobby shows the next showing + countdown;
 	// without, the room simply rests with the last-watched note.
+	import { dedupeSubtitle } from '../text.js';
 	let { status } = $props();
 
 	// The lobby's copy rotates per visit — the room should not greet a
@@ -83,7 +84,7 @@
 			{/if}
 			{#if status?.lastPlayed?.title}
 				<div class="foot">
-					last watched together — <b>{status.lastPlayed.title}{status.lastPlayed.subtitle ? ' · ' + status.lastPlayed.subtitle : ''}</b>
+					last watched together — <b>{status.lastPlayed.title}{dedupeSubtitle(status.lastPlayed.title, status.lastPlayed.subtitle) ? ' · ' + dedupeSubtitle(status.lastPlayed.title, status.lastPlayed.subtitle) : ''}</b>
 					{#if lastWatched}<span class="dim"> · {lastWatched}</span>{/if}
 				</div>
 			{:else if lastWatched}

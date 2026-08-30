@@ -1,6 +1,7 @@
 <script>
 	import '../app.css';
 	import { status, config, role, reachable } from '$lib/stores.js';
+	import { dedupeSubtitle } from '$lib/text.js';
 	import { logout } from '$lib/api.js';
 	import GlowFrame from '$lib/components/GlowFrame.svelte';
 	import NowTray from '$lib/components/NowTray.svelte';
@@ -16,7 +17,10 @@
 
 	const tabTitle = $derived.by(() => {
 		const np = $status?.nowPlaying;
-		if (live && np?.title) return np.subtitle ? `${np.title} — ${np.subtitle}` : np.title;
+		if (live && np?.title) {
+			const sub = dedupeSubtitle(np.title, np.subtitle);
+			return sub ? `${np.title} — ${sub}` : np.title;
+		}
 		return theaterName + (live ? ' · live' : '');
 	});
 </script>
