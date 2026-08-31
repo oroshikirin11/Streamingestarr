@@ -25,6 +25,7 @@ import (
 // encoder claims about it.
 
 type ffprobeStream struct {
+	Index         int    `json:"index"`
 	CodecType     string `json:"codec_type"`
 	CodecName     string `json:"codec_name"`
 	Profile       string `json:"profile"`
@@ -37,8 +38,16 @@ type ffprobeStream struct {
 	BitRate       string `json:"bit_rate"`
 }
 
+type ffprobePacket struct {
+	StreamIndex int    `json:"stream_index"`
+	DtsTime     string `json:"dts_time"`
+	PtsTime     string `json:"pts_time"`
+	Size        string `json:"size"`
+}
+
 type ffprobeOutput struct {
 	Streams []ffprobeStream `json:"streams"`
+	Packets []ffprobePacket `json:"packets"`
 }
 
 var videoCodecNames = map[string]string{
@@ -59,6 +68,9 @@ func probeInboundStream(prefix []byte) (models.InboundStreamDetails, bool) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, ffprobePath(),
 		"-v", "quiet", "-print_format", "json", "-show_streams",
+		// Packets too: mpegts rarely carries per-stream bit_rate headers,
+		// so the rates are measured from what actually arrived instead.
+		"-show_packets", "-show_entries", "packet=stream_index,dts_time,pts_time,size",
 		"-f", "mpegts", "-i", "pipe:0")
 	cmd.Stdin = bytes.NewReader(prefix)
 	out, err := cmd.Output()
@@ -73,6 +85,7 @@ func probeInboundStream(prefix []byte) (models.InboundStreamDetails, bool) {
 		return details, false
 	}
 
+	measured := measuredRates(parsed)
 	sawVideo, sawAudio := false, false
 	for _, s := range parsed.Streams {
 		switch s.CodecType {
@@ -85,18 +98,71 @@ func probeInboundStream(prefix []byte) (models.InboundStreamDetails, bool) {
 			details.Width = s.Width
 			details.Height = s.Height
 			details.VideoFramerate = parseFrameRate(s.AvgFrameRate, s.RFrameRate)
-			details.VideoBitrate = parseKbps(s.BitRate)
+			details.VideoBitrate = firstNonZero(measured[s.Index], parseKbps(s.BitRate))
 		case "audio":
 			if sawAudio {
 				continue
 			}
 			sawAudio = true
 			details.AudioCodec = describeAudio(s)
-			details.AudioBitrate = parseKbps(s.BitRate)
+			details.AudioBitrate = firstNonZero(measured[s.Index], parseKbps(s.BitRate))
 		}
 	}
 	details.VideoOnly = sawVideo && !sawAudio
 	return details, sawVideo || sawAudio
+}
+
+// measuredRates computes per-stream kbps from the packets in the capture:
+// payload bytes over the DTS span they cover. A span under half a second is
+// discarded — one keyframe would dominate it and the number would be noise.
+func measuredRates(parsed ffprobeOutput) map[int]int {
+	type span struct {
+		bytes    int
+		min, max float64
+		any      bool
+	}
+	spans := map[int]*span{}
+	for _, p := range parsed.Packets {
+		size, err := strconv.Atoi(p.Size)
+		if err != nil || size <= 0 {
+			continue
+		}
+		t, err := strconv.ParseFloat(p.DtsTime, 64)
+		if err != nil {
+			if t, err = strconv.ParseFloat(p.PtsTime, 64); err != nil {
+				continue
+			}
+		}
+		s := spans[p.StreamIndex]
+		if s == nil {
+			s = &span{min: t, max: t}
+			spans[p.StreamIndex] = s
+		}
+		s.bytes += size
+		s.any = true
+		if t < s.min {
+			s.min = t
+		}
+		if t > s.max {
+			s.max = t
+		}
+	}
+	rates := map[int]int{}
+	for idx, s := range spans {
+		if window := s.max - s.min; s.any && window >= 0.5 {
+			rates[idx] = int(float64(s.bytes) * 8 / window / 1000)
+		}
+	}
+	return rates
+}
+
+func firstNonZero(values ...int) int {
+	for _, v := range values {
+		if v > 0 {
+			return v
+		}
+	}
+	return 0
 }
 
 // describeVideo folds codec, profile and dynamic range into the one codec

@@ -120,15 +120,18 @@ func handlePublisher(conn gosrt.Conn) {
 	_setStreamAsConnected(pipeOut, key)
 
 	// The transcoder consumes raw mpegts from the pipe; ffmpeg probes the
-	// container itself, so no demuxing happens here. A copy of the opening
-	// prefix does get kept aside for one ffprobe run that fills in the
-	// broadcaster details the admin shows — enough bytes for parameter sets
-	// and a few frames, capped by time so a thin stream still gets probed.
-	const probeTarget = 2 << 20
+	// container itself, so no demuxing happens here. A copy of the stream
+	// does get kept aside for ffprobe runs that fill in the broadcaster
+	// details the admin shows — enough bytes for parameter sets, frames and
+	// a usable bitrate window at 4K rates, capped by time so a thin stream
+	// still qualifies. A fresh capture every 30s keeps the shown numbers
+	// tracking a VBR source instead of freezing the connect-time estimate.
+	const probeTarget = 4 << 20
 	const probeFloor = 128 << 10
+	const reprobeAfter = 30 * time.Second
 	probeBuf := make([]byte, 0, probeTarget)
-	probeStart := time.Now()
-	probed := false
+	captureStart := time.Now()
+	var resumeAt time.Time // zero while a capture is filling
 
 	buffer := make([]byte, 1316) // 7 mpegts packets, the SRT payload convention
 	for {
@@ -137,22 +140,26 @@ func handlePublisher(conn gosrt.Conn) {
 			if _, werr := pipeIn.Write(buffer[:n]); werr != nil {
 				break
 			}
-			if !probed {
+			if resumeAt.IsZero() {
 				if room := probeTarget - len(probeBuf); room > 0 {
 					probeBuf = append(probeBuf, buffer[:min(n, room)]...)
 				}
 				if len(probeBuf) >= probeTarget ||
-					(len(probeBuf) >= probeFloor && time.Since(probeStart) > 3*time.Second) {
-					probed = true
+					(len(probeBuf) >= probeFloor && time.Since(captureStart) > 3*time.Second) {
 					prefix := probeBuf
-					probeBuf = nil
+					probeBuf = make([]byte, 0, probeTarget)
+					resumeAt = time.Now().Add(reprobeAfter)
 					go func() {
 						if details, ok := probeInboundStream(prefix); ok {
-							broadcaster.StreamDetails = details
-							_setBroadcaster(broadcaster, key)
+							b := broadcaster
+							b.StreamDetails = details
+							_setBroadcaster(b, key)
 						}
 					}()
 				}
+			} else if time.Now().After(resumeAt) {
+				resumeAt = time.Time{}
+				captureStart = time.Now()
 			}
 		}
 		if err != nil {
