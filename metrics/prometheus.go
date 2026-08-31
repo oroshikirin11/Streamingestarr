@@ -49,7 +49,7 @@ func setupPrometheusCollectors() {
 
 	cpuUsage = promauto.NewGauge(prometheus.GaugeOpts{
 		Name:        "streamingestarr_instance_cpu_usage",
-		Help:        "CPU usage as seen internally to Owncast.",
+		Help:        "CPU usage as seen internally to Streamingestarr.",
 		ConstLabels: labels,
 	})
 }

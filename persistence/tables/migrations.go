@@ -14,7 +14,7 @@ import (
 
 func MigrateDatabaseSchema(db *sql.DB, from, to int) error {
 	log.Printf("Migrating database from version %d to %d", from, to)
-	dbBackupFile := filepath.Join(config.BackupDirectory, fmt.Sprintf("owncast-v%d.bak", from))
+	dbBackupFile := filepath.Join(config.BackupDirectory, fmt.Sprintf("streamingestarr-v%d.bak", from))
 	utils.Backup(db, dbBackupFile)
 	for v := from; v < to; v++ {
 		log.Tracef("Migration step from %d to %d\n", v, v+1)

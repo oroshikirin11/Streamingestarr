@@ -20,7 +20,7 @@ var (
 
 var errorResetDuration = time.Minute * 5
 
-const alertingError = "The %s utilization of %f%% could cause problems with video generation and delivery. Visit the documentation at http://owncast.online/docs/troubleshooting/ if you are experiencing issues."
+const alertingError = "The %s utilization of %f%% could cause problems with video generation and delivery."
 
 func handleAlerting() {
 	handleCPUAlerting()

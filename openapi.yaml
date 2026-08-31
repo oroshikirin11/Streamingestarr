@@ -8,7 +8,7 @@ info:
     name: Streamingestarr
   license:
     name: MIT
-    url: https://github.com/owncast/owncast/blob/develop/LICENSE
+    url: https://en.wikipedia.org/wiki/MIT_License
 servers:
 - url: http://localhost:8080/api
   description: Localhost port 8080

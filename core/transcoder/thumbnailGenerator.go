@@ -38,7 +38,7 @@ func StartThumbnailGenerator(chunkPath string, variantIndex int, isVideoPassthro
 				if err := fireThumbnailGenerator(chunkPath, variantIndex); err != nil {
 					logMsg := "Unable to generate thumbnail: " + err.Error()
 					if isVideoPassthrough {
-						logMsg += ". Video Passthrough is enabled. You should disable it to fix this, and other, streaming errors. https://owncast.online/troubleshoot"
+						logMsg += ". Video passthrough is enabled — the thumbnail has to decode whatever codec the sender pushes, which this ffmpeg may not support."
 					}
 					log.Errorln("Unable to generate thumbnail:", logMsg)
 				}

@@ -268,7 +268,7 @@ func ValidatedFfmpegPath(ffmpegPath string) string {
 		// Fall back to looking for ffmpeg in the system path.
 		ffmpegPath, err = exec.LookPath("ffmpeg")
 		if err != nil || VerifyFFMpegPath(ffmpegPath) != nil {
-			log.Fatalln("Unable to locate ffmpeg. Either install it globally on your system or put the ffmpeg binary in the same directory as Owncast. The binary must be named ffmpeg.")
+			log.Fatalln("Unable to locate ffmpeg. Either install it globally on your system or put the ffmpeg binary in the same directory as Streamingestarr. The binary must be named ffmpeg.")
 		}
 	}
 

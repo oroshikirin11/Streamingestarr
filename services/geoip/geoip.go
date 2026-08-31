@@ -1,6 +1,5 @@
 // This package utilizes the MaxMind GeoLite2 GeoIP database https://dev.maxmind.com/geoip/geoip2/geolite2/.
 // You must provide your own copy of this database for it to work.
-// Read more about how this works at http://owncast.online/docs/geoip
 
 package geoip
 
@@ -62,7 +61,7 @@ func (c *Client) fetchGeoForIP(ip string) *GeoDetails {
 
 	db, err := geoip2.Open(geoIPDatabasePath)
 	if err != nil {
-		log.Traceln("GeoIP support is disabled. visit https://owncast.online/docs/geoip to learn how to enable.", err)
+		log.Traceln("GeoIP support is disabled. Place a MaxMind GeoLite2 City database at", geoIPDatabasePath, "to enable it.", err)
 		atomic.StoreInt32(&c.enabled, 0)
 		return nil
 	}

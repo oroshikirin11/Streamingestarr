@@ -65,8 +65,10 @@ If you're the owner of this server, visit the admin panel to customize this page
 
 		DatabaseFilePath: "data/streamingestarr.db",
 
+		// Directory listing was carved out with the rest of the public
+		// surface; the fields remain only because the config struct does.
 		YPEnabled: false,
-		YPServer:  "https://owncast.directory",
+		YPServer:  "",
 
 		WebServerPort:  8080,
 		WebServerIP:    "0.0.0.0",
