@@ -36,15 +36,37 @@
 	}
 
 	// Try to start with sound at the remembered volume; if the browser's
-	// autoplay policy refuses, restart muted rather than not playing at all.
-	// The slider keeps showing the real volume either way, and one click on
-	// the speaker (or a slider touch) brings the sound in.
+	// autoplay policy refuses (a refresh wipes the page's gesture state, so
+	// this is the NORMAL path on reload), restart muted rather than not
+	// playing at all — and arm a one-shot listener so the very first
+	// click/tap anywhere brings the sound in, instead of demanding the
+	// viewer find the speaker button.
+	let unmuteHandler = null;
+	function disarmUnmute() {
+		if (!unmuteHandler) return;
+		window.removeEventListener('pointerdown', unmuteHandler, true);
+		unmuteHandler = null;
+	}
+	function armUnmuteOnGesture() {
+		if (unmuteHandler) return;
+		unmuteHandler = (e) => {
+			// A tap on the sound controls speaks for itself — let it decide.
+			if (e.target?.closest?.('.snd-btn, .vol')) return;
+			disarmUnmute();
+			muted = false;
+			videoEl.muted = false;
+			videoEl.volume = volume;
+			videoEl.play().catch(() => {});
+		};
+		window.addEventListener('pointerdown', unmuteHandler, true);
+	}
 	function startPlayback() {
 		videoEl.muted = muted;
 		videoEl.volume = volume;
 		videoEl.play().catch(() => {
 			muted = true;
 			videoEl.muted = true;
+			armUnmuteOnGesture();
 			videoEl.play().catch(() => {});
 		});
 	}
@@ -113,11 +135,14 @@
 	onDestroy(() => {
 		dead = true;
 		clearTimeout(retryTimer);
+		disarmUnmute();
 		hls?.destroy();
 		hls = null;
 	});
 
 	function toggleMute() {
+		// An explicit choice either way retires the first-gesture unmute.
+		disarmUnmute();
 		muted = !muted;
 		videoEl.muted = muted;
 		if (!muted) videoEl.volume = volume;
