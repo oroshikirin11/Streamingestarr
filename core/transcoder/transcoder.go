@@ -253,11 +253,17 @@ func (t *Transcoder) getFlags() *execInfo {
 		ffmpegFlags = append(ffmpegFlags, []string{
 			"-hls_segment_type", "fmp4",
 			"-hls_fmp4_init_filename", "init-" + t.segmentIdentifier + ".mp4",
-			// mpegts sources (SRT ingest, the offline clip) carry AAC as
-			// ADTS, which cannot be copied into fMP4 without this filter.
-			// Verified harmless for ASC input (RTMP/FLV) and re-encodes.
-			"-bsf:a", "aac_adtstoasc",
 		}...)
+		// mpegts sources (SRT ingest, the offline clip) carry AAC as ADTS,
+		// which cannot be copied into fMP4 without this filter. Verified
+		// harmless for ASC input (RTMP/FLV) and re-encodes — but it refuses
+		// to INITIALIZE on any other audio codec and kills the session, so
+		// it only rides when the audio is AAC. The SRT ingest sniffs the
+		// codec from the stream head before this spawn; unknown ("") means
+		// RTMP or a failed sniff, both of which are AAC territory.
+		if audio := config.GetInboundAudioCodec(); audio == "" || audio == "aac" {
+			ffmpegFlags = append(ffmpegFlags, "-bsf:a", "aac_adtstoasc")
+		}
 	} else {
 		ffmpegFlags = append(ffmpegFlags, []string{
 			"-segment_format_options", "mpegts_flags=mpegts_copyts=1",

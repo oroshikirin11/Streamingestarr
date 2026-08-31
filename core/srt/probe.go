@@ -245,6 +245,37 @@ func parseKbps(bps string) int {
 	return n / 1000
 }
 
+// probeAudioCodec identifies just the audio codec from a head capture —
+// the one fact the transcoder needs BEFORE it spawns (its fMP4 path picks
+// a bitstream filter per codec, and picking wrong is fatal). Kept light so
+// the ingest can afford to run it synchronously: streams only, no packets.
+// Returns "" when the head is too thin to say.
+func probeAudioCodec(head []byte) string {
+	if len(head) == 0 {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, ffprobePath(),
+		"-v", "quiet", "-print_format", "json",
+		"-show_streams", "-select_streams", "a", "-i", "pipe:0")
+	cmd.Stdin = bytes.NewReader(head)
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	var parsed ffprobeOutput
+	if err := json.Unmarshal(out, &parsed); err != nil {
+		return ""
+	}
+	for _, s := range parsed.Streams {
+		if s.CodecType == "audio" && s.CodecName != "" {
+			return s.CodecName
+		}
+	}
+	return ""
+}
+
 // ffprobePath looks next to the configured ffmpeg first — wherever the
 // operator's ffmpeg lives, its ffprobe lives too — then falls back to PATH.
 func ffprobePath() string {

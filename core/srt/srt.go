@@ -14,6 +14,7 @@ import (
 	gosrt "github.com/datarhei/gosrt"
 	log "github.com/sirupsen/logrus"
 
+	"streamingestarr/config"
 	"streamingestarr/models"
 	"streamingestarr/persistence/configrepository"
 )
@@ -106,10 +107,34 @@ func handlePublisher(conn gosrt.Conn) {
 		RemoteAddr: remoteAddr,
 		Time:       time.Now(),
 		StreamDetails: models.InboundStreamDetails{
-			Encoder: "SRT/mpegts",
+			Encoder: "SRT",
 		},
 	}
 	_setBroadcaster(broadcaster, key)
+
+	// Sniff the audio codec BEFORE the transcoder spawns: its fMP4 path
+	// picks a bitstream filter per audio codec, and picking wrong kills the
+	// session at startup. Bounded — whatever arrives inside a second, capped
+	// well under the details capture — and a failed sniff just leaves the
+	// codec unknown, which the transcoder treats as it always has. The head
+	// is not lost: it seeds both the pipe and the details capture below.
+	const headMax = 256 << 10
+	head := make([]byte, 0, headMax)
+	{
+		_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+		hb := make([]byte, 1316)
+		for len(head) < headMax {
+			n, err := conn.Read(hb)
+			if n > 0 {
+				head = append(head, hb[:n]...)
+			}
+			if err != nil {
+				break
+			}
+		}
+		_ = conn.SetReadDeadline(time.Time{})
+	}
+	config.SetInboundAudioCodec(probeAudioCodec(head))
 
 	pipeOut, pipeIn := io.Pipe()
 
@@ -138,6 +163,15 @@ func handlePublisher(conn gosrt.Conn) {
 	var resumeAt time.Time // zero while a capture is filling
 	var reprobe atomic.Bool
 	reprobe.Store(true)
+
+	if len(head) > 0 {
+		if _, werr := pipeIn.Write(head); werr != nil {
+			log.Infoln("Inbound SRT stream disconnected.")
+			teardown(conn, pipeIn)
+			return
+		}
+		probeBuf = append(probeBuf, head...)
+	}
 
 	buffer := make([]byte, 1316) // 7 mpegts packets, the SRT payload convention
 	for {
@@ -189,6 +223,9 @@ func teardown(conn gosrt.Conn, pipe *io.PipeWriter) {
 		_activeConn = nil
 		_activePipe = nil
 	}
+	// The sniffed codec belongs to the session that just ended; a following
+	// RTMP broadcast must not inherit it.
+	config.SetInboundAudioCodec("")
 }
 
 // Disconnect will force disconnect the current inbound SRT connection.
