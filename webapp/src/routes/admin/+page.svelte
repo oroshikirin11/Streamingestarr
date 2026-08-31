@@ -41,6 +41,8 @@
 	let viewersSeries = $state(null);
 	let bitrateSeries = $state(null);
 	let ingestStats = $state(null);
+	let avSyncLatest = $state(null);
+	let avSyncWorst = $state(0);
 	let tokens = $state([]);
 	let newTokenName = $state('');
 
@@ -92,6 +94,9 @@
 				viewersSeries = await api.getViewersOverTime(Math.floor(Date.now() / 1000) - 4 * 3600);
 				bitrateSeries = status?.broadcaster ? await api.getIngestBitrate() : null;
 				ingestStats = status?.broadcaster ? await api.getIngestStats() : null;
+				const av = status?.broadcaster ? await api.getAVSync() : null;
+				avSyncLatest = av?.length ? av[av.length - 1] : null;
+				avSyncWorst = av?.length ? av.reduce((w, m) => (Math.abs(m.deltaMs) > Math.abs(w) ? m.deltaMs : w), 0) : 0;
 			}
 		} catch {}
 	}
@@ -229,6 +234,13 @@
 							Receive health — SRT drops: {ingestStats.srtPktRecvDrop}
 							· link loss: {ingestStats.srtPktRecvLoss} (recovered {ingestStats.srtPktRecvRetrans})
 							· buffer drops: {ingestStats.bufferDroppedBytes > 0 ? `${Math.round(ingestStats.bufferDroppedBytes / 1024)} KB` : '0'}
+						</p>
+					{/if}
+					{#if avSyncLatest}
+						<p class="hint" class:danger-text={Math.abs(avSyncWorst) > 45}>
+							A/V offset per segment — now: {avSyncLatest.deltaMs > 0 ? '+' : ''}{Math.round(avSyncLatest.deltaMs)} ms
+							· worst recent: {avSyncWorst > 0 ? '+' : ''}{Math.round(avSyncWorst)} ms
+							(audio {avSyncLatest.deltaMs >= 0 ? 'behind' : 'ahead of'} video; skew in the SEGMENTS means the sender, clean segments with drifting playback means the player)
 						</p>
 					{/if}
 					<footer>

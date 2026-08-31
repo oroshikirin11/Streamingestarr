@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"streamingestarr/auth"
+	"streamingestarr/core/avsync"
 	"streamingestarr/core/srt"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/utils"
@@ -352,6 +353,13 @@ func GetIngestBitrate(w http.ResponseWriter, r *http.Request) {
 func GetIngestStatsAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(srt.GetIngestStats())
+}
+
+// GetAVSync returns the per-segment audio/video first-PTS offsets of the
+// current broadcast — the ledger that tells sender seams from player drift.
+func GetAVSync(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(avsync.Get())
 }
 
 // SetSRTPassphrase stores the SRT encryption passphrase. Optional: an

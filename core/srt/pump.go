@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"streamingestarr/config"
+	"streamingestarr/core/avsync"
 	"streamingestarr/models"
 )
 
@@ -25,6 +26,9 @@ type ingestConn interface {
 
 func pump(conn ingestConn, remoteAddr, transport, key string) {
 	log.Infoln("Inbound", transport, "stream connected from", remoteAddr)
+	// A fresh session gets a fresh A/V ledger — the numbers must always
+	// describe THIS broadcast.
+	avsync.Reset()
 
 	broadcaster := models.Broadcaster{
 		RemoteAddr: remoteAddr,

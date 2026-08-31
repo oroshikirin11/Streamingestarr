@@ -69,6 +69,7 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/config/srt/passphrase", middleware.RequireAdminAuth(handlers.SetSRTPassphrase))
 	r.Get("/api/admin/ingestbitrate", middleware.RequireAdminAuth(handlers.GetIngestBitrate))
 	r.Get("/api/admin/ingeststats", middleware.RequireAdminAuth(handlers.GetIngestStatsAPI))
+	r.Get("/api/admin/avsync", middleware.RequireAdminAuth(handlers.GetAVSync))
 	r.Post("/api/admin/config/tcp/enabled", middleware.RequireAdminAuth(handlers.SetTCPIngestEnabled))
 	r.Post("/api/admin/config/tcp/port", middleware.RequireAdminAuth(handlers.SetTCPIngestPort))
 	r.Post("/api/admin/config/tcp/passphrase", middleware.RequireAdminAuth(handlers.SetTCPIngestPassphrase))

@@ -10,6 +10,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"streamingestarr/config"
+	"streamingestarr/core/avsync"
 	"streamingestarr/persistence/configrepository"
 )
 
@@ -34,6 +35,9 @@ func (s *LocalStorage) Setup() error {
 
 // SegmentWritten is called when a single segment of video is written.
 func (s *LocalStorage) SegmentWritten(localFilePath string) {
+	// One parse-only probe per finished segment: the A/V offset ledger
+	// that tells sender seams apart from player drift.
+	avsync.MeasureSegment(localFilePath)
 	if _, err := s.Save(localFilePath, 0); err != nil {
 		log.Warnln(err)
 	}
