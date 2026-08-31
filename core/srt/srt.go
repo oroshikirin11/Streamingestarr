@@ -101,13 +101,14 @@ func handlePublisher(conn gosrt.Conn) {
 	remoteAddr := conn.RemoteAddr().String()
 	log.Infoln("Inbound SRT stream connected from", remoteAddr)
 
-	_setBroadcaster(models.Broadcaster{
+	broadcaster := models.Broadcaster{
 		RemoteAddr: remoteAddr,
 		Time:       time.Now(),
 		StreamDetails: models.InboundStreamDetails{
 			Encoder: "SRT/mpegts",
 		},
-	}, key)
+	}
+	_setBroadcaster(broadcaster, key)
 
 	pipeOut, pipeIn := io.Pipe()
 
@@ -119,13 +120,39 @@ func handlePublisher(conn gosrt.Conn) {
 	_setStreamAsConnected(pipeOut, key)
 
 	// The transcoder consumes raw mpegts from the pipe; ffmpeg probes the
-	// container itself, so no demuxing happens here.
+	// container itself, so no demuxing happens here. A copy of the opening
+	// prefix does get kept aside for one ffprobe run that fills in the
+	// broadcaster details the admin shows — enough bytes for parameter sets
+	// and a few frames, capped by time so a thin stream still gets probed.
+	const probeTarget = 2 << 20
+	const probeFloor = 128 << 10
+	probeBuf := make([]byte, 0, probeTarget)
+	probeStart := time.Now()
+	probed := false
+
 	buffer := make([]byte, 1316) // 7 mpegts packets, the SRT payload convention
 	for {
 		n, err := conn.Read(buffer)
 		if n > 0 {
 			if _, werr := pipeIn.Write(buffer[:n]); werr != nil {
 				break
+			}
+			if !probed {
+				if room := probeTarget - len(probeBuf); room > 0 {
+					probeBuf = append(probeBuf, buffer[:min(n, room)]...)
+				}
+				if len(probeBuf) >= probeTarget ||
+					(len(probeBuf) >= probeFloor && time.Since(probeStart) > 3*time.Second) {
+					probed = true
+					prefix := probeBuf
+					probeBuf = nil
+					go func() {
+						if details, ok := probeInboundStream(prefix); ok {
+							broadcaster.StreamDetails = details
+							_setBroadcaster(broadcaster, key)
+						}
+					}()
+				}
 			}
 		}
 		if err != nil {
