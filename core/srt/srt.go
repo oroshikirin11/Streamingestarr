@@ -134,7 +134,9 @@ func handlePublisher(conn gosrt.Conn) {
 		}
 		_ = conn.SetReadDeadline(time.Time{})
 	}
-	config.SetInboundAudioCodec(probeAudioCodec(head))
+	videoCodec, audioCodec := probeHeadCodecs(head)
+	config.SetInboundVideoCodec(videoCodec)
+	config.SetInboundAudioCodec(audioCodec)
 
 	pipeOut, pipeIn := io.Pipe()
 
@@ -223,9 +225,10 @@ func teardown(conn gosrt.Conn, pipe *io.PipeWriter) {
 		_activeConn = nil
 		_activePipe = nil
 	}
-	// The sniffed codec belongs to the session that just ended; a following
-	// RTMP broadcast must not inherit it.
+	// The sniffed codecs belong to the session that just ended; a following
+	// RTMP broadcast must not inherit them.
 	config.SetInboundAudioCodec("")
+	config.SetInboundVideoCodec("")
 }
 
 // Disconnect will force disconnect the current inbound SRT connection.

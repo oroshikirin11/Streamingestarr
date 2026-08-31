@@ -245,35 +245,44 @@ func parseKbps(bps string) int {
 	return n / 1000
 }
 
-// probeAudioCodec identifies just the audio codec from a head capture —
-// the one fact the transcoder needs BEFORE it spawns (its fMP4 path picks
-// a bitstream filter per codec, and picking wrong is fatal). Kept light so
-// the ingest can afford to run it synchronously: streams only, no packets.
-// Returns "" when the head is too thin to say.
-func probeAudioCodec(head []byte) string {
+// probeHeadCodecs identifies the codecs from a head capture — the facts
+// needed BEFORE the transcoder spawns: its fMP4 path picks a bitstream
+// filter per audio codec (picking wrong is fatal), and the master-playlist
+// repair needs the real video codec to catch ffmpeg's default-avc1 lie for
+// copied streams. Kept light so the ingest can afford to run it
+// synchronously: streams only, no packets. Empty strings mean the head was
+// too thin to say.
+func probeHeadCodecs(head []byte) (video, audio string) {
 	if len(head) == 0 {
-		return ""
+		return "", ""
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, ffprobePath(),
 		"-v", "quiet", "-print_format", "json",
-		"-show_streams", "-select_streams", "a", "-i", "pipe:0")
+		"-show_streams", "-i", "pipe:0")
 	cmd.Stdin = bytes.NewReader(head)
 	out, err := cmd.Output()
 	if err != nil {
-		return ""
+		return "", ""
 	}
 	var parsed ffprobeOutput
 	if err := json.Unmarshal(out, &parsed); err != nil {
-		return ""
+		return "", ""
 	}
 	for _, s := range parsed.Streams {
-		if s.CodecType == "audio" && s.CodecName != "" {
-			return s.CodecName
+		switch s.CodecType {
+		case "video":
+			if video == "" {
+				video = s.CodecName
+			}
+		case "audio":
+			if audio == "" {
+				audio = s.CodecName
+			}
 		}
 	}
-	return ""
+	return video, audio
 }
 
 // ffprobePath looks next to the configured ffmpeg first — wherever the
