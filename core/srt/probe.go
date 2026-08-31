@@ -285,6 +285,35 @@ func probeHeadCodecs(head []byte) (video, audio string) {
 	return video, audio
 }
 
+// mergeDetails folds a fresh probe into what is already known — and never
+// downgrades. A capture window without a keyframe in it (mid-GOP reconnect,
+// high-bitrate stream with long GOPs) tells ffprobe the codec but not the
+// profile, geometry or colour; those fields come back empty and must not
+// erase the richer answer an earlier window produced. Rates are the live
+// part and always update when measured.
+func mergeDetails(prev, fresh models.InboundStreamDetails) models.InboundStreamDetails {
+	out := fresh
+	// No frame was parsed: the whole video description is unreliable, keep
+	// the previous one and take only the measured rate.
+	if fresh.Width == 0 && prev.Width != 0 {
+		out.VideoCodec = prev.VideoCodec
+		out.Width = prev.Width
+		out.Height = prev.Height
+		out.VideoFramerate = prev.VideoFramerate
+	}
+	if fresh.AudioCodec == "" && prev.AudioCodec != "" {
+		out.AudioCodec = prev.AudioCodec
+		out.VideoOnly = prev.VideoOnly
+	}
+	if fresh.VideoBitrate == 0 {
+		out.VideoBitrate = prev.VideoBitrate
+	}
+	if fresh.AudioBitrate == 0 {
+		out.AudioBitrate = prev.AudioBitrate
+	}
+	return out
+}
+
 // ffprobePath looks next to the configured ffmpeg first — wherever the
 // operator's ffmpeg lives, its ffprobe lives too — then falls back to PATH.
 func ffprobePath() string {

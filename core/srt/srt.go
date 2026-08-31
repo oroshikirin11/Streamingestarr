@@ -201,6 +201,12 @@ func handlePublisher(conn gosrt.Conn) {
 	brBytes := int64(len(head))
 	brLast := time.Now()
 
+	// The richest details seen this session; fresh probes merge into it
+	// rather than replace it (a keyframe-less window must not blank the
+	// card). Guarded because probe goroutines outlive their 30s slots.
+	var detailsMu sync.Mutex
+	lastDetails := models.InboundStreamDetails{Encoder: "SRT"}
+
 	buffer := make([]byte, 1316) // 7 mpegts packets, the SRT payload convention
 	for {
 		n, err := conn.Read(buffer)
@@ -225,8 +231,11 @@ func handlePublisher(conn gosrt.Conn) {
 					resumeAt = time.Now().Add(reprobeAfter)
 					go func() {
 						if details, container := probeInboundStream(prefix); container != "" {
+							detailsMu.Lock()
+							lastDetails = mergeDetails(lastDetails, details)
 							b := broadcaster
-							b.StreamDetails = details
+							b.StreamDetails = lastDetails
+							detailsMu.Unlock()
 							_setBroadcaster(b, key)
 							if container != "mpegts" {
 								reprobe.Store(false)
