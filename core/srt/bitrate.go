@@ -76,11 +76,15 @@ func GetIngestStats() IngestStats {
 	if conn == nil {
 		return out
 	}
-	var s gosrt.Statistics
-	conn.Stats(&s)
 	out.Connected = true
-	out.SrtPktRecvDrop = s.Accumulated.PktRecvDrop
-	out.SrtPktRecvLoss = s.Accumulated.PktRecvLoss
-	out.SrtPktRecvRetrans = s.Accumulated.PktRecvRetrans
+	// SRT counters only exist on an SRT session; a TCP ingest cannot lose
+	// packets by construction (the kernel retransmits), so zeros are truth.
+	if c, ok := conn.(gosrt.Conn); ok {
+		var s gosrt.Statistics
+		c.Stats(&s)
+		out.SrtPktRecvDrop = s.Accumulated.PktRecvDrop
+		out.SrtPktRecvLoss = s.Accumulated.PktRecvLoss
+		out.SrtPktRecvRetrans = s.Accumulated.PktRecvRetrans
+	}
 	return out
 }

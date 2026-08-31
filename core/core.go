@@ -69,6 +69,7 @@ func Start() error {
 
 	// start the SRT/mpegts server — the preferred ingest path
 	go srt.Start(setStreamAsConnected, setBroadcaster, isStreamKeyBusy)
+	go srt.StartTCP(setStreamAsConnected, setBroadcaster, isStreamKeyBusy)
 	if configRepository.GetSRTServerEnabled() {
 		log.Infof("SRT is accepting inbound streams on udp port %d.", configRepository.GetSRTServerPort())
 	}

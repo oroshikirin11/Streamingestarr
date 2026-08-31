@@ -35,6 +35,8 @@ const (
 	srtServerEnabledKey             = "srt_server_enabled"
 	srtServerPortKey                = "srt_server_port"
 	srtPassphraseKey                = "srt_passphrase"
+	tcpIngestEnabledKey             = "tcp_ingest_enabled"
+	tcpIngestPortKey                = "tcp_ingest_port"
 	blockedUsernamesKey             = "blocked_usernames"
 	publicKeyKey                    = "public_key"
 	privateKeyKey                   = "private_key"

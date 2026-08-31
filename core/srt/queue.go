@@ -29,6 +29,13 @@ type pipeQueue struct {
 	bytes  int
 	max    int
 	closed bool
+	// lossless flips overflow behavior: instead of dropping oldest, push
+	// BLOCKS until the drain makes room. Correct for TCP — the kernel then
+	// backpressures the sender, which retransmits nothing and loses
+	// nothing; dropping here would reintroduce loss on the one transport
+	// that guarantees losslessness. SRT stays drop-oldest: blocking its
+	// reader is exactly the stall-starves-the-window bug this queue fixed.
+	lossless bool
 
 	lastDropLog time.Time
 }
@@ -37,17 +44,27 @@ type pipeQueue struct {
 // admin ingest stats; reset at each publisher connect.
 var _queueDroppedBytes atomic.Int64
 
-func newPipeQueue(maxBytes int) *pipeQueue {
-	q := &pipeQueue{max: maxBytes}
+func newPipeQueue(maxBytes int, lossless bool) *pipeQueue {
+	q := &pipeQueue{max: maxBytes, lossless: lossless}
 	q.cond = sync.NewCond(&q.mu)
 	return q
 }
 
-// push copies b into the queue. Never blocks: over budget, the oldest
-// chunks go first and the loss is counted and logged (rate-limited).
+// push copies b into the queue. Lossy mode never blocks: over budget, the
+// oldest chunks go first and the loss is counted and logged (rate-limited).
+// Lossless mode blocks until the drain makes room (see the field comment).
 func (q *pipeQueue) push(b []byte) {
 	chunk := append([]byte(nil), b...)
 	q.mu.Lock()
+	if q.lossless {
+		for q.bytes+len(chunk) > q.max && !q.closed {
+			q.cond.Wait()
+		}
+		if q.closed {
+			q.mu.Unlock()
+			return
+		}
+	}
 	q.chunks = append(q.chunks, chunk)
 	q.bytes += len(chunk)
 	var dropped int
@@ -64,7 +81,7 @@ func (q *pipeQueue) push(b []byte) {
 		}
 	}
 	q.mu.Unlock()
-	q.cond.Signal()
+	q.cond.Broadcast()
 }
 
 // pop blocks until a chunk is available; ok=false once closed and drained.
@@ -80,6 +97,9 @@ func (q *pipeQueue) pop() ([]byte, bool) {
 	chunk := q.chunks[0]
 	q.chunks = q.chunks[1:]
 	q.bytes -= len(chunk)
+	// Wake a lossless pusher waiting for room (and fellow poppers; both
+	// re-check their conditions).
+	q.cond.Broadcast()
 	return chunk, true
 }
 

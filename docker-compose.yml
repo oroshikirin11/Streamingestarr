@@ -19,5 +19,10 @@ services:
       # fragment loss under load shows up as picture artifacts. The streamid
       # (stream key) still gates the handshake either way.
       - "${SRT_BIND_IP:-${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}}:9710:9710/udp"
+      # TCP ingest (raw mpegts) — NO in-band auth, tailnet only, never
+      # public. TCP retransmits forever, so a lossy uplink shows as delay
+      # instead of artifacts; the tunnel MTU issue is UDP-only. Off by
+      # default in the app; enable in admin → Stream.
+      - "${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}:9711:9711"
     volumes:
       - ./data:/app/data

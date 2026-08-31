@@ -69,8 +69,8 @@ var audioCodecNames = map[string]string{
 // The returned container name is "" when the probe could not say anything
 // useful; the caller then keeps the bare details rather than showing
 // half-parsed junk.
-func probeInboundStream(prefix []byte) (models.InboundStreamDetails, string) {
-	details := models.InboundStreamDetails{Encoder: "SRT"}
+func probeInboundStream(prefix []byte, transport string) (models.InboundStreamDetails, string) {
+	details := models.InboundStreamDetails{Encoder: transport}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -96,7 +96,7 @@ func probeInboundStream(prefix []byte) (models.InboundStreamDetails, string) {
 	// "matroska,webm" and friends: the first name is the one that matters.
 	container, _, _ := strings.Cut(parsed.Format.FormatName, ",")
 	if container != "" {
-		details.Encoder = "SRT/" + container
+		details.Encoder = transport + "/" + container
 	}
 
 	measured := measuredRates(parsed)

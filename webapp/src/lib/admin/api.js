@@ -43,6 +43,8 @@ export const setUserEnabled = (userId, enabled) =>
 export const setSRTEnabled = (value) => post('/api/admin/config/srt/enabled', { value });
 export const setSRTPort = (value) => post('/api/admin/config/srt/port', { value });
 export const setSRTPassphrase = (value) => post('/api/admin/config/srt/passphrase', { value });
+export const setTCPIngestEnabled = (value) => post('/api/admin/config/tcp/enabled', { value });
+export const setTCPIngestPort = (value) => post('/api/admin/config/tcp/port', { value });
 export const getLogs = () => req('/api/admin/logs');
 export const getWarnings = () => req('/api/admin/logs/warnings');
 export const getIPBans = () => req('/api/admin/chat/users/ipbans');

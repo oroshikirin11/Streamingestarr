@@ -21,6 +21,8 @@
 	let srtPort = $state(9710);
 	let srtPassphrase = $state('');
 	let srtPassphraseSet = $state(false);
+	let tcpIngestEnabled = $state(false);
+	let tcpIngestPort = $state(9711);
 	let reservationDays = $state(30);
 	let chatEnabled = $state(true);
 	let joinMessages = $state(true);
@@ -69,6 +71,8 @@
 		srtEnabled = cfg.srtServerEnabled ?? true;
 		srtPort = cfg.srtServerPort ?? 9710;
 		srtPassphraseSet = cfg.srtPassphraseSet ?? false;
+		tcpIngestEnabled = cfg.tcpIngestEnabled ?? false;
+		tcpIngestPort = cfg.tcpIngestPort ?? 9711;
 		reservationDays = cfg.chatNameReservationDays ?? 30;
 		chatEnabled = !(cfg.chatDisabled ?? false);
 		joinMessages = cfg.chatJoinMessagesEnabled ?? true;
@@ -291,6 +295,17 @@
 					</div>
 				</div>
 				<p class="hint">With a passphrase the ingest only accepts encrypted callers carrying it — worth having when the port faces the internet. Give the sender the same passphrase. Applies to the next connection, no restart.</p>
+				<div class="field-row">
+					<label class="switch">
+						<input type="checkbox" bind:checked={tcpIngestEnabled} onchange={() => run(() => api.setTCPIngestEnabled(tcpIngestEnabled))} />
+						<span class="track"></span> TCP ingest
+					</label>
+					<div class="field compact">
+						<label for="tcpport">TCP port</label>
+						<input id="tcpport" type="number" bind:value={tcpIngestPort} onchange={() => run(() => api.setTCPIngestPort(Number(tcpIngestPort)))} />
+					</div>
+				</div>
+				<p class="hint">Raw container over TCP: retransmits forever, so uplink loss becomes delay instead of artifacts — carries HEVC/AV1 like SRT, survives lossy links like RTMP. The sender authenticates with the stream key (Jellystreamerr: protocol TCP + this host + port); key and media travel in plaintext, so keep it tailnet-bound. Restart to apply.</p>
 				<footer>
 					<button onclick={() => run(async () => {
 						const r = await api.setSRTPort(Number(srtPort));

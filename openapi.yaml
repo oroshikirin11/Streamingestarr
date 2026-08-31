@@ -3281,6 +3281,40 @@ paths:
               properties:
                 value:
                   type: string
+  /admin/config/tcp/enabled:
+    post:
+      operationId: SetTCPIngestEnabled
+      summary: Toggle the raw mpegts-over-TCP ingest (tailnet-only trust; restart to apply)
+      tags:
+      - Admin
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: boolean
+  /admin/config/tcp/port:
+    post:
+      operationId: SetTCPIngestPort
+      summary: TCP ingest port (restart to apply)
+      tags:
+      - Admin
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: integer
   /integrations/metadata/nowplaying:
     post:
       operationId: SetNowPlayingMetadata

@@ -144,6 +144,35 @@ func (r *SqlConfigRepository) SetSRTPassphrase(passphrase string) error {
 	return r.datastore.SetString(srtPassphraseKey, passphrase)
 }
 
+// GetTCPIngestEnabled returns whether the raw mpegts-over-TCP ingest
+// listens. Default OFF: it has no in-band auth and belongs on the tailnet.
+func (r *SqlConfigRepository) GetTCPIngestEnabled() bool {
+	enabled, err := r.datastore.GetBool(tcpIngestEnabledKey)
+	if err != nil {
+		return false
+	}
+	return enabled
+}
+
+// SetTCPIngestEnabled toggles the TCP ingest (effective on restart).
+func (r *SqlConfigRepository) SetTCPIngestEnabled(enabled bool) error {
+	return r.datastore.SetBool(tcpIngestEnabledKey, enabled)
+}
+
+// GetTCPIngestPort returns the TCP ingest port.
+func (r *SqlConfigRepository) GetTCPIngestPort() int {
+	port, err := r.datastore.GetNumber(tcpIngestPortKey)
+	if err != nil || port == 0 {
+		return 9711
+	}
+	return int(port)
+}
+
+// SetTCPIngestPort sets the TCP ingest port (effective on restart).
+func (r *SqlConfigRepository) SetTCPIngestPort(port int) error {
+	return r.datastore.SetNumber(tcpIngestPortKey, float64(port))
+}
+
 // GetVideoSegmentFormat returns the HLS segment container choice: "ts",
 // "fmp4", or "auto" (the default). Auto resolves per broadcast in the
 // transcoder from the codec the ingest sniffed — fMP4/CMAF is required to

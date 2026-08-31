@@ -23,6 +23,10 @@ type ConfigRepository interface {
 	SetSRTServerPort(port int) error
 	GetSRTPassphrase() string
 	SetSRTPassphrase(passphrase string) error
+	GetTCPIngestEnabled() bool
+	SetTCPIngestEnabled(enabled bool) error
+	GetTCPIngestPort() int
+	SetTCPIngestPort(port int) error
 	SetVideoSegmentFormat(format string) error
 	SetChatNameReservationDays(days int) error
 	SetViewerUsername(username string) error
