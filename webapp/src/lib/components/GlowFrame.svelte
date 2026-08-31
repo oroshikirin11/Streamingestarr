@@ -8,7 +8,11 @@
 	let frameEl;
 	let ambiEl;
 	let hls = null;
-	let muted = $state(true); // autoplay needs muted; one click un-mutes
+	// Sound-first: viewers arrive through the login click, which counts as
+	// the user gesture browsers want before unmuted autoplay. startPlayback
+	// tries with sound and falls back to muted only when the browser
+	// actually refuses (e.g. a restored tab with no interaction yet).
+	let muted = $state(false);
 	// Default quiet: a first-time viewer gets 5%, not a full-volume blast.
 	let volume = $state(Number(localStorage.getItem('sgr_volume') ?? 0.05) || 0.05);
 
@@ -29,6 +33,20 @@
 		uiVisible = true;
 		clearTimeout(uiTimer);
 		uiTimer = setTimeout(() => (uiVisible = false), 3000);
+	}
+
+	// Try to start with sound at the remembered volume; if the browser's
+	// autoplay policy refuses, restart muted rather than not playing at all.
+	// The slider keeps showing the real volume either way, and one click on
+	// the speaker (or a slider touch) brings the sound in.
+	function startPlayback() {
+		videoEl.muted = muted;
+		videoEl.volume = volume;
+		videoEl.play().catch(() => {
+			muted = true;
+			videoEl.muted = true;
+			videoEl.play().catch(() => {});
+		});
 	}
 
 	function initPlayer() {
@@ -55,7 +73,7 @@
 			});
 			hls.loadSource(src());
 			hls.attachMedia(videoEl);
-			hls.on(Hls.Events.MANIFEST_PARSED, () => videoEl.play().catch(() => {}));
+			hls.on(Hls.Events.MANIFEST_PARSED, startPlayback);
 			hls.on(Hls.Events.ERROR, (_e, data) => {
 				if (!data.fatal) return;
 				clearTimeout(retryTimer);
@@ -63,7 +81,7 @@
 			});
 		} else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
 			videoEl.src = src();
-			videoEl.play().catch(() => {});
+			startPlayback();
 			videoEl.onerror = () => {
 				clearTimeout(retryTimer);
 				retryTimer = setTimeout(initPlayer, 3000);
