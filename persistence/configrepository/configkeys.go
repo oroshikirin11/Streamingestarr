@@ -37,6 +37,7 @@ const (
 	srtPassphraseKey                = "srt_passphrase"
 	tcpIngestEnabledKey             = "tcp_ingest_enabled"
 	tcpIngestPortKey                = "tcp_ingest_port"
+	tcpIngestPassphraseKey          = "tcp_ingest_passphrase"
 	blockedUsernamesKey             = "blocked_usernames"
 	publicKeyKey                    = "public_key"
 	privateKeyKey                   = "private_key"

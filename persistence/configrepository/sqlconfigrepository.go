@@ -173,6 +173,21 @@ func (r *SqlConfigRepository) SetTCPIngestPort(port int) error {
 	return r.datastore.SetNumber(tcpIngestPortKey, float64(port))
 }
 
+// GetTCPIngestPassphrase returns the TCP preamble passphrase, or "" when
+// the stream key alone opens the door. Read per connection.
+func (r *SqlConfigRepository) GetTCPIngestPassphrase() string {
+	passphrase, err := r.datastore.GetString(tcpIngestPassphraseKey)
+	if err != nil {
+		return ""
+	}
+	return passphrase
+}
+
+// SetTCPIngestPassphrase stores the TCP preamble passphrase ("" disables).
+func (r *SqlConfigRepository) SetTCPIngestPassphrase(passphrase string) error {
+	return r.datastore.SetString(tcpIngestPassphraseKey, passphrase)
+}
+
 // GetVideoSegmentFormat returns the HLS segment container choice: "ts",
 // "fmp4", or "auto" (the default). Auto resolves per broadcast in the
 // transcoder from the codec the ingest sniffed — fMP4/CMAF is required to

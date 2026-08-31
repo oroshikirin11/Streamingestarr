@@ -23,6 +23,8 @@
 	let srtPassphraseSet = $state(false);
 	let tcpIngestEnabled = $state(false);
 	let tcpIngestPort = $state(9711);
+	let tcpPassphrase = $state('');
+	let tcpPassphraseSet = $state(false);
 	let reservationDays = $state(30);
 	let chatEnabled = $state(true);
 	let joinMessages = $state(true);
@@ -73,6 +75,7 @@
 		srtPassphraseSet = cfg.srtPassphraseSet ?? false;
 		tcpIngestEnabled = cfg.tcpIngestEnabled ?? false;
 		tcpIngestPort = cfg.tcpIngestPort ?? 9711;
+		tcpPassphraseSet = cfg.tcpPassphraseSet ?? false;
 		reservationDays = cfg.chatNameReservationDays ?? 30;
 		chatEnabled = !(cfg.chatDisabled ?? false);
 		joinMessages = cfg.chatJoinMessagesEnabled ?? true;
@@ -152,8 +155,11 @@
 	});
 
 	const host = typeof location !== 'undefined' ? location.hostname : 'localhost';
-	const rtmpURL = $derived(`rtmp://${host}:${cfg?.rtmpServerPort ?? 1935}/live/${keys[0]?.key ?? ''}`);
-	const srtURL = $derived(`srt://${host}:${srtPort}?streamid=${keys[0]?.key ?? ''}`);
+	// Bare addresses — the stream key lives in its own card with its own
+	// Copy button; senders take address and key as separate fields anyway.
+	const rtmpURL = $derived(`rtmp://${host}:${cfg?.rtmpServerPort ?? 1935}/live`);
+	const srtURL = $derived(`srt://${host}:${srtPort}`);
+	const tcpURL = $derived(`tcp://${host}:${tcpIngestPort}`);
 
 	const uptime = $derived.by(() => {
 		const t = status?.broadcaster?.time;
@@ -275,6 +281,9 @@
 				<dl class="mono">
 					<div><dt>RTMP</dt><dd>{rtmpURL}</dd><button class="ghost tiny" onclick={() => copy(rtmpURL)}>Copy</button></div>
 					<div><dt>SRT</dt><dd>{srtURL}</dd><button class="ghost tiny" onclick={() => copy(srtURL)}>Copy</button></div>
+					{#if tcpIngestEnabled}
+						<div><dt>TCP</dt><dd>{tcpURL}</dd><button class="ghost tiny" onclick={() => copy(tcpURL)}>Copy</button></div>
+					{/if}
 				</dl>
 			</div>
 
@@ -303,6 +312,12 @@
 					<div class="field compact">
 						<label for="tcpport">TCP port</label>
 						<input id="tcpport" type="number" bind:value={tcpIngestPort} onchange={() => run(() => api.setTCPIngestPort(Number(tcpIngestPort)))} />
+					</div>
+					<div class="field">
+						<label for="tcppass">Passphrase — optional ({tcpPassphraseSet ? 'set' : 'not set'})</label>
+						<input id="tcppass" type="password" bind:value={tcpPassphrase} autocomplete="new-password"
+							placeholder={tcpPassphraseSet ? 'unchanged — type to replace, clear to disable' : '10–79 chars, no spaces; empty = key only'}
+							onchange={() => run(async () => { const r = await api.setTCPIngestPassphrase(tcpPassphrase); tcpPassphraseSet = tcpPassphrase !== ''; tcpPassphrase = ''; return r; })} />
 					</div>
 				</div>
 				<p class="hint">Raw container over TCP: retransmits forever, so uplink loss becomes delay instead of artifacts — carries HEVC/AV1 like SRT, survives lossy links like RTMP. The sender authenticates with the stream key (Jellystreamerr: protocol TCP + this host + port); key and media travel in plaintext, so keep it tailnet-bound. Restart to apply.</p>

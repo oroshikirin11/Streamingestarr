@@ -407,6 +407,26 @@ func SetTCPIngestPort(w http.ResponseWriter, r *http.Request) {
 	authJSON(w, http.StatusOK, true, "")
 }
 
+// SetTCPIngestPassphrase stores the TCP preamble passphrase. Optional:
+// empty means the stream key alone opens the door. No spaces or newlines —
+// it rides a space-delimited preamble line. Applies to new connections.
+func SetTCPIngestPassphrase(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Value string `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
+		strings.ContainsAny(req.Value, " \r\n") ||
+		(req.Value != "" && (len(req.Value) < 10 || len(req.Value) > 79)) {
+		authJSON(w, http.StatusBadRequest, false, "TCP passphrases must be 10-79 characters with no spaces; send an empty value to disable.")
+		return
+	}
+	if err := configrepository.Get().SetTCPIngestPassphrase(req.Value); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	authJSON(w, http.StatusOK, true, "")
+}
+
 // SetSRTEnabled toggles the SRT ingest listener (takes effect on restart).
 func SetSRTEnabled(w http.ResponseWriter, r *http.Request) {
 	var req struct {

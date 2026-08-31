@@ -83,6 +83,7 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 		SRTPassphraseSet:   configRepository.GetSRTPassphrase() != "",
 		TCPIngestEnabled:   configRepository.GetTCPIngestEnabled(),
 		TCPIngestPort:      configRepository.GetTCPIngestPort(),
+		TCPPassphraseSet:   configRepository.GetTCPIngestPassphrase() != "",
 		ForbiddenUsernames: usernameBlocklist,
 		SuggestedUsernames: usernameSuggestions,
 
@@ -116,6 +117,7 @@ type serverConfigAdminResponse struct {
 	SRTPassphraseSet          bool                    `json:"srtPassphraseSet"`
 	TCPIngestEnabled          bool                    `json:"tcpIngestEnabled"`
 	TCPIngestPort             int                     `json:"tcpIngestPort"`
+	TCPPassphraseSet          bool                    `json:"tcpPassphraseSet"`
 	YP                        legacyYPStub            `json:"yp"`
 	S3                        legacyS3Stub            `json:"s3"`
 	Federation                legacyFederationStub    `json:"federation"`

@@ -88,9 +88,18 @@ func handleTCPPublisher(conn *net.TCPConn) {
 	}
 	_ = conn.SetReadDeadline(time.Time{})
 
-	tag, rawKey, ok := strings.Cut(strings.TrimRight(string(line), "\r"), " ")
+	tag, rest, ok := strings.Cut(strings.TrimRight(string(line), "\r"), " ")
 	if !ok || tag != "SGR-TS/1" {
 		log.Errorln("TCP ingest connection from", remoteAddr, "rejected — malformed preamble")
+		_ = conn.Close()
+		return
+	}
+	// Optional second token: the TCP passphrase. When one is configured,
+	// key alone no longer opens the door — the extra lock for a listener
+	// that faces the internet, where the streamid... IS the whole lock.
+	rawKey, suppliedPass, _ := strings.Cut(strings.TrimSpace(rest), " ")
+	if want := configrepository.Get().GetTCPIngestPassphrase(); want != "" && strings.TrimSpace(suppliedPass) != want {
+		log.Errorln("TCP ingest connection from", remoteAddr, "rejected — missing or wrong passphrase")
 		_ = conn.Close()
 		return
 	}

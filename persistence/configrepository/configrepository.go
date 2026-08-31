@@ -27,6 +27,8 @@ type ConfigRepository interface {
 	SetTCPIngestEnabled(enabled bool) error
 	GetTCPIngestPort() int
 	SetTCPIngestPort(port int) error
+	GetTCPIngestPassphrase() string
+	SetTCPIngestPassphrase(passphrase string) error
 	SetVideoSegmentFormat(format string) error
 	SetChatNameReservationDays(days int) error
 	SetViewerUsername(username string) error
