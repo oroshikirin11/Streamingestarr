@@ -3264,6 +3264,23 @@ paths:
               properties:
                 value:
                   type: integer
+  /admin/config/srt/passphrase:
+    post:
+      operationId: SetSRTPassphrase
+      summary: SRT ingest passphrase (10-79 chars, empty disables; applies to new connections immediately)
+      tags:
+      - Admin
+      responses:
+        '200':
+          description: Operation result
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                value:
+                  type: string
   /integrations/metadata/nowplaying:
     post:
       operationId: SetNowPlayingMetadata

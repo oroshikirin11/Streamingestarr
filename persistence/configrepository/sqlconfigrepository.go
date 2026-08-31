@@ -128,6 +128,22 @@ func (r *SqlConfigRepository) SetSRTServerPort(port int) error {
 	return r.datastore.SetNumber(srtServerPortKey, float64(port))
 }
 
+// GetSRTPassphrase returns the SRT encryption passphrase, or "" when the
+// ingest accepts unencrypted callers. Read per connection, so a change
+// applies to the next handshake without a restart.
+func (r *SqlConfigRepository) GetSRTPassphrase() string {
+	passphrase, err := r.datastore.GetString(srtPassphraseKey)
+	if err != nil {
+		return ""
+	}
+	return passphrase
+}
+
+// SetSRTPassphrase stores the SRT encryption passphrase ("" disables).
+func (r *SqlConfigRepository) SetSRTPassphrase(passphrase string) error {
+	return r.datastore.SetString(srtPassphraseKey, passphrase)
+}
+
 // GetVideoSegmentFormat returns the HLS segment container choice: "ts",
 // "fmp4", or "auto" (the default). Auto resolves per broadcast in the
 // transcoder from the codec the ingest sniffed — fMP4/CMAF is required to

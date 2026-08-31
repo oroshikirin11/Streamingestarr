@@ -339,6 +339,26 @@ func SetVideoSegmentFormat(w http.ResponseWriter, r *http.Request) {
 	authJSON(w, http.StatusOK, true, "")
 }
 
+// SetSRTPassphrase stores the SRT encryption passphrase. Optional: an
+// empty value disables encryption (the streamid stays the only lock);
+// non-empty must be 10-79 characters — the SRT handshake's own limits.
+// Applies to the next connection, no restart needed.
+func SetSRTPassphrase(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Value string `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
+		(req.Value != "" && (len(req.Value) < 10 || len(req.Value) > 79)) {
+		authJSON(w, http.StatusBadRequest, false, "SRT passphrases must be 10-79 characters; send an empty value to disable encryption.")
+		return
+	}
+	if err := configrepository.Get().SetSRTPassphrase(req.Value); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	authJSON(w, http.StatusOK, true, "")
+}
+
 // SetSRTEnabled toggles the SRT ingest listener (takes effect on restart).
 func SetSRTEnabled(w http.ResponseWriter, r *http.Request) {
 	var req struct {

@@ -21,6 +21,8 @@ type ConfigRepository interface {
 	SetSRTServerEnabled(enabled bool) error
 	GetSRTServerPort() int
 	SetSRTServerPort(port int) error
+	GetSRTPassphrase() string
+	SetSRTPassphrase(passphrase string) error
 	SetVideoSegmentFormat(format string) error
 	SetChatNameReservationDays(days int) error
 	SetViewerUsername(username string) error

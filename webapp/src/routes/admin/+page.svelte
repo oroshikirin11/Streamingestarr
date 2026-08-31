@@ -2,6 +2,7 @@
 	import '../../app.css';
 	import { onMount } from 'svelte';
 	import * as api from '$lib/admin/api.js';
+	import Spark from '$lib/admin/Spark.svelte';
 
 	let section = $state('status');
 	let cfg = $state(null);
@@ -18,6 +19,8 @@
 	let segmentFormat = $state('auto');
 	let srtEnabled = $state(true);
 	let srtPort = $state(9710);
+	let srtPassphrase = $state('');
+	let srtPassphraseSet = $state(false);
 	let reservationDays = $state(30);
 	let chatEnabled = $state(true);
 	let joinMessages = $state(true);
@@ -31,6 +34,7 @@
 	let logs = $state([]);
 	let logFilter = $state('warnings');
 	let hw = $state(null);
+	let viewersSeries = $state(null);
 	let tokens = $state([]);
 	let newTokenName = $state('');
 
@@ -62,6 +66,7 @@
 		segmentFormat = cfg.videoSegmentFormat ?? 'auto';
 		srtEnabled = cfg.srtServerEnabled ?? true;
 		srtPort = cfg.srtServerPort ?? 9710;
+		srtPassphraseSet = cfg.srtPassphraseSet ?? false;
 		reservationDays = cfg.chatNameReservationDays ?? 30;
 		chatEnabled = !(cfg.chatDisabled ?? false);
 		joinMessages = cfg.chatJoinMessagesEnabled ?? true;
@@ -71,7 +76,12 @@
 	async function refreshStatus() {
 		try {
 			status = await api.getAdminStatus();
-			if (section === 'status') hw = await api.getHardwareStats();
+			if (section === 'status') {
+				hw = await api.getHardwareStats();
+				// Last 4 hours of viewer counts — sampled every 2 minutes
+				// server-side, so this stays a tiny payload.
+				viewersSeries = await api.getViewersOverTime(Math.floor(Date.now() / 1000) - 4 * 3600);
+			}
 		} catch {}
 	}
 
@@ -209,15 +219,28 @@
 					<div class="tile"><span class="num">{status?.sessionPeakViewerCount ?? 0}</span><span class="lab">session peak</span></div>
 					<div class="tile"><span class="num">{status?.overallPeakViewerCount ?? 0}</span><span class="lab">all-time peak</span></div>
 				</div>
+				{#if viewersSeries?.length > 1}
+					<p class="spark-label">last 4 hours</p>
+					<Spark data={viewersSeries} height={72} />
+				{/if}
 			</div>
 
 			{#if hw}
 				<div class="card">
 					<header><h2>Server health</h2></header>
 					<div class="tiles">
-						<div class="tile"><span class="num">{latest(hw.cpu) ?? '—'}<small>%</small></span><span class="lab">cpu</span></div>
-						<div class="tile"><span class="num">{latest(hw.memory) ?? '—'}<small>%</small></span><span class="lab">memory</span></div>
-						<div class="tile"><span class="num">{latest(hw.disk) ?? '—'}<small>%</small></span><span class="lab">disk</span></div>
+						<div class="tile">
+							<span class="num">{latest(hw.cpu) ?? '—'}<small>%</small></span><span class="lab">cpu</span>
+							<Spark data={hw.cpu} unit="%" max={100} height={44} />
+						</div>
+						<div class="tile">
+							<span class="num">{latest(hw.memory) ?? '—'}<small>%</small></span><span class="lab">memory</span>
+							<Spark data={hw.memory} unit="%" max={100} height={44} />
+						</div>
+						<div class="tile">
+							<span class="num">{latest(hw.disk) ?? '—'}<small>%</small></span><span class="lab">disk</span>
+							<Spark data={hw.disk} unit="%" max={100} height={44} />
+						</div>
 					</div>
 					{#if status?.health?.message}
 						<p class="hint">{status.health.message}</p>
@@ -237,7 +260,7 @@
 			</div>
 
 			<div class="card">
-				<header><h2>SRT ingest</h2><p>The preferred path — carries AV1 and HEVC. Changes take effect after a restart.</p></header>
+				<header><h2>SRT ingest</h2><p>The preferred path — carries AV1 and HEVC. Port and toggle take effect after a restart.</p></header>
 				<div class="field-row">
 					<label class="switch">
 						<input type="checkbox" bind:checked={srtEnabled} onchange={() => run(() => api.setSRTEnabled(srtEnabled))} />
@@ -247,8 +270,24 @@
 						<label for="srtport">UDP port</label>
 						<input id="srtport" type="number" bind:value={srtPort} />
 					</div>
+					<div class="field">
+						<label for="srtpass">Passphrase — optional ({srtPassphraseSet ? 'set' : 'not set'})</label>
+						<input id="srtpass" type="password" bind:value={srtPassphrase} placeholder={srtPassphraseSet ? 'unchanged — type to replace, clear to disable' : '10–79 chars; empty = no encryption'} autocomplete="new-password" />
+					</div>
 				</div>
-				<footer><button onclick={() => run(() => api.setSRTPort(Number(srtPort)))}>Save</button></footer>
+				<p class="hint">With a passphrase the ingest only accepts encrypted callers carrying it — worth having when the port faces the internet. Give the sender the same passphrase. Applies to the next connection, no restart.</p>
+				<footer>
+					<button onclick={() => run(async () => {
+						const r = await api.setSRTPort(Number(srtPort));
+						if (srtPassphrase !== '' || srtPassphraseSet) {
+							const p = await api.setSRTPassphrase(srtPassphrase);
+							srtPassphraseSet = srtPassphrase !== '';
+							srtPassphrase = '';
+							return p;
+						}
+						return r;
+					})}>Save</button>
+				</footer>
 			</div>
 
 			<div class="card">
@@ -640,6 +679,7 @@
 
 	/* ---------- stat tiles ---------- */
 	.tiles { display: flex; gap: 12px; }
+	.spark-label { margin: 0.6rem 0 0.15rem; font-size: 0.72rem; opacity: 0.5; }
 	.tile {
 		flex: 1; display: flex; flex-direction: column; gap: 3px;
 		background: color-mix(in srgb, var(--surface-2) 55%, transparent);

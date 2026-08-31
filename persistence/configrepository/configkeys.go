@@ -34,6 +34,7 @@ const (
 	videoSegmentFormatKey           = "video_segment_format"
 	srtServerEnabledKey             = "srt_server_enabled"
 	srtServerPortKey                = "srt_server_port"
+	srtPassphraseKey                = "srt_passphrase"
 	blockedUsernamesKey             = "blocked_usernames"
 	publicKeyKey                    = "public_key"
 	privateKeyKey                   = "private_key"

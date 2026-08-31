@@ -66,8 +66,28 @@ func Start(setStreamAsConnected func(*io.PipeReader, string), setBroadcaster fun
 	}
 }
 
-// acceptConnection validates the stream key carried in the SRT streamid.
+// acceptConnection validates the stream key carried in the SRT streamid
+// and, when a passphrase is configured, demands encryption with it. The
+// passphrase is OPTIONAL: empty keeps today's behavior (unencrypted
+// callers welcome, the streamid is the lock). It is read per connection,
+// so a change applies to the next handshake without a restart.
 func acceptConnection(req gosrt.ConnRequest) gosrt.ConnType {
+	if passphrase := configrepository.Get().GetSRTPassphrase(); passphrase != "" {
+		if !req.IsEncrypted() {
+			log.Errorln("unencrypted SRT connection rejected from", req.RemoteAddr().String(), "— this ingest requires a passphrase")
+			return gosrt.REJECT
+		}
+		if err := req.SetPassphrase(passphrase); err != nil {
+			log.Errorln("SRT connection with wrong passphrase rejected from", req.RemoteAddr().String())
+			return gosrt.REJECT
+		}
+	} else if req.IsEncrypted() {
+		// The caller encrypts but no passphrase is configured here — the
+		// stream would arrive as undecryptable noise, so refuse honestly.
+		log.Errorln("encrypted SRT connection rejected from", req.RemoteAddr().String(), "— no passphrase is configured on this ingest")
+		return gosrt.REJECT
+	}
+
 	key := streamKeyFromStreamID(req.StreamId())
 	if key == "" {
 		log.Errorln("SRT connection with unknown or missing stream key rejected from", req.RemoteAddr().String())

@@ -64,6 +64,10 @@ func Start(enableVerboseLogging bool) error {
 	// for the admin app's assets.
 	r.HandleFunc("/*", handlers.ViewerAppHandler)
 
+	// Hand-registered API routes — endpoints added after the generated
+	// chi-server snapshot; the spec in openapi.yaml still documents them.
+	r.Post("/api/admin/config/srt/passphrase", middleware.RequireAdminAuth(handlers.SetSRTPassphrase))
+
 	// mount the api
 	r.Mount("/api/", handlers.New().Handler())
 

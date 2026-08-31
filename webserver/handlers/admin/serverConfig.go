@@ -80,6 +80,7 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 		VideoSegmentFormat: configRepository.GetVideoSegmentFormat(),
 		SRTServerEnabled:   configRepository.GetSRTServerEnabled(),
 		SRTServerPort:      configRepository.GetSRTServerPort(),
+		SRTPassphraseSet:   configRepository.GetSRTPassphrase() != "",
 		ForbiddenUsernames: usernameBlocklist,
 		SuggestedUsernames: usernameSuggestions,
 
@@ -110,6 +111,7 @@ type serverConfigAdminResponse struct {
 	VideoSegmentFormat        string                  `json:"videoSegmentFormat"`
 	SRTServerEnabled          bool                    `json:"srtServerEnabled"`
 	SRTServerPort             int                     `json:"srtServerPort"`
+	SRTPassphraseSet          bool                    `json:"srtPassphraseSet"`
 	YP                        legacyYPStub            `json:"yp"`
 	S3                        legacyS3Stub            `json:"s3"`
 	Federation                legacyFederationStub    `json:"federation"`
