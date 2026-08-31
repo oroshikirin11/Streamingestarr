@@ -351,7 +351,7 @@ func NewTranscoder() *Transcoder {
 	transcoder.codec = getCodec(configRepository.GetVideoCodec())
 	transcoder.segmentOutputPath = config.HLSStoragePath
 	transcoder.playlistOutputPath = config.HLSStoragePath
-	transcoder.segmentFormat = configRepository.GetVideoSegmentFormat()
+	transcoder.segmentFormat = resolveSegmentFormat(configRepository.GetVideoSegmentFormat())
 
 	transcoder.input = "pipe:0" // stdin
 
@@ -525,6 +525,23 @@ func (t *Transcoder) SetIdentifier(output string) {
 // SetInternalHTTPPort will set the port to be used for internal communication.
 func (t *Transcoder) SetInternalHTTPPort(port string) {
 	t.internalListenerPort = port
+}
+
+// resolveSegmentFormat turns the stored choice into a concrete container.
+// The explicit values win; "auto" decides per broadcast from the codec the
+// SRT ingest sniffed before this spawn. Only AV1 forces fMP4 — mpegts
+// simply cannot carry it, and segmenting it into ts silently destroys the
+// video track while audio plays on. HEVC and H.264 keep the proven ts
+// path, and unknown (RTMP, or a failed sniff) is H.264 territory.
+func resolveSegmentFormat(stored string) string {
+	if stored == "ts" || stored == "fmp4" {
+		return stored
+	}
+	if config.GetInboundVideoCodec() == "av1" {
+		log.Infoln("segment container: auto chose fMP4 — the inbound stream is AV1, which mpegts cannot carry")
+		return "fmp4"
+	}
+	return "ts"
 }
 
 // SetSegmentFormat overrides the HLS segment container ("ts" or "fmp4").

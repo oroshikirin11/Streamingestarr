@@ -15,7 +15,7 @@
 	let keys = $state([]);
 	let variants = $state([]);
 	let latency = $state(2);
-	let segmentFormat = $state('ts');
+	let segmentFormat = $state('auto');
 	let srtEnabled = $state(true);
 	let srtPort = $state(9710);
 	let reservationDays = $state(30);
@@ -59,7 +59,7 @@
 		keys = (cfg.streamKeys ?? []).map((k) => ({ key: k.key ?? '', comment: k.comment ?? '' }));
 		variants = structuredClone($state.snapshot(cfg.videoSettings?.videoQualityVariants ?? []));
 		latency = cfg.videoSettings?.latencyLevel ?? 2;
-		segmentFormat = cfg.videoSegmentFormat ?? 'ts';
+		segmentFormat = cfg.videoSegmentFormat ?? 'auto';
 		srtEnabled = cfg.srtServerEnabled ?? true;
 		srtPort = cfg.srtServerPort ?? 9710;
 		reservationDays = cfg.chatNameReservationDays ?? 30;
@@ -317,8 +317,9 @@
 					<div class="field">
 						<label for="segfmt">Segment container</label>
 						<select id="segfmt" bind:value={segmentFormat} onchange={() => run(() => api.setSegmentFormat(segmentFormat))}>
-							<option value="ts">mpegts — H.264 today</option>
-							<option value="fmp4">fMP4 — AV1 / HEVC ready</option>
+							<option value="auto">Auto — fMP4 when the codec needs it</option>
+							<option value="ts">mpegts — always</option>
+							<option value="fmp4">fMP4 — always</option>
 						</select>
 					</div>
 					<div class="field">

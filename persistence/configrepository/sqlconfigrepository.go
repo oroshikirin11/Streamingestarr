@@ -128,12 +128,14 @@ func (r *SqlConfigRepository) SetSRTServerPort(port int) error {
 	return r.datastore.SetNumber(srtServerPortKey, float64(port))
 }
 
-// GetVideoSegmentFormat returns the HLS segment container: "ts" (default)
-// or "fmp4". fMP4/CMAF is required to carry AV1 (and HEVC) in HLS.
+// GetVideoSegmentFormat returns the HLS segment container choice: "ts",
+// "fmp4", or "auto" (the default). Auto resolves per broadcast in the
+// transcoder from the codec the ingest sniffed — fMP4/CMAF is required to
+// carry AV1 in HLS, mpegts cannot.
 func (r *SqlConfigRepository) GetVideoSegmentFormat() string {
 	format, err := r.datastore.GetString(videoSegmentFormatKey)
-	if err != nil || format != "fmp4" {
-		return "ts"
+	if err != nil || (format != "fmp4" && format != "ts") {
+		return "auto"
 	}
 	return format
 }

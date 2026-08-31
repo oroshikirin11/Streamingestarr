@@ -319,14 +319,17 @@ func SetChatNameReservationDays(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetVideoSegmentFormat lets the admin switch the HLS segment container.
-// Body: {"value": "ts"|"fmp4"}. fMP4 is required for AV1/HEVC delivery.
-// Takes effect on the next stream (and next offline transition).
+// Body: {"value": "auto"|"ts"|"fmp4"}. Auto picks per broadcast from the
+// sniffed inbound codec (fMP4 is required for AV1 delivery); the explicit
+// values force one container. Takes effect on the next stream (and next
+// offline transition).
 func SetVideoSegmentFormat(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Value string `json:"value"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || (req.Value != "ts" && req.Value != "fmp4") {
-		authJSON(w, http.StatusBadRequest, false, "Send {\"value\": \"ts\"} or {\"value\": \"fmp4\"}.")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
+		(req.Value != "auto" && req.Value != "ts" && req.Value != "fmp4") {
+		authJSON(w, http.StatusBadRequest, false, "Send {\"value\": \"auto\"}, {\"value\": \"ts\"} or {\"value\": \"fmp4\"}.")
 		return
 	}
 	if err := configrepository.Get().SetVideoSegmentFormat(req.Value); err != nil {
