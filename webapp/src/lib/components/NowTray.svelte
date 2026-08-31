@@ -76,7 +76,10 @@
 		{/if}
 		<div class="txt">
 			<div class="cell-label hot">Now Playing</div>
-			<div class="t">{title}</div>
+			<div class="t">
+				{title}
+				{#if status?.videoRange}<span class="hdr-badge" title="This broadcast is high dynamic range ({status.videoRange})">HDR</span>{/if}
+			</div>
 			{#if subtitle}<div class="s">{subtitle}</div>{/if}
 		</div>
 		<div class="ring">
@@ -198,6 +201,19 @@
 		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
+	}
+	.hdr-badge {
+		display: inline-block;
+		vertical-align: 1px;
+		margin-left: 6px;
+		padding: 0 5px;
+		border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+		border-radius: 4px;
+		color: var(--accent);
+		font-size: 9px;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		line-height: 15px;
 	}
 	.s {
 		font-size: 11.5px;

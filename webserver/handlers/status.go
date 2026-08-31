@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"streamingestarr/config"
 	"streamingestarr/core"
 	"streamingestarr/models"
 	"streamingestarr/persistence/configrepository"
@@ -43,6 +44,14 @@ func getStatusResponse() webStatusResponse {
 	if !configRepository.GetHideViewerCount() {
 		response.ViewerCount = status.ViewerCount
 	}
+	// The colour range the sender declared ("pq"/"hlg"), so the viewer UI
+	// can badge HDR broadcasts. Omitted for SDR — absence means nothing to
+	// announce, same as before the field existed.
+	if status.Online {
+		if vr := config.HLSVideoRangeToken(); vr != "" {
+			response.VideoRange = vr
+		}
+	}
 	return response
 }
 
@@ -59,4 +68,5 @@ type webStatusResponse struct {
 	StreamTitle   string                `json:"streamTitle"`
 	ViewerCount   int                   `json:"viewerCount,omitempty"`
 	Online        bool                  `json:"online"`
+	VideoRange    string                `json:"videoRange,omitempty"` // "PQ" | "HLG", absent for SDR
 }
