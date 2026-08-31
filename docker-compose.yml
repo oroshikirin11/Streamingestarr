@@ -13,6 +13,11 @@ services:
       - "127.0.0.1:8080:8080"                 # web + API — Caddy proxies here
       - "${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}:8080:8080"      # metadata channel, tailnet only
       - "${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}:1935:1935"      # RTMP ingest, tailnet only
-      - "${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}:9710:9710/udp"  # SRT ingest, tailnet only
+      # SRT ingest. Tailnet-bound by default; set SRT_BIND_IP=0.0.0.0 in .env
+      # to take the stream over the public internet instead — the WireGuard
+      # tunnel's 1280-byte MTU fragments every 1316-byte SRT payload, and
+      # fragment loss under load shows up as picture artifacts. The streamid
+      # (stream key) still gates the handshake either way.
+      - "${SRT_BIND_IP:-${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}}:9710:9710/udp"
     volumes:
       - ./data:/app/data

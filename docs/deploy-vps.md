@@ -58,6 +58,26 @@ If you deployed an earlier compose that published `0.0.0.0:8080/1935`, the
 Go server, RTMP and SRT were internet-facing — re-deploy with this file and
 re-check.
 
+### SRT over the public internet (when the tunnel hurts the picture)
+
+The tailnet path has a real cost for the media stream: WireGuard's
+interface MTU is 1280, every full SRT packet is ~1360 bytes on the wire
+(1316 payload + SRT/UDP/IP), so the tunnel fragments every single media
+packet — and fragment loss under load appears as picture artifacts. To
+ingest directly instead:
+
+```sh
+echo "SRT_BIND_IP=0.0.0.0" >> .env
+docker compose up -d          # re-creates with the public bind
+ufw allow 9710/udp            # and/or the provider's cloud firewall
+```
+
+Then point the sender's SRT destination at the public DNS name instead of
+the tailscale IP. The streamid (stream key) still gates the handshake;
+keep it long and random since it is now the only lock on a public port.
+RTMP and the metadata channel stay tailnet-bound — only the heavy media
+path moves.
+
 ### Retire Owncast completely
 
 Caddy must reverse-proxy the domain to Streamingestarr, not Owncast. As long
