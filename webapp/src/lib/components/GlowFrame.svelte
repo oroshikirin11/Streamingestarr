@@ -9,7 +9,8 @@
 	let ambiEl;
 	let hls = null;
 	let muted = $state(true); // autoplay needs muted; one click un-mutes
-	let volume = $state(Number(localStorage.getItem('sgr_volume') ?? 1) || 1);
+	// Default quiet: a first-time viewer gets 5%, not a full-volume blast.
+	let volume = $state(Number(localStorage.getItem('sgr_volume') ?? 0.05) || 0.05);
 
 	const src = () => `/hls/${channelId}/stream.m3u8`;
 
@@ -136,7 +137,10 @@
 				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
 			{/if}
 		</button>
-		<input class="vol" type="range" min="0" max="1" step="0.02" value={muted ? 0 : volume} oninput={setVolume} aria-label="Volume" />
+		<!-- Show the real volume even while autoplay-muted, so the slider
+		     opens where sound WILL be once unmuted instead of at zero; the
+		     speaker icon still carries the muted state. -->
+		<input class="vol" type="range" min="0" max="1" step="0.02" value={volume} oninput={setVolume} aria-label="Volume" />
 	</div>
 		<button class="frame-fs" title="Fullscreen" onclick={goFullscreen} aria-label="Fullscreen">
 			<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
