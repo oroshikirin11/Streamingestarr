@@ -3,28 +3,15 @@ services:
     build: .
     container_name: streamingestarr
     restart: unless-stopped
-    # Nothing is published to the public internet. Caddy terminates TLS on the
-    # host and proxies to 127.0.0.1:8080; the metadata channel and the RTMP/SRT
-    # ingests are reachable only over the tailnet. TAILNET_IP must be set in
-    # .env to this host's tailscale address (e.g. TAILNET_IP=100.124.204.59) —
-    # if it is missing, compose refuses to start rather than falling back to a
-    # public bind.
+    # Plain port mappings — the locks live in the app (login gate, stream
+    # keys, SRT/TCP passphrases), and anything you want closed you close in
+    # the host firewall (ufw). Every clever per-interface bind we tried
+    # here cost a debugging evening.
     ports:
-      - "127.0.0.1:8080:8080"                 # web + API — Caddy proxies here
-      - "${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}:8080:8080"      # metadata channel, tailnet only
-      - "${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}:1935:1935"      # RTMP ingest, tailnet only
-      # SRT ingest. Tailnet-bound by default; set SRT_BIND_IP=0.0.0.0 in .env
-      # to take the stream over the public internet instead — the WireGuard
-      # tunnel's 1280-byte MTU fragments every 1316-byte SRT payload, and
-      # fragment loss under load shows up as picture artifacts. The streamid
-      # (stream key) still gates the handshake either way.
-      - "${SRT_BIND_IP:-${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}}:9710:9710/udp"
-      # TCP ingest (raw container + SGR-TS/1 preamble). TCP retransmits
-      # forever, so a lossy uplink shows as delay instead of artifacts.
-      # Tailnet-bound by default; set TCP_BIND_IP=0.0.0.0 in .env for the
-      # public internet — the preamble carries key (+ optional passphrase),
-      # but both travel PLAINTEXT, so set the passphrase when public.
-      # Off by default in the app; enable in admin → Stream.
-      - "${TCP_BIND_IP:-${TAILNET_IP:?set TAILNET_IP in .env to this host's tailscale IP}}:9711:9711"
+      - "8080:8080"        # web + API (Caddy proxies the public domain here)
+      - "1935:1935"        # RTMP ingest
+      - "9710:9710/udp"    # SRT ingest
+      - "9711:9711"        # TCP ingest (SGR-TS/1 preamble)
+
     volumes:
       - ./data:/app/data

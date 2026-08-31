@@ -37,46 +37,21 @@ websocket proxies through `reverse_proxy` as-is.
 RTMP/SRT are not HTTP — they bypass Caddy. Since the only sender is
 Jellystreamerr, keep them closed publicly and ingest over Tailscale.
 
-### Bind everything but Caddy to the tailnet
+### Ports and the firewall
 
-The compose file publishes the web port only to `127.0.0.1` (for Caddy) and
-the metadata/RTMP/SRT ports only to this host's tailscale address. Set it in
-`.env`:
-
-```sh
-echo "TAILNET_IP=$(tailscale ip -4)" > .env   # e.g. 100.124.204.59
-```
-
-`TAILNET_IP` is **required** — compose refuses to start without it rather
-than falling back to a public bind. Verify nothing leaked to the internet:
+Every port is published plainly (`8080`, `1935`, `9710/udp`, `9711`) — no
+per-interface binds, no required env vars. The locks live in the app: the
+login gate on the web port, stream keys on every ingest, and the SRT/TCP
+passphrases (set them in admin → Stream when the ingests face the
+internet — SRT's also encrypts the wire). Anything you want closed, close
+in `ufw`:
 
 ```sh
-ss -tlnp | grep -E ':8080|:1935'   # should show 127.0.0.1 and the tailnet IP only
+ufw allow 9710/udp   # SRT in
+ufw allow 9711/tcp   # TCP in
+# 8080/1935 need no public rule if Caddy fronts the domain and the sender
+# uses SRT/TCP — leave them closed unless you use them.
 ```
-
-If you deployed an earlier compose that published `0.0.0.0:8080/1935`, the
-Go server, RTMP and SRT were internet-facing — re-deploy with this file and
-re-check.
-
-### SRT over the public internet (when the tunnel hurts the picture)
-
-The tailnet path has a real cost for the media stream: WireGuard's
-interface MTU is 1280, every full SRT packet is ~1360 bytes on the wire
-(1316 payload + SRT/UDP/IP), so the tunnel fragments every single media
-packet — and fragment loss under load appears as picture artifacts. To
-ingest directly instead:
-
-```sh
-echo "SRT_BIND_IP=0.0.0.0" >> .env
-docker compose up -d          # re-creates with the public bind
-ufw allow 9710/udp            # and/or the provider's cloud firewall
-```
-
-Then point the sender's SRT destination at the public DNS name instead of
-the tailscale IP. The streamid (stream key) still gates the handshake;
-keep it long and random since it is now the only lock on a public port.
-RTMP and the metadata channel stay tailnet-bound — only the heavy media
-path moves.
 
 ### Kernel UDP buffers (required for high-bitrate ingest)
 
