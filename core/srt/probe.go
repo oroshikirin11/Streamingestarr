@@ -45,9 +45,14 @@ type ffprobePacket struct {
 	Size        string `json:"size"`
 }
 
+type ffprobeFormat struct {
+	FormatName string `json:"format_name"`
+}
+
 type ffprobeOutput struct {
 	Streams []ffprobeStream `json:"streams"`
 	Packets []ffprobePacket `json:"packets"`
+	Format  ffprobeFormat   `json:"format"`
 }
 
 var videoCodecNames = map[string]string{
@@ -58,31 +63,40 @@ var audioCodecNames = map[string]string{
 	"aac": "AAC", "ac3": "AC-3", "eac3": "E-AC-3", "opus": "Opus", "mp3": "MP3", "flac": "FLAC",
 }
 
-// probeInboundStream describes the captured mpegts prefix. A false return
-// means the probe could not say anything useful; the caller keeps the
-// bare "SRT/mpegts" details rather than showing half-parsed junk.
-func probeInboundStream(prefix []byte) (models.InboundStreamDetails, bool) {
-	details := models.InboundStreamDetails{Encoder: "SRT/mpegts"}
+// probeInboundStream describes a captured prefix of the inbound stream. The
+// container is autodetected, not assumed: SRT carries mpegts for H.264/HEVC
+// but matroska or NUT for AV1, where a forced mpegts read finds nothing.
+// The returned container name is "" when the probe could not say anything
+// useful; the caller then keeps the bare details rather than showing
+// half-parsed junk.
+func probeInboundStream(prefix []byte) (models.InboundStreamDetails, string) {
+	details := models.InboundStreamDetails{Encoder: "SRT"}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, ffprobePath(),
-		"-v", "quiet", "-print_format", "json", "-show_streams",
-		// Packets too: mpegts rarely carries per-stream bit_rate headers,
-		// so the rates are measured from what actually arrived instead.
+		"-v", "quiet", "-print_format", "json", "-show_format", "-show_streams",
+		// Packets too: these containers rarely carry per-stream bit_rate
+		// headers, so the rates are measured from what actually arrived.
 		"-show_packets", "-show_entries", "packet=stream_index,dts_time,pts_time,size",
-		"-f", "mpegts", "-i", "pipe:0")
+		"-i", "pipe:0")
 	cmd.Stdin = bytes.NewReader(prefix)
 	out, err := cmd.Output()
 	if err != nil {
 		log.Debugln("SRT inbound stream probe failed:", err)
-		return details, false
+		return details, ""
 	}
 
 	var parsed ffprobeOutput
 	if err := json.Unmarshal(out, &parsed); err != nil {
 		log.Debugln("SRT inbound stream probe unreadable:", err)
-		return details, false
+		return details, ""
+	}
+
+	// "matroska,webm" and friends: the first name is the one that matters.
+	container, _, _ := strings.Cut(parsed.Format.FormatName, ",")
+	if container != "" {
+		details.Encoder = "SRT/" + container
 	}
 
 	measured := measuredRates(parsed)
@@ -109,7 +123,10 @@ func probeInboundStream(prefix []byte) (models.InboundStreamDetails, bool) {
 		}
 	}
 	details.VideoOnly = sawVideo && !sawAudio
-	return details, sawVideo || sawAudio
+	if !sawVideo && !sawAudio {
+		return details, ""
+	}
+	return details, container
 }
 
 // measuredRates computes per-stream kbps from the packets in the capture:

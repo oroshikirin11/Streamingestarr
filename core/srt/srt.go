@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	gosrt "github.com/datarhei/gosrt"
@@ -119,19 +120,24 @@ func handlePublisher(conn gosrt.Conn) {
 
 	_setStreamAsConnected(pipeOut, key)
 
-	// The transcoder consumes raw mpegts from the pipe; ffmpeg probes the
-	// container itself, so no demuxing happens here. A copy of the stream
-	// does get kept aside for ffprobe runs that fill in the broadcaster
-	// details the admin shows — enough bytes for parameter sets, frames and
-	// a usable bitrate window at 4K rates, capped by time so a thin stream
-	// still qualifies. A fresh capture every 30s keeps the shown numbers
-	// tracking a VBR source instead of freezing the connect-time estimate.
+	// The transcoder consumes the raw container from the pipe; ffmpeg probes
+	// it itself, so no demuxing happens here. A copy of the stream does get
+	// kept aside for ffprobe runs that fill in the broadcaster details the
+	// admin shows — enough bytes for parameter sets, frames and a usable
+	// bitrate window at 4K rates, capped by time so a thin stream still
+	// qualifies. A fresh capture every 30s keeps the shown numbers tracking
+	// a VBR source instead of freezing the connect-time estimate — but only
+	// for mpegts, which self-syncs from any byte. A matroska/NUT chunk cut
+	// mid-stream has no header to parse from, so those streams keep their
+	// connect-time measurement.
 	const probeTarget = 4 << 20
 	const probeFloor = 128 << 10
 	const reprobeAfter = 30 * time.Second
 	probeBuf := make([]byte, 0, probeTarget)
 	captureStart := time.Now()
 	var resumeAt time.Time // zero while a capture is filling
+	var reprobe atomic.Bool
+	reprobe.Store(true)
 
 	buffer := make([]byte, 1316) // 7 mpegts packets, the SRT payload convention
 	for {
@@ -150,14 +156,17 @@ func handlePublisher(conn gosrt.Conn) {
 					probeBuf = make([]byte, 0, probeTarget)
 					resumeAt = time.Now().Add(reprobeAfter)
 					go func() {
-						if details, ok := probeInboundStream(prefix); ok {
+						if details, container := probeInboundStream(prefix); container != "" {
 							b := broadcaster
 							b.StreamDetails = details
 							_setBroadcaster(b, key)
+							if container != "mpegts" {
+								reprobe.Store(false)
+							}
 						}
 					}()
 				}
-			} else if time.Now().After(resumeAt) {
+			} else if reprobe.Load() && time.Now().After(resumeAt) {
 				resumeAt = time.Time{}
 				captureStart = time.Now()
 			}
