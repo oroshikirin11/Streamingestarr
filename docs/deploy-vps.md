@@ -78,6 +78,27 @@ keep it long and random since it is now the only lock on a public port.
 RTMP and the metadata channel stay tailnet-bound — only the heavy media
 path moves.
 
+### Kernel UDP buffers (required for high-bitrate ingest)
+
+The ingest's UDP socket gets the kernel's default receive buffer —
+~212KB, a 68ms cushion at 25 Mbps. On a shared-vCPU host the scheduler
+routinely gaps longer than that, and the kernel silently discards
+datagrams: viewers see decode artifacts that scale with bitrate, and
+`netstat -su` shows RcvbufErrors climbing. Raise the defaults on the
+HOST (net.core.* is global, containers inherit it):
+
+```sh
+cat > /etc/sysctl.d/90-streamingestarr.conf <<'EOF'
+net.core.rmem_max = 16777216
+net.core.rmem_default = 16777216
+EOF
+sysctl --system
+docker compose restart streamingestarr   # new socket, new buffer
+```
+
+The Receive health line on the admin Status page is the ongoing check:
+SRT drops and buffer drops should sit at zero through a whole broadcast.
+
 ### Retire Owncast completely
 
 Caddy must reverse-proxy the domain to Streamingestarr, not Owncast. As long
