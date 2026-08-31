@@ -195,12 +195,24 @@ func handlePublisher(conn gosrt.Conn) {
 		probeBuf = append(probeBuf, head...)
 	}
 
+	// Live inbound rate: counted here where the bytes actually arrive,
+	// sampled on the read loop's own clock — no goroutine to race.
+	resetBitrate()
+	brBytes := int64(len(head))
+	brLast := time.Now()
+
 	buffer := make([]byte, 1316) // 7 mpegts packets, the SRT payload convention
 	for {
 		n, err := conn.Read(buffer)
 		if n > 0 {
 			if _, werr := pipeIn.Write(buffer[:n]); werr != nil {
 				break
+			}
+			brBytes += int64(n)
+			if since := time.Since(brLast); since >= bitrateSampleEvery {
+				recordBitrate(brBytes, since)
+				brBytes = 0
+				brLast = time.Now()
 			}
 			if resumeAt.IsZero() {
 				if room := probeTarget - len(probeBuf); room > 0 {

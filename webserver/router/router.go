@@ -67,6 +67,7 @@ func Start(enableVerboseLogging bool) error {
 	// Hand-registered API routes — endpoints added after the generated
 	// chi-server snapshot; the spec in openapi.yaml still documents them.
 	r.Post("/api/admin/config/srt/passphrase", middleware.RequireAdminAuth(handlers.SetSRTPassphrase))
+	r.Get("/api/admin/ingestbitrate", middleware.RequireAdminAuth(handlers.GetIngestBitrate))
 
 	// mount the api
 	r.Mount("/api/", handlers.New().Handler())

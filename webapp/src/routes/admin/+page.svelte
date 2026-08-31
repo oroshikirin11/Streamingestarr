@@ -35,6 +35,7 @@
 	let logFilter = $state('warnings');
 	let hw = $state(null);
 	let viewersSeries = $state(null);
+	let bitrateSeries = $state(null);
 	let tokens = $state([]);
 	let newTokenName = $state('');
 
@@ -81,6 +82,7 @@
 				// Last 4 hours of viewer counts — sampled every 2 minutes
 				// server-side, so this stays a tiny payload.
 				viewersSeries = await api.getViewersOverTime(Math.floor(Date.now() / 1000) - 4 * 3600);
+				bitrateSeries = status?.broadcaster ? await api.getIngestBitrate() : null;
 			}
 		} catch {}
 	}
@@ -206,6 +208,10 @@
 						<div><dt>Video</dt><dd>{[d.videoCodec, d.width ? `${d.width}×${d.height}` : null, d.framerate ? `${d.framerate} fps` : null, kbps(d.videoBitrate)].filter(Boolean).join(' · ') || '—'}</dd></div>
 						<div><dt>Audio</dt><dd>{d.videoOnly ? 'none — video only' : [d.audioCodec, kbps(d.audioBitrate)].filter(Boolean).join(' · ') || '—'}</dd></div>
 					</dl>
+					{#if bitrateSeries?.length > 1}
+						<p class="spark-label">inbound bitrate — live, 5s samples</p>
+						<Spark data={bitrateSeries} unit=" kbps" height={64} />
+					{/if}
 					<footer>
 						<button class="danger" onclick={() => run(api.disconnectStream, 'Stream disconnected')}>Disconnect the stream</button>
 					</footer>

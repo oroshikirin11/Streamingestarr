@@ -51,6 +51,7 @@ export const unbanIP = (ip) => post('/api/admin/chat/users/ipbans/remove', { val
 export const getHardwareStats = () => req('/api/admin/hardwarestats');
 export const getViewersOverTime = (windowStartUnix) =>
 	req(`/api/admin/viewersOverTime?windowStart=${windowStartUnix}`);
+export const getIngestBitrate = () => req('/api/admin/ingestbitrate');
 export const getAccessTokens = () => req('/api/admin/accesstokens');
 export const createAccessToken = (name) =>
 	post('/api/admin/accesstokens/create', { name, scopes: ['CAN_SEND_SYSTEM_MESSAGES'] });

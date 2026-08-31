@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"streamingestarr/auth"
+	"streamingestarr/core/srt"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/utils"
 	"streamingestarr/webserver/router/middleware"
@@ -337,6 +338,13 @@ func SetVideoSegmentFormat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	authJSON(w, http.StatusOK, true, "")
+}
+
+// GetIngestBitrate returns the live inbound bitrate series (5s samples,
+// kbps, current session) measured at the SRT read loop.
+func GetIngestBitrate(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(srt.GetInboundBitrate())
 }
 
 // SetSRTPassphrase stores the SRT encryption passphrase. Optional: an
