@@ -88,6 +88,12 @@
 				// this is a broadcast, not a call.
 				liveSyncDurationCount: 5,
 				liveMaxLatencyDurationCount: 12,
+				// Room sync, part 1: a client that fell behind (a stall, a
+				// slow start) plays 5% fast until it is back at the target
+				// distance from the live edge, instead of parking wherever
+				// the stall left it. Everyone continuously converges to the
+				// same latency — inaudible, invisible, no jumps.
+				maxLiveSyncPlaybackRate: 1.05,
 				maxBufferLength: 45,
 				maxMaxBufferLength: 90,
 				backBufferLength: 30,
@@ -112,6 +118,25 @@
 	}
 
 	onMount(initPlayer);
+
+	// Room sync, part 2: the hard bound. Rate catch-up recovers ~3s per
+	// minute — fine for drift, hopeless after a long stall. A client more
+	// than 8s behind the shared target snaps to the sync position once,
+	// then the rate controller holds it there. Checked on a slow clock so
+	// the snap stays a rare correction, not a metronome.
+	let driftTimer;
+	onMount(() => {
+		driftTimer = setInterval(() => {
+			if (!hls || !videoEl || videoEl.paused || dead) return;
+			const target = hls.targetLatency;
+			const latency = hls.latency;
+			if (!Number.isFinite(target) || !Number.isFinite(latency)) return;
+			if (latency - target > 8 && Number.isFinite(hls.liveSyncPosition)) {
+				videoEl.currentTime = hls.liveSyncPosition;
+			}
+		}, 3000);
+		return () => clearInterval(driftTimer);
+	});
 
 	// Ambilight: the video is drawn tiny (32×18) into a canvas that sits
 	// behind the frame, scaled up and heavily blurred by CSS. Drawing with
