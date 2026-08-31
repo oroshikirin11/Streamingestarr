@@ -652,9 +652,13 @@
 	dl.mono dd { font-family: ui-monospace, monospace; font-size: 12.5px; }
 
 	/* ---------- stream keys ---------- */
-	.keyrow { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
-	.keyrow input.mono { font-family: ui-monospace, monospace; font-size: 12.5px; flex: 1.4; }
-	.keyrow input.comment { flex: 1; }
+	/* Wraps on narrow cards: the inputs shrink first (min-width keeps them
+	   usable), and the buttons drop to their own line before ever leaving
+	   the card. Four buttons used to push Remove past the edge. */
+	.keyrow { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+	.keyrow input.mono { font-family: ui-monospace, monospace; font-size: 12.5px; flex: 1.4 1 140px; min-width: 140px; }
+	.keyrow input.comment { flex: 1 1 90px; min-width: 90px; }
+	.keyrow button { flex: 0 0 auto; }
 
 	/* ---------- variants ---------- */
 	.variant {
