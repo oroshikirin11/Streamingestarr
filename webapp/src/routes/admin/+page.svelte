@@ -257,6 +257,7 @@
 					<div class="keyrow">
 						<input class="mono" bind:value={k.key} placeholder="key" />
 						<input class="comment" bind:value={k.comment} placeholder="comment" />
+						<button class="ghost tiny" onclick={() => copy(k.key)}>Copy</button>
 						<button class="ghost tiny" onclick={() => (k.key = randomKey())}>Randomize</button>
 						<button class="ghost tiny danger-text" onclick={() => (keys = keys.filter((_, j) => j !== i))}>Remove</button>
 					</div>
