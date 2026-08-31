@@ -4,6 +4,12 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="robots" content="noindex" />
+		<!-- Every route gets the brand icon — without this, pages that do not
+		     inject their own (admin, login) fall back to /favicon.ico, which
+		     serves whatever lives in the instance's data dir; on servers
+		     carried over from Owncast that is still the legacy logo. The
+		     viewer page's live-state icon overrides this one. -->
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
