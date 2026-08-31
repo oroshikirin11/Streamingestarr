@@ -68,6 +68,7 @@ func Start(enableVerboseLogging bool) error {
 	// chi-server snapshot; the spec in openapi.yaml still documents them.
 	r.Post("/api/admin/config/srt/passphrase", middleware.RequireAdminAuth(handlers.SetSRTPassphrase))
 	r.Get("/api/admin/ingestbitrate", middleware.RequireAdminAuth(handlers.GetIngestBitrate))
+	r.Get("/api/admin/ingeststats", middleware.RequireAdminAuth(handlers.GetIngestStatsAPI))
 
 	// mount the api
 	r.Mount("/api/", handlers.New().Handler())

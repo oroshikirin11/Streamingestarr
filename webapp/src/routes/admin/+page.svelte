@@ -36,6 +36,7 @@
 	let hw = $state(null);
 	let viewersSeries = $state(null);
 	let bitrateSeries = $state(null);
+	let ingestStats = $state(null);
 	let tokens = $state([]);
 	let newTokenName = $state('');
 
@@ -83,6 +84,7 @@
 				// server-side, so this stays a tiny payload.
 				viewersSeries = await api.getViewersOverTime(Math.floor(Date.now() / 1000) - 4 * 3600);
 				bitrateSeries = status?.broadcaster ? await api.getIngestBitrate() : null;
+				ingestStats = status?.broadcaster ? await api.getIngestStats() : null;
 			}
 		} catch {}
 	}
@@ -211,6 +213,13 @@
 					{#if bitrateSeries?.length > 1}
 						<p class="spark-label">inbound bitrate — live, 5s samples</p>
 						<Spark data={bitrateSeries} unit=" kbps" height={64} />
+					{/if}
+					{#if ingestStats?.connected}
+						<p class="hint" class:danger-text={ingestStats.srtPktRecvDrop > 0 || ingestStats.bufferDroppedBytes > 0}>
+							Receive health — SRT drops: {ingestStats.srtPktRecvDrop}
+							· link loss: {ingestStats.srtPktRecvLoss} (recovered {ingestStats.srtPktRecvRetrans})
+							· buffer drops: {ingestStats.bufferDroppedBytes > 0 ? `${Math.round(ingestStats.bufferDroppedBytes / 1024)} KB` : '0'}
+						</p>
 					{/if}
 					<footer>
 						<button class="danger" onclick={() => run(api.disconnectStream, 'Stream disconnected')}>Disconnect the stream</button>

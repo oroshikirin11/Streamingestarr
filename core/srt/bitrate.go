@@ -3,6 +3,8 @@ package srt
 import (
 	"sync"
 	"time"
+
+	gosrt "github.com/datarhei/gosrt"
 )
 
 // Live inbound bitrate, measured where it cannot lie: the bytes the read
@@ -50,5 +52,35 @@ func GetInboundBitrate() []BitrateSample {
 	defer _brMu.Unlock()
 	out := make([]BitrateSample, len(_brSamples))
 	copy(out, _brSamples)
+	return out
+}
+
+// IngestStats is the receive-health surface for the admin: the SRT
+// counters that convict (or acquit) the transport when viewers report
+// artifacts, plus our own buffer's overflow counter. PktRecvDrop is the
+// smoking gun — packets SRT gave up on because nobody consumed in time.
+type IngestStats struct {
+	Connected          bool   `json:"connected"`
+	SrtPktRecvDrop     uint64 `json:"srtPktRecvDrop"`
+	SrtPktRecvLoss     uint64 `json:"srtPktRecvLoss"`
+	SrtPktRecvRetrans  uint64 `json:"srtPktRecvRetrans"`
+	BufferDroppedBytes int64  `json:"bufferDroppedBytes"`
+}
+
+// GetIngestStats reads the live connection's accumulated SRT statistics.
+func GetIngestStats() IngestStats {
+	out := IngestStats{BufferDroppedBytes: _queueDroppedBytes.Load()}
+	_mu.Lock()
+	conn := _activeConn
+	_mu.Unlock()
+	if conn == nil {
+		return out
+	}
+	var s gosrt.Statistics
+	conn.Stats(&s)
+	out.Connected = true
+	out.SrtPktRecvDrop = s.Accumulated.PktRecvDrop
+	out.SrtPktRecvLoss = s.Accumulated.PktRecvLoss
+	out.SrtPktRecvRetrans = s.Accumulated.PktRecvRetrans
 	return out
 }

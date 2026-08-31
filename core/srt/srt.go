@@ -179,19 +179,38 @@ func handlePublisher(conn gosrt.Conn) {
 	// connect-time measurement.
 	const probeTarget = 4 << 20
 	const probeFloor = 128 << 10
-	const reprobeAfter = 30 * time.Second
+	// 60s, and nice'd (probeCommand): the re-probe shares a small CPU with
+	// the live transcoder and must stay a background citizen.
+	const reprobeAfter = 60 * time.Second
 	probeBuf := make([]byte, 0, probeTarget)
 	captureStart := time.Now()
 	var resumeAt time.Time // zero while a capture is filling
 	var reprobe atomic.Bool
 	reprobe.Store(true)
 
-	if len(head) > 0 {
-		if _, werr := pipeIn.Write(head); werr != nil {
-			log.Infoln("Inbound SRT stream disconnected.")
-			teardown(conn, pipeIn)
-			return
+	// The reader must NEVER block on the transcoder (see pipeQueue): all
+	// pipe writes happen on a drain goroutine, the reader only enqueues.
+	// ~10s of stream at 25 Mbps fits the budget; a stall longer than that
+	// drops oldest data audibly in the log instead of silently on the wire.
+	_queueDroppedBytes.Store(0)
+	q := newPipeQueue(32 << 20)
+	go func() {
+		for {
+			chunk, ok := q.pop()
+			if !ok {
+				return
+			}
+			if _, werr := pipeIn.Write(chunk); werr != nil {
+				// The transcoder is gone; unblock the reader so the
+				// session tears down instead of buffering into the void.
+				_ = conn.Close()
+				return
+			}
 		}
+	}()
+
+	if len(head) > 0 {
+		q.push(head)
 		probeBuf = append(probeBuf, head...)
 	}
 
@@ -211,9 +230,7 @@ func handlePublisher(conn gosrt.Conn) {
 	for {
 		n, err := conn.Read(buffer)
 		if n > 0 {
-			if _, werr := pipeIn.Write(buffer[:n]); werr != nil {
-				break
-			}
+			q.push(buffer[:n])
 			brBytes += int64(n)
 			if since := time.Since(brLast); since >= bitrateSampleEvery {
 				recordBitrate(brBytes, since)
@@ -254,6 +271,7 @@ func handlePublisher(conn gosrt.Conn) {
 	}
 
 	log.Infoln("Inbound SRT stream disconnected.")
+	q.close()
 	teardown(conn, pipeIn)
 }
 

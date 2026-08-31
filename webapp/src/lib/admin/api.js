@@ -52,6 +52,7 @@ export const getHardwareStats = () => req('/api/admin/hardwarestats');
 export const getViewersOverTime = (windowStartUnix) =>
 	req(`/api/admin/viewersOverTime?windowStart=${windowStartUnix}`);
 export const getIngestBitrate = () => req('/api/admin/ingestbitrate');
+export const getIngestStats = () => req('/api/admin/ingeststats');
 export const getAccessTokens = () => req('/api/admin/accesstokens');
 export const createAccessToken = (name) =>
 	post('/api/admin/accesstokens/create', { name, scopes: ['CAN_SEND_SYSTEM_MESSAGES'] });

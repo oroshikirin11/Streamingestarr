@@ -347,6 +347,13 @@ func GetIngestBitrate(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(srt.GetInboundBitrate())
 }
 
+// GetIngestStatsAPI returns the SRT receive-health counters — drops, loss,
+// retransmissions — plus the ingest buffer's overflow counter.
+func GetIngestStatsAPI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(srt.GetIngestStats())
+}
+
 // SetSRTPassphrase stores the SRT encryption passphrase. Optional: an
 // empty value disables encryption (the streamid stays the only lock);
 // non-empty must be 10-79 characters — the SRT handshake's own limits.

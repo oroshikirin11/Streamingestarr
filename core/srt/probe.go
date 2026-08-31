@@ -74,7 +74,7 @@ func probeInboundStream(prefix []byte) (models.InboundStreamDetails, string) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, ffprobePath(),
+	cmd := probeCommand(ctx,
 		"-v", "quiet", "-print_format", "json", "-show_format", "-show_streams",
 		// Packets too: these containers rarely carry per-stream bit_rate
 		// headers, so the rates are measured from what actually arrived.
@@ -258,7 +258,7 @@ func probeHeadCodecs(head []byte) (video, audio string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, ffprobePath(),
+	cmd := probeCommand(ctx,
 		"-v", "quiet", "-print_format", "json",
 		"-show_streams", "-i", "pipe:0")
 	cmd.Stdin = bytes.NewReader(head)
@@ -323,4 +323,15 @@ func ffprobePath() string {
 		return candidate
 	}
 	return "ffprobe"
+}
+
+// probeCommand builds the ffprobe invocation at the lowest CPU priority the
+// host offers: the probe runs BESIDE the live transcoder, and on a small
+// CPU a full-priority ffprobe is itself a plausible stall source for the
+// very pipeline it is inspecting.
+func probeCommand(ctx context.Context, args ...string) *exec.Cmd {
+	if nice, err := exec.LookPath("nice"); err == nil {
+		return exec.CommandContext(ctx, nice, append([]string{"-n", "19", ffprobePath()}, args...)...)
+	}
+	return exec.CommandContext(ctx, ffprobePath(), args...)
 }
