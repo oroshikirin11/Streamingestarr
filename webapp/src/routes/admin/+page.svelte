@@ -43,6 +43,7 @@
 	let avSyncWorst = $state(0);
 	let cadence = $state(null);
 	let incidents = $state([]);
+	let ingestEvents = $state([]);
 	let tokens = $state([]);
 	let newTokenName = $state('');
 	let rooms = $state([]);
@@ -103,6 +104,7 @@
 				avSyncWorst = av?.length ? av.reduce((w, m) => (Math.abs(m.deltaMs) > Math.abs(w) ? m.deltaMs : w), 0) : 0;
 				cadence = summarizeCadence(av);
 				incidents = ((await api.getPlayerIncidents(roomSel).catch(() => [])) ?? []);
+				ingestEvents = ((await api.getIngestEvents(roomSel).catch(() => [])) ?? []);
 			}
 		} catch {}
 	}
@@ -185,6 +187,22 @@
 			bursts
 		};
 	}
+
+	// The feed's own testimony: gaps in the last hour, and whether it is
+	// silent at this very moment.
+	const feedSummary = $derived.by(() => {
+		const cutoff = Date.now() - 60 * 60 * 1000;
+		const gaps = (ingestEvents ?? []).filter(
+			(e) => e.type === 'feed-gap' && new Date(e.time).getTime() > cutoff
+		);
+		const drops = (ingestEvents ?? []).filter(
+			(e) => e.type === 'queue-drop' && new Date(e.time).getTime() > cutoff
+		);
+		if (!gaps.length && !drops.length) return null;
+		const worst = gaps.reduce((w, g) => Math.max(w, g.durMs ?? 0), 0);
+		const last = gaps[gaps.length - 1] ?? drops[drops.length - 1];
+		return { gaps: gaps.length, worstMs: worst, drops: drops.length, last };
+	});
 
 	const incidentSummary = $derived.by(() => {
 		const cutoff = Date.now() - 10 * 60 * 1000;
@@ -346,6 +364,21 @@
 							· link loss: {ingestStats.srtPktRecvLoss} (recovered {ingestStats.srtPktRecvRetrans})
 							· buffer drops: {ingestStats.bufferDroppedBytes > 0 ? `${Math.round(ingestStats.bufferDroppedBytes / 1024)} KB` : '0'}
 						</p>
+					{/if}
+					{#if ingestStats?.silentMs > 1000}
+						<p class="hint danger-text">
+							FEED SILENT for {(ingestStats.silentMs / 1000).toFixed(1)}s — nothing is arriving on the socket right now (uplink or sender).
+						</p>
+					{/if}
+					{#if feedSummary}
+						<p class="hint danger-text">
+							Feed events (1 h) — {feedSummary.gaps} gap{feedSummary.gaps === 1 ? '' : 's'}, worst {(feedSummary.worstMs / 1000).toFixed(1)}s
+							{#if feedSummary.drops}&nbsp;· {feedSummary.drops} buffer-drop marks{/if}
+							· last at {new Date(feedSummary.last.time).toLocaleTimeString()}
+							— the feed itself starved; check the sender's pacing and the uplink.
+						</p>
+					{:else if status?.online}
+						<p class="hint">Feed events (1 h) — none: every byte arrived on time.</p>
 					{/if}
 					{#if cadence}
 						<p class="hint" class:danger-text={cadence.seams > 0 || cadence.late > 0}>

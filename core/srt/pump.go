@@ -4,6 +4,7 @@
 package srt
 
 import (
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -38,6 +39,7 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 	}
 
 	log.Infoln("Inbound", transport, "stream connected from", remoteAddr, "feeding room", channelID)
+	recordIngestEvent(channelID, "connect", 0, transport+" from "+remoteAddr)
 	// A fresh session gets a fresh A/V ledger — the numbers must always
 	// describe THIS broadcast.
 	avsync.Reset(channelID)
@@ -132,6 +134,13 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 	// sampled on the read loop's own clock — no goroutine to race.
 	brBytes := int64(len(head))
 	brLast := time.Now()
+	// Feed-gap forensics: a read blocking past feedGapAfter is the uplink
+	// (or sender) starving THIS room — logged with its duration, the
+	// ground truth for rubberband attribution. Queue drops get an event
+	// too (rate-limited; the byte counter carries the running total).
+	lastDropEventBytes := int64(0)
+	lastDropEventAt := time.Time{}
+	s.lastReadUnixMs.Store(time.Now().UnixMilli())
 
 	// The richest details seen this session; fresh probes merge into it
 	// rather than replace it (a keyframe-less window must not blank the
@@ -141,14 +150,24 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 
 	buffer := make([]byte, 1316) // 7 mpegts packets, the SRT payload convention
 	for {
+		readStart := time.Now()
 		n, err := conn.Read(buffer)
+		if gap := time.Since(readStart); gap > feedGapAfter {
+			recordIngestEvent(channelID, "feed-gap", gap.Milliseconds(), "")
+		}
 		if n > 0 {
+			s.lastReadUnixMs.Store(time.Now().UnixMilli())
 			q.push(buffer[:n])
 			brBytes += int64(n)
 			if since := time.Since(brLast); since >= bitrateSampleEvery {
 				s.recordBitrate(brBytes, since)
 				brBytes = 0
 				brLast = time.Now()
+				if dropped := s.queueDroppedBytes.Load(); dropped > lastDropEventBytes && time.Since(lastDropEventAt) > 10*time.Second {
+					recordIngestEvent(channelID, "queue-drop", 0, fmt.Sprintf("%dKB dropped so far", dropped/1024))
+					lastDropEventBytes = dropped
+					lastDropEventAt = time.Now()
+				}
 			}
 			if resumeAt.IsZero() {
 				if room := probeTarget - len(probeBuf); room > 0 {
@@ -184,6 +203,7 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 	}
 
 	log.Infoln("Inbound", transport, "stream for room", channelID, "disconnected.")
+	recordIngestEvent(channelID, "disconnect", 0, transport)
 	q.close()
 	teardown(s)
 }

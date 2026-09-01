@@ -89,6 +89,7 @@ func Start(enableVerboseLogging bool) error {
 	// admin reads them next to the segment ledger.
 	r.Post("/api/metrics/player", handlers.ReportPlayerIncidents)
 	r.Get("/api/admin/playerincidents", middleware.RequireAdminAuth(handlers.GetPlayerIncidents))
+	r.Get("/api/admin/ingestevents", middleware.RequireAdminAuth(handlers.GetIngestEvents))
 
 	// Sender helper: which room does a stream key feed (fan-out metadata).
 	r.Post("/api/integrations/metadata/resolve-channel",

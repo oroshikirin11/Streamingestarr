@@ -58,6 +58,7 @@ export const getIngestBitrate = (channel = 'main') => req(`/api/admin/ingestbitr
 export const getIngestStats = (channel = 'main') => req(`/api/admin/ingeststats?channel=${channel}`);
 export const getAVSync = (channel = 'main') => req(`/api/admin/avsync?channel=${channel}`);
 export const getPlayerIncidents = (channel = 'main') => req(`/api/admin/playerincidents?channel=${channel}`);
+export const getIngestEvents = (channel = 'main') => req(`/api/admin/ingestevents?channel=${channel}`);
 export const getAccessTokens = () => req('/api/admin/accesstokens');
 export const createAccessToken = (name) =>
 	post('/api/admin/accesstokens/create', { name, scopes: ['CAN_SEND_SYSTEM_MESSAGES'] });

@@ -31,8 +31,8 @@ type PlayerIncident struct {
 }
 
 const (
-	incidentsKeepPerChannel = 400
-	incidentsMaxAge         = 30 * time.Minute
+	incidentsKeepPerChannel = 1000
+	incidentsMaxAge         = 3 * time.Hour
 	incidentsMaxPerReport   = 30
 )
 

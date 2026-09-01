@@ -356,6 +356,13 @@ func GetIngestStatsAPI(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(srt.GetIngestStats(channelIDFromRequest(r)))
 }
 
+// GetIngestEvents returns a room's feed event log — connects, feed gaps,
+// queue drops — the ground truth for "what did the FEED do at 21:37".
+func GetIngestEvents(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(srt.GetIngestEvents(channelIDFromRequest(r)))
+}
+
 // GetAVSync returns the per-segment audio/video first-PTS offsets of the
 // room's current broadcast — the ledger that tells sender seams from player
 // drift.

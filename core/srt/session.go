@@ -22,6 +22,9 @@ type ingestSession struct {
 	brSamples []BitrateSample
 
 	queueDroppedBytes atomic.Int64
+	// lastReadUnixMs is stamped by every successful socket read; "now
+	// minus this" being large means the feed is silent RIGHT NOW.
+	lastReadUnixMs atomic.Int64
 }
 
 var (

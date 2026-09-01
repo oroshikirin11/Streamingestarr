@@ -55,7 +55,7 @@ type Measurement struct {
 	StepSegments int       `json:"stepSegments"`
 }
 
-const keep = 90 // ~a few minutes of segments
+const keep = 900 // ~an hour of segments — the ledger must outlive the incident
 
 // ledger is one channel's measurement state.
 type ledger struct {

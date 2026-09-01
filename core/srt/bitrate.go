@@ -20,7 +20,7 @@ type BitrateSample struct {
 
 const (
 	bitrateSampleEvery = 5 * time.Second
-	bitrateKeep        = 360 // 30 minutes of 5s samples
+	bitrateKeep        = 2160 // 3 hours of 5s samples — a movie plus questions after
 )
 
 // recordBitrate appends one sample to the session's ring, trimming it.
@@ -63,6 +63,9 @@ type IngestStats struct {
 	SrtPktRecvLoss     uint64 `json:"srtPktRecvLoss"`
 	SrtPktRecvRetrans  uint64 `json:"srtPktRecvRetrans"`
 	BufferDroppedBytes int64  `json:"bufferDroppedBytes"`
+	// SilentMs is how long the socket has been quiet RIGHT NOW — the live
+	// view of an ongoing feed gap (an ended gap is in the event log).
+	SilentMs int64 `json:"silentMs"`
 }
 
 // GetIngestStats reads the channel's live receive statistics; after a
@@ -82,6 +85,11 @@ func GetIngestStats(channelID string) IngestStats {
 	}
 	out.Connected = true
 	out.BufferDroppedBytes = s.queueDroppedBytes.Load()
+	if last := s.lastReadUnixMs.Load(); last > 0 {
+		if silent := time.Now().UnixMilli() - last; silent > 500 {
+			out.SilentMs = silent
+		}
+	}
 	// SRT counters only exist on an SRT session; a TCP ingest cannot lose
 	// packets by construction (the kernel retransmits), so zeros are truth.
 	if c, ok := s.conn.(gosrt.Conn); ok {
