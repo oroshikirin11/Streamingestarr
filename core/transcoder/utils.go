@@ -57,6 +57,11 @@ var ignoredErrors = []string{
 	"Error parsing global options",
 	"maybe the hls segment duration will not precise",
 	"Non-monotonous DTS in output",
+	// mp4 muxer advisory on passthrough of quirky input timing (the
+	// sender's ~1fps still sections stamp nominal-fps durations); the
+	// muxer clamps and moves on, but at one line per second per room it
+	// drowned the warnings view.
+	"Packet duration: ",
 	"frames duplicated",
 	"To ignore this",
 	"Driver does not support some wanted packed headers (wanted 0xd, found 0x1)",
