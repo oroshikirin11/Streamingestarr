@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -59,6 +60,39 @@ func SetScheduleMetadata(integration models.ExternalAPIUser, w http.ResponseWrit
 	}
 	core.SetSchedule(payload.Items)
 	webutils.WriteSimpleResponse(w, true, "schedule updated")
+}
+
+// ResolveChannel tells a sender which room a stream key feeds, so a
+// fan-out can push its (identical) metadata once per room WITHOUT any
+// room mapping in the sender's settings: it already holds the keys.
+// Body: {"key": "..."} → {"channel": "<room id>"}.
+func ResolveChannel(integration models.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Key string `json:"key"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil || payload.Key == "" {
+		webutils.BadRequestHandler(w, errors.New("send {\"key\": \"...\"}"))
+		return
+	}
+	channelID := channelrepository.GetChannelIDForKey(payload.Key)
+	if channelID == "" {
+		// Not a room key — check the global list, which feeds the default
+		// channel. An unknown key resolves to nothing, honestly.
+		channelID = channelrepository.DefaultChannelID
+		found := false
+		for _, k := range configrepository.Get().GetStreamKeys() {
+			if k.Key != nil && *k.Key != "" && *k.Key == payload.Key {
+				found = true
+				break
+			}
+		}
+		if !found {
+			webutils.WriteSimpleResponse(w, false, "unknown stream key")
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"channel": channelID})
 }
 
 // GetCapabilities tells a sender what this receiver accepts, so a

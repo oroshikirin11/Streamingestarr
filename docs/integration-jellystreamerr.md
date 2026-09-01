@@ -81,6 +81,22 @@ there is no need to push progress on a timer.
 - The viewer page renders: title+subtitle in the Now Playing tray cell, a
   true progress ring from position/duration, and an Up Next cell.
 
+## 2a. Rooms — `POST /api/integrations/metadata/resolve-channel`
+
+The receiver hosts multiple rooms; a stream key belongs to exactly one.
+Because the sender fans out ONE encode, the metadata for every room it
+feeds is identical — so no room mapping is needed in the sender's
+settings. At broadcast start, resolve each destination's stream key once:
+
+```json
+{ "key": "<stream key>" }        →  { "channel": "second-screen" }
+```
+
+Unknown keys return `success: false`. Then send each `nowplaying` push
+once per distinct resolved `channel` (same payload, different `channel`
+field). Artwork is id-addressed and room-agnostic — push once as before.
+The schedule is receiver-global — push once.
+
 ## 3a. Artwork — `POST /api/integrations/metadata/artwork`
 
 ```json

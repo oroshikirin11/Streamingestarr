@@ -15,6 +15,7 @@ import (
 
 	"streamingestarr/config"
 	"streamingestarr/core/chat"
+	"streamingestarr/models"
 	"streamingestarr/webserver/handlers"
 	"streamingestarr/webserver/handlers/admin"
 	"streamingestarr/webserver/router/middleware"
@@ -84,6 +85,9 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/rooms/rename", middleware.RequireAdminAuth(admin.RenameRoom))
 	r.Post("/api/admin/rooms/keys", middleware.RequireAdminAuth(admin.SetRoomKeys))
 	r.Post("/api/admin/rooms/config", middleware.RequireAdminAuth(admin.SetRoomConfig))
+	// Sender helper: which room does a stream key feed (fan-out metadata).
+	r.Post("/api/integrations/metadata/resolve-channel",
+		middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.ResolveChannel))
 
 	// mount the api
 	r.Mount("/api/", handlers.New().Handler())
