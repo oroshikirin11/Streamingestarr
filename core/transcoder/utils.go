@@ -62,6 +62,12 @@ var ignoredErrors = []string{
 	// muxer clamps and moves on, but at one line per second per room it
 	// drowned the warnings view.
 	"Packet duration: ",
+	// Input timestamp trouble floods one line PER PACKET during a bad
+	// sender splice (seen: a pause/resume that re-based the timeline by
+	// hours — thousands of lines in seconds). The segment ledger's seam
+	// detection reports the same fact once, with a verdict.
+	"timestamp discontinuity",
+	"out of order",
 	"frames duplicated",
 	"To ignore this",
 	"Driver does not support some wanted packed headers (wanted 0xd, found 0x1)",

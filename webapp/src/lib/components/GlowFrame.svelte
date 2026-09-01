@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import Hls from 'hls.js';
 
-	let { channelId = 'main', clockSkewMs = 0 } = $props();
+	let { channelId = 'main', clockSkewMs = 0, paused = false } = $props();
 
 	let videoEl;
 	let frameEl;
@@ -192,10 +192,39 @@
 	// same number.
 	const wallAnchor = (edgeTarget) => edgeTarget * 0.7;
 	let driftTimer;
+	let lastSnapEdge = -1;
 	onMount(() => {
 		driftTimer = setInterval(() => {
 			if (!hls || !videoEl || dead) return;
-			if (videoEl.paused || videoEl.seeking || videoEl.readyState < 3) {
+			// The streamer pressed pause: the live edge is about to freeze
+			// DELIBERATELY. Steering against a frozen edge is what looped
+			// the last seconds forever — so the controller stands down, the
+			// buffered tail plays out, and the picture rests on its final
+			// frame until the broadcast moves again (then one clean snap
+			// re-joins the room at the live edge).
+			if (paused) {
+				if (videoEl.playbackRate !== 1) videoEl.playbackRate = 1;
+				return;
+			}
+			if (videoEl.paused || videoEl.seeking) {
+				if (videoEl.playbackRate !== 1) videoEl.playbackRate = 1;
+				return;
+			}
+			if (videoEl.readyState < 3) {
+				// Starved at the buffer's end. A browser never crawls out of
+				// a deep hole on its own — when fresh segments exist well
+				// ahead of the stall point (the feed came back after a
+				// freeze), jump to them.
+				if (
+					Number.isFinite(hls.liveSyncPosition) &&
+					hls.liveSyncPosition > videoEl.currentTime + 3 &&
+					Math.abs(hls.liveSyncPosition - lastSnapEdge) >= 1
+				) {
+					lastSnapEdge = hls.liveSyncPosition;
+					lastControllerSeek = performance.now();
+					noteIncident('sync-snap', (hls.liveSyncPosition - videoEl.currentTime) * 1000);
+					videoEl.currentTime = hls.liveSyncPosition;
+				}
 				if (videoEl.playbackRate !== 1) videoEl.playbackRate = 1;
 				return;
 			}
@@ -233,6 +262,15 @@
 					return;
 				}
 				if (drift > 0 && Number.isFinite(hls.liveSyncPosition)) {
+					// A frozen playlist means a frozen liveSyncPosition —
+					// snapping to it again just replays the same seconds in
+					// a loop. Only snap when the edge has actually moved;
+					// otherwise hold and let the stream come back to us.
+					if (Math.abs(hls.liveSyncPosition - lastSnapEdge) < 1) {
+						videoEl.playbackRate = 1;
+						return;
+					}
+					lastSnapEdge = hls.liveSyncPosition;
 					lastControllerSeek = performance.now();
 					noteIncident('sync-snap', drift * 1000);
 					videoEl.currentTime = hls.liveSyncPosition;
@@ -263,7 +301,7 @@
 			if (!videoEl || dead) return;
 			const now = performance.now();
 			const media = videoEl.currentTime;
-			const playing = !videoEl.paused && !videoEl.seeking;
+			const playing = !videoEl.paused && !videoEl.seeking && !paused;
 			if (wd.wall && playing) {
 				const wallDt = (now - wd.wall) / 1000;
 				const mediaDt = media - wd.media;
@@ -367,6 +405,11 @@
 	<div class="glow-frame" class:show-ui={uiVisible} bind:this={frameEl} onpointerup={pokeUI}>
 		<!-- svelte-ignore a11y_media_has_caption -->
 		<video bind:this={videoEl} playsinline muted={muted}></video>
+		{#if paused}
+			<div class="paused-veil">
+				<span class="paused-chip">⏸&nbsp; paused by the streamer</span>
+			</div>
+		{/if}
 	<div class="sound">
 		<button class="snd-btn" title={muted ? 'Unmute' : 'Mute'} aria-label={muted ? 'Unmute' : 'Mute'} onclick={toggleMute}>
 			{#if muted || volume === 0}
@@ -417,6 +460,24 @@
 		height: 100%;
 		object-fit: contain;
 		background: transparent;
+	}
+	.paused-veil {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-items: center;
+		background: #00000038;
+		pointer-events: none;
+	}
+	.paused-chip {
+		padding: 10px 20px;
+		border-radius: 99px;
+		background: #000000b8;
+		border: 1px solid #ffffff22;
+		color: #eee;
+		font-size: 14px;
+		letter-spacing: 0.04em;
+		backdrop-filter: blur(8px);
 	}
 	.sound {
 		position: absolute;
