@@ -121,8 +121,13 @@ container.
 ## Updating
 
 ```sh
-git pull && docker compose up -d --build
+git pull && docker compose up -d --build && docker builder prune -f --filter until=24h
 ```
+
+The prune matters: every `--build` leaves ~500 MB of BuildKit cache behind
+and docker never garbage-collects it on its own — frequent deploys once
+piled up 18 GB of it. The 24h filter keeps the freshest cache so rebuilds
+stay fast.
 
 (Restarting the container drops an in-progress inbound stream; Jellystreamerr
 needs a broadcast stop/start after. UI-only tweaks can avoid this: drop a
