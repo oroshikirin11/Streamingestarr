@@ -5,7 +5,7 @@ your theater page, your chat, behind a login you control.
 
 <p align="center"><img src="docs/media/theater.png" alt="The theater — live stream with ambilight, now-playing tray and chat" width="920"></p>
 
-Built as the receiving half of **[Streamerr](https://github.com/PLACEHOLDER/streamerr)**,
+Built as the receiving half of **[Streamerr](https://github.com/oroshikirin11/Streamerr)**,
 its hybrid streaming service: Streamerr broadcasts your media library to this
 server, which turns it into a watch-together theater. Install Streamerr on a
 machine with **direct directory access to your media library** (preferred) —
@@ -14,7 +14,7 @@ SMB shares are supported as well. Any RTMP/SRT encoder (OBS included) works too.
 ## Setup — Docker
 
 ```sh
-git clone https://github.com/PLACEHOLDER/streamingestarr.git
+git clone https://github.com/oroshikirin11/Streamingestarr.git
 cd streamingestarr
 docker compose up -d --build
 ```
