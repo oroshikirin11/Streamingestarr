@@ -15,7 +15,7 @@ SMB shares are supported as well. Any RTMP/SRT encoder (OBS included) works too.
 
 ```sh
 git clone https://github.com/oroshikirin11/Streamingestarr.git
-cd streamingestarr
+cd Streamingestarr
 docker compose up -d --build
 ```
 
