@@ -2,20 +2,53 @@
 	import '../app.css';
 	import { status, config, role, reachable, clockSkewMs } from '$lib/stores.js';
 	import { dedupeSubtitle } from '$lib/text.js';
-	import { logout } from '$lib/api.js';
+	import { logout, getRooms } from '$lib/api.js';
 	import GlowFrame from '$lib/components/GlowFrame.svelte';
 	import NowTray from '$lib/components/NowTray.svelte';
 	import ChatPanel from '$lib/components/ChatPanel.svelte';
 	import Lobby from '$lib/components/Lobby.svelte';
+	import RoomWall from '$lib/components/RoomWall.svelte';
 
 	let chatHidden = $state(false);
 	let frame = $state();
 
+	// The rooms list drives the overview: with more than one room the front
+	// page becomes the screen wall, and scoped theaters grow a way back to
+	// it. Polled so the wall follows rooms being created, deleted, and
+	// going live — no refresh.
+	const scoped =
+		typeof location !== 'undefined' && location.pathname.startsWith('/t/');
+	let roomsList = $state(null);
+	$effect(() => {
+		let stopped = false;
+		let timer;
+		async function poll() {
+			try {
+				const d = await getRooms();
+				if (!stopped) roomsList = d.rooms ?? [];
+			} catch {}
+			if (!stopped) timer = setTimeout(poll, 10000);
+		}
+		poll();
+		return () => {
+			stopped = true;
+			clearTimeout(timer);
+		};
+	});
+	const multiRoom = $derived((roomsList?.length ?? 0) > 1);
+	const showWall = $derived(!scoped && multiRoom);
+
 	const live = $derived($status?.online === true);
 	const viewers = $derived($status?.viewerCount ?? 0);
-	const theaterName = $derived($config?.name || 'Main Theater');
+	const roomName = $derived.by(() => {
+		if (!scoped) return null;
+		const id = location.pathname.match(/^\/t\/([a-z][a-z0-9-]*)/)?.[1];
+		return roomsList?.find((r) => r.id === id)?.name ?? null;
+	});
+	const theaterName = $derived(roomName || $config?.name || 'Main Theater');
 
 	const tabTitle = $derived.by(() => {
+		if (showWall) return theaterName + ' — rooms';
 		const np = $status?.nowPlaying;
 		if (live && np?.title) {
 			const sub = dedupeSubtitle(np.title, np.subtitle);
@@ -40,11 +73,16 @@
 			<div class="mood">{$status.streamTitle}</div>
 		{/if}
 		<div class="spacer"></div>
-		{#if live}
+		{#if live && !showWall}
 			<div class="presence">{viewers} watching</div>
 		{/if}
 		<div class="iconbar">
-			{#if live}
+			{#if multiRoom && scoped}
+				<a class="icon-btn" href="/" title="All rooms" aria-label="All rooms">
+					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+				</a>
+			{/if}
+			{#if live && !showWall}
 				<button
 					class="icon-btn"
 					class:active={!chatHidden}
@@ -66,7 +104,11 @@
 		</div>
 	</header>
 
-	{#if live}
+	{#if !scoped && roomsList === null}
+		<div class="loading">·</div>
+	{:else if showWall}
+		<RoomWall rooms={roomsList} />
+	{:else if live}
 		<div class="lounge" class:chat-hidden={chatHidden}>
 			<div class="screen-zone">
 				<GlowFrame bind:this={frame} channelId={$status?.channelId || 'main'} clockSkewMs={$clockSkewMs} />

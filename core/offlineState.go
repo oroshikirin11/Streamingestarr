@@ -94,15 +94,21 @@ func createEmptyOfflinePlaylist(playlistFilePath string, offlineFilename string)
 
 func saveOfflineClipToDisk(offlineFilename string) (string, error) {
 	offlineFileData := static.GetOfflineSegment()
-	offlineTmpFile, err := os.CreateTemp(config.TempDir, offlineFilename)
-	if err != nil {
-		log.Errorln("unable to create temp file for offline video segment", err)
+
+	// One fixed file, overwritten in place. The previous CreateTemp left a
+	// new uniquely-suffixed copy behind on EVERY disconnect and offline
+	// transition, slowly littering data/tmp forever; sweep those up once.
+	if stale, err := filepath.Glob(filepath.Join(config.TempDir, offlineFilename+"*")); err == nil {
+		for _, f := range stale {
+			if filepath.Base(f) != offlineFilename {
+				_ = os.Remove(f)
+			}
+		}
 	}
 
-	if _, err = offlineTmpFile.Write(offlineFileData); err != nil {
+	offlineFilePath := filepath.Join(config.TempDir, offlineFilename)
+	if err := os.WriteFile(offlineFilePath, offlineFileData, 0o600); err != nil {
 		return "", fmt.Errorf("unable to write offline segment to disk: %s", err)
 	}
-
-	offlineFilePath := offlineTmpFile.Name()
 	return filepath.Abs(offlineFilePath)
 }

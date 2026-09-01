@@ -230,7 +230,13 @@ func getAllFilesRecursive(baseDirectory string) (map[string][]os.FileInfo, error
 			directory = info.Name()
 		}
 
-		if filepath.Ext(info.Name()) == ".ts" {
+		// Both segment containers age out — .ts and .m4s. Leaving .m4s
+		// out of this match let fMP4 broadcasts keep EVERY segment ever
+		// written and fill the disk (~8 GB/h at 4K rates); the init-*.mp4
+		// header is deliberately kept, players need it for the whole
+		// session and it is a few KB.
+		switch filepath.Ext(info.Name()) {
+		case ".ts", ".m4s":
 			files[directory] = append(files[directory], info)
 		}
 

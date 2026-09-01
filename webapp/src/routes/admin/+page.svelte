@@ -824,6 +824,7 @@
 
 	/* ---------- switches ---------- */
 	.switch { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 13px; cursor: pointer; padding: 4px 0; }
+	.card > .switch { margin: 12px 0 10px; }
 	.switch input { position: absolute; opacity: 0; pointer-events: none; }
 	.switch .track {
 		width: 32px; height: 18px; border-radius: 99px; flex: none;
@@ -860,8 +861,6 @@
 	.roompick button.on { border-color: var(--accent, #dd6a4d); color: var(--text); }
 	.roompick .dot { width: 7px; height: 7px; }
 	.msgrow .who .dot { display: inline-block; margin-right: 4px; }
-	.roomrow .who { width: 160px; }
-	.keyline { word-break: break-all; margin-top: -6px; }
 
 	/* ---------- definition rows ---------- */
 	dl { display: flex; flex-direction: column; gap: 2px; }
@@ -896,6 +895,10 @@
 
 	/* ---------- moderation ---------- */
 	.empty { color: var(--muted); font-size: 13px; }
+	.hint { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 12px 0 2px; }
+	.card footer + .hint { margin-top: 14px; }
+	.hint + .field-row, .hint + .keyrow { margin-top: 14px; }
+	p.danger-text { color: var(--danger); }
 	.modlist { max-height: 380px; overflow-y: auto; }
 	.msgrow {
 		display: flex; align-items: center; gap: 12px; padding: 8px 2px;
@@ -907,7 +910,6 @@
 	.msgrow .body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 	.msgrow .actions { flex: none; display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; }
 	.msgrow:hover .actions { opacity: 1; }
-	.msgrow.roomrow .actions { opacity: 1; }
 	.card header h2 .dot { display: inline-block; margin-right: 6px; }
 	.msgrow.hidden-msg .body { opacity: 0.35; text-decoration: line-through; }
 	.msgrow.hidden-msg .actions { opacity: 1; }
