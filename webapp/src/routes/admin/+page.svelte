@@ -91,7 +91,7 @@
 	async function refreshStatus() {
 		try {
 			status = await api.getAdminStatus(roomSel);
-			if (section === 'status' || section === 'rooms') {
+			if (section === 'status') {
 				await loadRooms();
 			}
 			if (section === 'status') {
@@ -116,6 +116,18 @@
 			if (!rooms.some((r) => r.id === roomSel)) roomSel = 'main';
 		} catch {}
 	}
+
+	// The editable copy the Rooms section works on — refreshed on entry and
+	// after saves, NEVER by the 5s poll, so typing does not get clobbered.
+	let roomsEdit = $state([]);
+	async function loadRoomsEdit() {
+		await loadRooms();
+		roomsEdit = rooms.map((r) => ({
+			...r,
+			keys: (r.keys ?? []).map((k) => ({ key: k.key ?? '', comment: k.comment ?? '' }))
+		}));
+	}
+	const roomStatus = (id) => rooms.find((r) => r.id === id);
 
 	const latest = (series) => {
 		const v = series?.[series.length - 1]?.value;
@@ -165,7 +177,8 @@
 		if (s === 'chat') loadModeration();
 		if (s === 'logs') loadLogs();
 		if (s === 'stream') loadTokens();
-		if (s === 'rooms' || s === 'status') loadRooms();
+		if (s === 'rooms') loadRoomsEdit();
+		if (s === 'status') loadRooms();
 	}
 
 	$effect(() => {
@@ -316,40 +329,65 @@
 		{:else if section === 'rooms'}
 			<hgroup><h1>Rooms</h1><p>Up to {maxRooms} theaters, all sharing the same ingest ports — the stream key decides which room a broadcast lands in.</p></hgroup>
 
-			<div class="card">
-				<header><h2>Your rooms</h2><p>Each room has its own theater page at /t/&lt;id&gt;, its own chat, and (except the main room) its own stream key.</p></header>
-				{#each rooms as r (r.id)}
-					<div class="msgrow roomrow">
-						<span class="who"><span class="dot" class:live={r.online}></span> {r.name}</span>
-						<span class="body dim">
-							/t/{r.id}
-							{#if r.online}&nbsp;· live · {r.viewerCount} watching{/if}
-						</span>
-						<span class="actions">
-							{#if r.isDefault}
-								<span class="dim">keys in Stream →</span>
-							{:else}
-								<button class="ghost tiny" onclick={() => copy(r.streamKey)}>Copy key</button>
-								<button class="ghost tiny" onclick={() => run(async () => { const res = await api.regenerateRoomKey(r.id); await loadRooms(); return res; }, 'New key minted')}>New key</button>
-								<button class="ghost tiny danger-text" onclick={() => { if (confirm(`Delete the room “${r.name}”? A live broadcast in it ends immediately.`)) run(async () => { const res = await api.deleteRoom(r.id); await loadRooms(); return res; }, 'Room deleted'); }}>Delete</button>
-							{/if}
-						</span>
-					</div>
-					{#if !r.isDefault}
-						<p class="hint mono-text dim keyline">{r.streamKey}</p>
-					{/if}
-				{/each}
-				{#if rooms.length < maxRooms}
+			{#each roomsEdit as r (r.id)}
+				<div class="card">
+					<header>
+						<h2><span class="dot" class:live={roomStatus(r.id)?.online}></span> {r.name}</h2>
+						<p>/t/{r.id}
+							{#if roomStatus(r.id)?.online}&nbsp;· live · {roomStatus(r.id)?.viewerCount} watching{:else}&nbsp;· resting{/if}
+						</p>
+					</header>
 					<div class="field-row">
-						<div class="field"><label for="roomname">New room name</label><input id="roomname" bind:value={newRoomName} placeholder="Second Screen" /></div>
+						<div class="field">
+							<label for={'roomname-' + r.id}>Name</label>
+							<input id={'roomname-' + r.id} bind:value={r.name} />
+						</div>
+					</div>
+					{#if r.isDefault}
+						<p class="hint">This is the main room — the front page. Its stream keys are the list in <b>Stream</b>.</p>
+					{:else}
+						{#each r.keys as k, i}
+							<div class="keyrow">
+								<input class="mono" bind:value={k.key} placeholder="key" />
+								<input class="comment" bind:value={k.comment} placeholder="comment" />
+								<button class="ghost tiny" onclick={() => copy(k.key)}>Copy</button>
+								<button class="ghost tiny" onclick={() => (k.key = randomKey())}>Randomize</button>
+								<button class="ghost tiny danger-text" onclick={() => (r.keys = r.keys.filter((_, j) => j !== i))}>Remove</button>
+							</div>
+						{/each}
+						<footer>
+							<button class="ghost" onclick={() => (r.keys = [...r.keys, { key: randomKey(), comment: '' }])}>Add a key</button>
+							{#if !r.isDefault}
+								<button class="ghost danger-text" onclick={() => { if (confirm(`Delete the room “${r.name}”? A live broadcast in it ends immediately.`)) run(async () => { const res = await api.deleteRoom(r.id); await loadRoomsEdit(); return res; }, 'Room deleted'); }}>Delete room</button>
+							{/if}
+							<button onclick={() => run(async () => {
+								const rn = await api.renameRoom(r.id, r.name.trim());
+								if (rn?.success === false) return rn;
+								return api.setRoomKeys(r.id, r.keys.filter((k) => k.key));
+							}, 'Room saved')}>Save</button>
+						</footer>
+					{/if}
+					{#if r.isDefault}
+						<footer>
+							<button onclick={() => run(() => api.renameRoom(r.id, r.name.trim()), 'Room renamed')}>Save</button>
+						</footer>
+					{/if}
+				</div>
+			{/each}
+
+			<div class="card">
+				<header><h2>New room</h2><p>Each room gets its own theater page at /t/&lt;id&gt;, its own chat, and its own stream keys.</p></header>
+				{#if roomsEdit.length < maxRooms}
+					<div class="field-row">
+						<div class="field"><label for="roomname">Room name</label><input id="roomname" bind:value={newRoomName} placeholder="Second Screen" /></div>
 					</div>
 					<footer>
-						<button disabled={!newRoomName.trim()} onclick={() => run(async () => { const res = await api.createRoom(newRoomName.trim()); newRoomName = ''; await loadRooms(); return res; }, 'Room created — copy its key')}>Create room</button>
+						<button disabled={!newRoomName.trim()} onclick={() => run(async () => { const res = await api.createRoom(newRoomName.trim()); newRoomName = ''; await loadRoomsEdit(); return res; }, 'Room created — copy its key')}>Create room</button>
 					</footer>
 				{:else}
 					<p class="hint">Room limit reached ({maxRooms}).</p>
 				{/if}
-				<p class="hint">Point a sender at the SAME ingest address as always and use the room's key — RTMP, SRT and TCP all route by it. Viewers pick a room at /t/&lt;id&gt;; the front page is the main room.</p>
+				<p class="hint">Point a sender at the SAME ingest address as always and use one of the room's keys — RTMP, SRT and TCP all route by it. Viewers pick a room at /t/&lt;id&gt;; the front page is the main room.</p>
 			</div>
 
 		{:else if section === 'stream'}
@@ -810,6 +848,7 @@
 	.msgrow .actions { flex: none; display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; }
 	.msgrow:hover .actions { opacity: 1; }
 	.msgrow.roomrow .actions { opacity: 1; }
+	.card header h2 .dot { display: inline-block; margin-right: 6px; }
 	.msgrow.hidden-msg .body { opacity: 0.35; text-decoration: line-through; }
 	.msgrow.hidden-msg .actions { opacity: 1; }
 

@@ -66,4 +66,4 @@ export const getRooms = () => req('/api/admin/rooms');
 export const createRoom = (name) => post('/api/admin/rooms', { name });
 export const deleteRoom = (id) => post('/api/admin/rooms/delete', { id });
 export const renameRoom = (id, name) => post('/api/admin/rooms/rename', { id, name });
-export const regenerateRoomKey = (id) => post('/api/admin/rooms/regenerate-key', { id });
+export const setRoomKeys = (id, keys) => post('/api/admin/rooms/keys', { id, keys });

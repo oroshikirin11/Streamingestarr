@@ -7,8 +7,9 @@ import (
 	"strings"
 
 	"streamingestarr/core"
+	"streamingestarr/models"
 	"streamingestarr/persistence/channelrepository"
-	"streamingestarr/utils"
+	"streamingestarr/persistence/configrepository"
 	webutils "streamingestarr/webserver/utils"
 )
 
@@ -17,22 +18,25 @@ import (
 // page — no restart, no extra ports.
 
 type roomResponse struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	StreamKey   string `json:"streamKey,omitempty"`
-	Online      bool   `json:"online"`
-	ViewerCount int    `json:"viewerCount"`
-	IsDefault   bool   `json:"isDefault"`
+	ID          string              `json:"id"`
+	Name        string              `json:"name"`
+	Keys        []models.ChannelKey `json:"keys"`
+	Online      bool                `json:"online"`
+	ViewerCount int                 `json:"viewerCount"`
+	IsDefault   bool                `json:"isDefault"`
 }
 
-func roomToResponse(id, name, key string) roomResponse {
+func roomToResponse(ch models.Channel) roomResponse {
 	out := roomResponse{
-		ID:        id,
-		Name:      name,
-		StreamKey: key,
-		IsDefault: id == channelrepository.DefaultChannelID,
+		ID:        ch.ID,
+		Name:      ch.Name,
+		Keys:      ch.Keys,
+		IsDefault: ch.ID == channelrepository.DefaultChannelID,
 	}
-	if c := core.GetChannelRuntime(id); c != nil {
+	if out.Keys == nil {
+		out.Keys = []models.ChannelKey{}
+	}
+	if c := core.GetChannelRuntime(ch.ID); c != nil {
 		status := c.GetStatus()
 		out.Online = status.Online
 		out.ViewerCount = status.ViewerCount
@@ -40,11 +44,11 @@ func roomToResponse(id, name, key string) roomResponse {
 	return out
 }
 
-// GetRooms lists every room with its live state and stream key.
+// GetRooms lists every room with its live state and stream keys.
 func GetRooms(w http.ResponseWriter, r *http.Request) {
 	rooms := []roomResponse{}
 	for _, c := range channelrepository.ListChannels() {
-		rooms = append(rooms, roomToResponse(c.ID, c.Name, c.StreamKey))
+		rooms = append(rooms, roomToResponse(c))
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
@@ -104,7 +108,7 @@ func CreateRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(roomToResponse(channel.ID, channel.Name, channel.StreamKey))
+	_ = json.NewEncoder(w).Encode(roomToResponse(*channel))
 }
 
 // DeleteRoom removes a room by {"id": "..."} — a live broadcast in it is
@@ -150,30 +154,35 @@ func RenameRoom(w http.ResponseWriter, r *http.Request) {
 	webutils.WriteSimpleResponse(w, true, "room renamed")
 }
 
-// RegenerateRoomKey mints a fresh stream key for a room: {"id": "..."}.
+// SetRoomKeys replaces a room's key list — the same edit-then-save flow
+// the global list uses: {"id": "...", "keys": [{"key": "...", "comment": ""}]}.
 // A broadcast already running keeps going — keys are checked at connect.
-func RegenerateRoomKey(w http.ResponseWriter, r *http.Request) {
+func SetRoomKeys(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		ID string `json:"id"`
+		ID   string              `json:"id"`
+		Keys []models.ChannelKey `json:"keys"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
-		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\"}")
+		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\", \"keys\": [...]}")
 		return
 	}
-	key, err := utils.GenerateAccessToken()
-	if err != nil {
-		webutils.WriteSimpleResponse(w, false, "unable to generate a key")
-		return
-	}
-	if err := channelrepository.SetChannelKey(req.ID, key); err != nil {
-		webutils.WriteSimpleResponse(w, false, err.Error())
-		return
-	}
-	channel := channelrepository.GetChannel(req.ID)
-	if channel == nil {
+	if channelrepository.GetChannel(req.ID) == nil {
 		webutils.WriteSimpleResponse(w, false, "no such room")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(roomToResponse(channel.ID, channel.Name, channel.StreamKey))
+	// A room key colliding with the global list would hijack a main-room
+	// key (room keys win the routing lookup) — refuse the ambiguity.
+	for _, global := range configrepository.Get().GetStreamKeys() {
+		for _, k := range req.Keys {
+			if global.Key != nil && *global.Key != "" && *global.Key == k.Key {
+				webutils.WriteSimpleResponse(w, false, "the key "+k.Key+" already belongs to the main room")
+				return
+			}
+		}
+	}
+	if err := channelrepository.ReplaceChannelKeys(req.ID, req.Keys); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "keys saved")
 }

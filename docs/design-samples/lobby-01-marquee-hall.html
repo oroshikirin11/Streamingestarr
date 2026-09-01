@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lobby 01 — Marquee Hall</title>
+<style>
+  :root {
+    --bg: #141416; --surface: #1d1c20; --surface-2: #27252b;
+    --text: #eeece9; --muted: #98938e; --border: #322f36;
+    --accent: #e8846b; --radius: 16px; --live: #5fc493;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    color: var(--text); font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 70% 50% at 20% 110%, #241a1a 0%, transparent 60%),
+      radial-gradient(ellipse 60% 45% at 85% -10%, #1e1a22 0%, transparent 60%),
+      var(--bg);
+  }
+
+  .tag {
+    position: fixed; top: 14px; right: 16px; font-size: 11px; color: var(--muted);
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+
+  .hall { max-width: 760px; margin: 0 auto; padding: 64px 24px 80px; }
+
+  header.top { text-align: center; margin-bottom: 46px; }
+  header.top .kicker {
+    font-size: 11px; letter-spacing: .28em; text-transform: uppercase; color: var(--muted);
+  }
+  header.top h1 { font-size: 26px; font-weight: 650; margin-top: 10px; }
+  header.top h1 b { color: var(--accent); font-weight: 650; }
+  header.top p { color: var(--muted); font-size: 14px; margin-top: 8px; }
+
+  .doors { display: flex; flex-direction: column; gap: 18px; }
+
+  /* One theater door: a wide card. Live doors glow — light spills out. */
+  .door {
+    position: relative; display: flex; align-items: stretch; gap: 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; cursor: pointer; text-decoration: none; color: inherit;
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .door:hover { transform: translateY(-2px); }
+  .door.live { border-color: #4a3a34; box-shadow: 0 10px 50px -18px #e8846b55, 0 0 0 1px #e8846b22; }
+  .door.live:hover { box-shadow: 0 14px 60px -16px #e8846b77, 0 0 0 1px #e8846b33; }
+
+  /* The marquee strip — bulbs running when live. */
+  .marquee { flex: none; width: 10px; background: var(--surface-2); position: relative; }
+  .door.live .marquee {
+    background:
+      repeating-linear-gradient(180deg, #f4c9a1 0 6px, #e8846b 6px 12px, #40302a 12px 26px);
+    animation: bulbs 1.4s linear infinite; box-shadow: 0 0 18px #e8846b66;
+  }
+  @keyframes bulbs { to { background-position-y: 26px; } }
+
+  .poster {
+    flex: none; width: 132px; aspect-ratio: 2 / 3; margin: 16px 0 16px 18px;
+    border-radius: 8px; overflow: hidden; position: relative;
+    background: linear-gradient(150deg, #3a2f4a, #1a2a33 55%, #12181c);
+    box-shadow: 0 8px 22px -8px #000c;
+  }
+  .poster.p2 { background: linear-gradient(160deg, #4a2f2f, #332a1a 55%, #1c1512); }
+  .poster::after {
+    content: attr(data-title); position: absolute; inset: auto 0 0 0; padding: 40px 10px 10px;
+    font-size: 11px; font-weight: 650; letter-spacing: .04em; color: #eeece9dd;
+    background: linear-gradient(transparent, #000a);
+  }
+  .poster.empty { background: #19181c; box-shadow: none; }
+  .poster.empty::after { content: ""; }
+  .poster.empty::before {
+    content: "◦"; position: absolute; inset: 0; display: grid; place-items: center;
+    color: #3a373f; font-size: 30px;
+  }
+
+  .door-body { flex: 1; min-width: 0; padding: 22px 22px 20px; display: flex; flex-direction: column; }
+  .roomline { display: flex; align-items: center; gap: 10px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3f3c44; flex: none; }
+  .live .dot { background: var(--live); box-shadow: 0 0 12px var(--live); }
+  .roomname { font-size: 18px; font-weight: 650; }
+  .badge {
+    margin-left: auto; font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 99px; border: 1px solid var(--border); color: var(--muted);
+  }
+  .live .badge { border-color: #e8846b55; color: var(--accent); background: #e8846b14; }
+
+  .nowline { margin-top: 10px; font-size: 14px; color: var(--muted); }
+  .nowline b { color: var(--text); font-weight: 600; }
+  .restline { margin-top: 10px; font-size: 14px; color: #6d6871; font-style: italic; }
+
+  .doorfoot { margin-top: auto; padding-top: 16px; display: flex; align-items: center; gap: 14px; font-size: 12.5px; color: var(--muted); }
+  .viewers::before { content: "● "; color: var(--live); font-size: 9px; vertical-align: 1px; }
+  .enter {
+    margin-left: auto; font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent); opacity: 0; transform: translateX(-4px); transition: all .18s ease;
+  }
+  .door:hover .enter { opacity: 1; transform: none; }
+  .door.empty .enter { color: var(--muted); }
+  .door.empty { opacity: .78; }
+  .door.empty:hover { opacity: 1; }
+
+  footer.hint { text-align: center; margin-top: 40px; color: #6d6871; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="tag">lobby sample 01 · marquee hall</div>
+<div class="hall">
+  <header class="top">
+    <div class="kicker">choose your theater</div>
+    <h1>The <b>hall</b> is open</h1>
+    <p>Two rooms are playing tonight. Walk into whichever glows.</p>
+  </header>
+
+  <div class="doors">
+    <a class="door live" href="#">
+      <div class="marquee"></div>
+      <div class="poster" data-title="COWBOY BEBOP · S1E5"></div>
+      <div class="door-body">
+        <div class="roomline"><span class="dot"></span><span class="roomname">Main Theater</span><span class="badge">Now playing</span></div>
+        <div class="nowline"><b>Cowboy Bebop</b> — Ballad of Fallen Angels</div>
+        <div class="doorfoot"><span class="viewers">3 watching</span><span>started 24 min ago</span><span class="enter">Enter →</span></div>
+      </div>
+    </a>
+
+    <a class="door live" href="#">
+      <div class="marquee"></div>
+      <div class="poster p2" data-title="F1 · GRAND PRIX"></div>
+      <div class="door-body">
+        <div class="roomline"><span class="dot"></span><span class="roomname">Second Screen</span><span class="badge">Now playing</span></div>
+        <div class="nowline"><b>Formula 1</b> — Monza, live broadcast</div>
+        <div class="doorfoot"><span class="viewers">1 watching</span><span>started 5 min ago</span><span class="enter">Enter →</span></div>
+      </div>
+    </a>
+
+    <a class="door empty" href="#">
+      <div class="marquee"></div>
+      <div class="poster empty"></div>
+      <div class="door-body">
+        <div class="roomline"><span class="dot"></span><span class="roomname">Anime Night</span><span class="badge">Resting</span></div>
+        <div class="restline">the projector sleeps — last watched: Frieren</div>
+        <div class="doorfoot"><span>you can still wait inside</span><span class="enter">Enter →</span></div>
+      </div>
+    </a>
+  </div>
+
+  <footer class="hint">the moment a room lights up, its door starts to glow — no refresh needed</footer>
+</div>
+</body>
+</html>

@@ -39,11 +39,24 @@ func Setup(db *sql.DB) {
 	if _, err := db.Exec(createTableSQL); err != nil {
 		log.Fatalln("unable to create channels table:", err)
 	}
-	// Migration: rooms carry their own stream key. The default channel keeps
-	// "" here — its keys are the pre-existing global list, untouched.
-	if !columnExists(db, "channels", "stream_key") {
-		if _, err := db.Exec(`ALTER TABLE channels ADD COLUMN stream_key TEXT NOT NULL DEFAULT ''`); err != nil {
-			log.Fatalln("unable to add stream_key column to channels:", err)
+	// Rooms carry their own stream keys — as many as they like, mirroring
+	// the global list (which stays the default channel's key store).
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS channel_keys (
+		"key" TEXT NOT NULL PRIMARY KEY,
+		"channel_id" TEXT NOT NULL,
+		"comment" TEXT NOT NULL DEFAULT ''
+	)`); err != nil {
+		log.Fatalln("unable to create channel_keys table:", err)
+	}
+	// Migration from the short-lived single-key column: carry the key over,
+	// then leave the column dormant.
+	if columnExists(db, "channels", "stream_key") {
+		if _, err := db.Exec(`INSERT OR IGNORE INTO channel_keys(key, channel_id)
+			SELECT stream_key, id FROM channels WHERE stream_key != ''`); err != nil {
+			log.Errorln("unable to migrate room keys:", err)
+		}
+		if _, err := db.Exec(`UPDATE channels SET stream_key = '' WHERE stream_key != ''`); err != nil {
+			log.Errorln("unable to clear migrated room keys:", err)
 		}
 	}
 	if _, err := db.Exec(`INSERT OR IGNORE INTO channels(id, name) VALUES(?, ?)`,
@@ -67,19 +80,21 @@ func columnExists(db *sql.DB, table, column string) bool {
 	return false
 }
 
-// GetChannel returns a channel by ID, or nil if it does not exist.
+// GetChannel returns a channel by ID (keys included), or nil if it does
+// not exist.
 func GetChannel(id string) *models.Channel {
 	var c models.Channel
-	row := _db.QueryRow("SELECT id, name, stream_key FROM channels WHERE id = ?", id)
-	if err := row.Scan(&c.ID, &c.Name, &c.StreamKey); err != nil {
+	row := _db.QueryRow("SELECT id, name FROM channels WHERE id = ?", id)
+	if err := row.Scan(&c.ID, &c.Name); err != nil {
 		return nil
 	}
+	c.Keys = ListChannelKeys(id)
 	return &c
 }
 
-// ListChannels returns all channels, oldest first.
+// ListChannels returns all channels with their keys, oldest first.
 func ListChannels() []models.Channel {
-	rows, err := _db.Query("SELECT id, name, stream_key FROM channels ORDER BY created_at")
+	rows, err := _db.Query("SELECT id, name FROM channels ORDER BY created_at")
 	if err != nil {
 		return nil
 	}
@@ -87,11 +102,32 @@ func ListChannels() []models.Channel {
 	var channels []models.Channel
 	for rows.Next() {
 		var c models.Channel
-		if err := rows.Scan(&c.ID, &c.Name, &c.StreamKey); err == nil {
+		if err := rows.Scan(&c.ID, &c.Name); err == nil {
 			channels = append(channels, c)
 		}
 	}
+	rows.Close()
+	for i := range channels {
+		channels[i].Keys = ListChannelKeys(channels[i].ID)
+	}
 	return channels
+}
+
+// ListChannelKeys returns a room's stream keys.
+func ListChannelKeys(channelID string) []models.ChannelKey {
+	rows, err := _db.Query("SELECT key, comment FROM channel_keys WHERE channel_id = ? ORDER BY key", channelID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var keys []models.ChannelKey
+	for rows.Next() {
+		var k models.ChannelKey
+		if err := rows.Scan(&k.Key, &k.Comment); err == nil {
+			keys = append(keys, k)
+		}
+	}
+	return keys
 }
 
 // CountChannels returns how many channels exist.
@@ -112,15 +148,15 @@ func GetChannelIDForKey(key string) string {
 		return ""
 	}
 	var id string
-	row := _db.QueryRow("SELECT id FROM channels WHERE stream_key = ? AND stream_key != ''", key)
+	row := _db.QueryRow("SELECT channel_id FROM channel_keys WHERE key = ?", key)
 	if err := row.Scan(&id); err != nil {
 		return ""
 	}
 	return id
 }
 
-// AddChannel inserts a new room with its own stream key. The MaxChannels
-// cap and runtime creation live in core; this only persists the row.
+// AddChannel inserts a new room with its first stream key. The MaxChannels
+// cap and runtime creation live in core; this only persists the rows.
 func AddChannel(id, name, streamKey string) error {
 	if !ValidChannelID.MatchString(id) {
 		return errors.New("invalid channel id")
@@ -131,17 +167,21 @@ func AddChannel(id, name, streamKey string) error {
 	if streamKey == "" {
 		return errors.New("a room needs a stream key")
 	}
-	res, err := _db.Exec(`INSERT OR IGNORE INTO channels(id, name, stream_key) VALUES(?, ?, ?)`, id, name, streamKey)
+	res, err := _db.Exec(`INSERT OR IGNORE INTO channels(id, name) VALUES(?, ?)`, id, name)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return errors.New("channel already exists")
 	}
+	if _, err := _db.Exec(`INSERT OR IGNORE INTO channel_keys(key, channel_id) VALUES(?, ?)`, streamKey, id); err != nil {
+		return err
+	}
 	return nil
 }
 
-// DeleteChannel removes a room. The default channel is not deletable.
+// DeleteChannel removes a room and its keys. The default channel is not
+// deletable.
 func DeleteChannel(id string) error {
 	if id == DefaultChannelID {
 		return errors.New("the default channel cannot be deleted")
@@ -153,6 +193,7 @@ func DeleteChannel(id string) error {
 	if n, _ := res.RowsAffected(); n == 0 {
 		return errors.New("no such channel")
 	}
+	_, _ = _db.Exec(`DELETE FROM channel_keys WHERE channel_id = ?`, id)
 	return nil
 }
 
@@ -162,15 +203,37 @@ func SetChannelName(id, name string) error {
 	return err
 }
 
-// SetChannelKey replaces a room's stream key (regenerate-on-demand). The
-// default channel's keys live in the global list, not here.
-func SetChannelKey(id, streamKey string) error {
+// ReplaceChannelKeys sets a room's full key list — the same edit-then-save
+// shape the global list uses. The default channel's keys live in the global
+// list, not here. A key already owned by ANOTHER room is rejected: keys are
+// the router, so they must be unambiguous.
+func ReplaceChannelKeys(id string, keys []models.ChannelKey) error {
 	if id == DefaultChannelID {
 		return errors.New("the default channel's keys are managed in the stream settings")
 	}
-	if streamKey == "" {
-		return errors.New("a room needs a stream key")
+	if len(keys) == 0 {
+		return errors.New("a room needs at least one stream key")
 	}
-	_, err := _db.Exec(`UPDATE channels SET stream_key = ? WHERE id = ?`, streamKey, id)
-	return err
+	for _, k := range keys {
+		if k.Key == "" {
+			return errors.New("a stream key cannot be empty")
+		}
+		if owner := GetChannelIDForKey(k.Key); owner != "" && owner != id {
+			return errors.New("the key " + k.Key + " already belongs to another room")
+		}
+	}
+	tx, err := _db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() // nolint
+	if _, err := tx.Exec(`DELETE FROM channel_keys WHERE channel_id = ?`, id); err != nil {
+		return err
+	}
+	for _, k := range keys {
+		if _, err := tx.Exec(`INSERT INTO channel_keys(key, channel_id, comment) VALUES(?, ?, ?)`, k.Key, id, k.Comment); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

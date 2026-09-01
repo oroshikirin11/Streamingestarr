@@ -82,7 +82,7 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/rooms", middleware.RequireAdminAuth(admin.CreateRoom))
 	r.Post("/api/admin/rooms/delete", middleware.RequireAdminAuth(admin.DeleteRoom))
 	r.Post("/api/admin/rooms/rename", middleware.RequireAdminAuth(admin.RenameRoom))
-	r.Post("/api/admin/rooms/regenerate-key", middleware.RequireAdminAuth(admin.RegenerateRoomKey))
+	r.Post("/api/admin/rooms/keys", middleware.RequireAdminAuth(admin.SetRoomKeys))
 
 	// mount the api
 	r.Mount("/api/", handlers.New().Handler())
