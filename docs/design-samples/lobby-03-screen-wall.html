@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lobby 03 — Screen Wall</title>
+<style>
+  :root {
+    --bg: #141416; --surface: #1d1c20; --surface-2: #27252b;
+    --text: #eeece9; --muted: #98938e; --border: #322f36;
+    --accent: #e8846b; --radius: 14px; --live: #5fc493;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    color: var(--text); font-family: system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 70% 50% at 20% 110%, #241a1a 0%, transparent 60%),
+      radial-gradient(ellipse 60% 45% at 85% -10%, #1e1a22 0%, transparent 60%),
+      var(--bg);
+  }
+
+  .tag {
+    position: fixed; top: 14px; right: 16px; font-size: 11px; color: var(--muted);
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+
+  .wall { max-width: 980px; margin: 0 auto; padding: 64px 28px 80px; }
+
+  header.top { text-align: center; margin-bottom: 42px; }
+  header.top .kicker { font-size: 11px; letter-spacing: .28em; text-transform: uppercase; color: var(--muted); }
+  header.top h1 { font-size: 25px; font-weight: 650; margin-top: 10px; }
+  header.top h1 b { color: var(--accent); font-weight: 650; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 26px;
+  }
+
+  .screen-card { text-decoration: none; color: inherit; display: block; }
+
+  /* The screen: a 16:9 tile. Live screens carry the room's live preview
+     (/preview.gif?channel=<id> in the real thing) and an ambilight halo. */
+  .screen {
+    position: relative; aspect-ratio: 16 / 9; border-radius: var(--radius);
+    background: #0d0d10; border: 1px solid var(--border); overflow: hidden;
+    transition: transform .18s ease;
+  }
+  .screen-card:hover .screen { transform: translateY(-3px) scale(1.01); }
+
+  .live .screen { border-color: #453832; }
+  .live .screen::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit;
+  }
+  /* stand-in for the live preview gif */
+  .live .screen .preview {
+    position: absolute; inset: 0;
+    background: linear-gradient(120deg, #4a2f4a, #22384a 45%, #1c4a3a 80%);
+    background-size: 300% 300%; animation: drift 9s ease-in-out infinite alternate;
+  }
+  .live .screen .preview.p2 {
+    background: linear-gradient(140deg, #4a3322, #4a2230 50%, #22304a);
+    background-size: 300% 300%;
+  }
+  @keyframes drift { to { background-position: 100% 100%; } }
+
+  /* ambilight halo behind live screens */
+  .live .halo {
+    position: absolute; inset: -18px; z-index: -1; border-radius: 24px; filter: blur(26px);
+    background: linear-gradient(120deg, #7a4a7a55, #2a557a55 50%, #2a7a5a55);
+    animation: drift 9s ease-in-out infinite alternate;
+  }
+  .halo-wrap { position: relative; z-index: 0; }
+
+  .empty .screen { opacity: .85; }
+  .empty .screen .off {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    color: #514d57; font-size: 13px; font-style: italic;
+  }
+  .empty .screen .off::before {
+    content: "●"; display: block; text-align: center; margin-bottom: 8px;
+    color: #2c2a31; font-size: 20px;
+  }
+
+  .live-chip {
+    position: absolute; top: 10px; left: 10px; display: flex; align-items: center; gap: 6px;
+    padding: 5px 11px; border-radius: 99px; background: #000a; backdrop-filter: blur(8px);
+    font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--live);
+  }
+  .live-chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--live); box-shadow: 0 0 8px var(--live); }
+  .viewers-chip {
+    position: absolute; top: 10px; right: 10px; padding: 5px 11px; border-radius: 99px;
+    background: #000a; backdrop-filter: blur(8px); font-size: 11px; color: #cfcbc7;
+  }
+
+  .nowbar {
+    position: absolute; inset: auto 0 0 0; padding: 26px 14px 12px;
+    background: linear-gradient(transparent, #000c);
+    font-size: 13px; color: #eeece9;
+  }
+  .nowbar small { display: block; font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: #b5aca7; margin-bottom: 3px; }
+
+  .meta { display: flex; align-items: baseline; gap: 10px; padding: 13px 4px 0; }
+  .meta .name { white-space: nowrap; }
+  .meta .path { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .meta .name { font-size: 15.5px; font-weight: 650; }
+  .empty .meta .name { color: #8d8892; }
+  .meta .path { font-size: 12px; color: #6d6871; }
+  .meta .enter {
+    margin-left: auto; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--accent); opacity: 0; transition: opacity .15s;
+  }
+  .screen-card:hover .enter { opacity: 1; }
+
+  footer.hint { text-align: center; margin-top: 44px; color: #6d6871; font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="tag">lobby sample 03 · screen wall</div>
+<div class="wall">
+  <header class="top">
+    <div class="kicker">pick a screen</div>
+    <h1>New <b>Streamingestarr</b> Theater</h1>
+  </header>
+
+  <div class="grid">
+    <a class="screen-card live" href="#">
+      <div class="halo-wrap">
+        <div class="halo"></div>
+        <div class="screen">
+          <div class="preview"></div>
+          <span class="live-chip">Live</span>
+          <span class="viewers-chip">3 watching</span>
+          <div class="nowbar"><small>Now playing</small>Cowboy Bebop — Ballad of Fallen Angels</div>
+        </div>
+      </div>
+      <div class="meta"><span class="name">Main Theater</span><span class="path">/t/main</span><span class="enter">Enter →</span></div>
+    </a>
+
+    <a class="screen-card live" href="#">
+      <div class="halo-wrap">
+        <div class="halo"></div>
+        <div class="screen">
+          <div class="preview p2"></div>
+          <span class="live-chip">Live</span>
+          <span class="viewers-chip">1 watching</span>
+          <div class="nowbar"><small>Now playing</small>Formula 1 — Monza</div>
+        </div>
+      </div>
+      <div class="meta"><span class="name">Second Screen</span><span class="path">/t/second-screen</span><span class="enter">Enter →</span></div>
+    </a>
+
+    <a class="screen-card empty" href="#">
+      <div class="halo-wrap">
+        <div class="screen"><div class="off">the projector sleeps</div></div>
+      </div>
+      <div class="meta"><span class="name">Anime Night</span><span class="path">/t/anime-night</span><span class="enter">Wait inside →</span></div>
+    </a>
+
+    <a class="screen-card empty" href="#">
+      <div class="halo-wrap">
+        <div class="screen"><div class="off">between showings</div></div>
+      </div>
+      <div class="meta"><span class="name">Watchparty</span><span class="path">/t/watchparty</span><span class="enter">Wait inside →</span></div>
+    </a>
+  </div>
+
+  <footer class="hint">live screens show the room's real preview and glow with its colours — empty ones rest until a stream wakes them</footer>
+</div>
+</body>
+</html>
