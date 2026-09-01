@@ -15,6 +15,7 @@ import (
 	"streamingestarr/config"
 	"streamingestarr/logging"
 	"streamingestarr/models"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/utils"
 )
@@ -354,12 +355,12 @@ func NewTranscoder(channelID string) *Transcoder {
 	transcoder.ffmpegPath = ffmpegPath
 	transcoder.internalListenerPort = config.InternalHLSListenerPort
 
-	transcoder.currentStreamOutputSettings = configRepository.GetStreamOutputVariants()
-	transcoder.currentLatencyLevel = configRepository.GetStreamLatencyLevel()
+	transcoder.currentStreamOutputSettings = channelrepository.GetEffectiveOutputVariants(channelID)
+	transcoder.currentLatencyLevel = channelrepository.GetEffectiveLatencyLevel(channelID)
 	transcoder.codec = getCodec(configRepository.GetVideoCodec())
 	transcoder.segmentOutputPath = config.HLSStoragePath
 	transcoder.playlistOutputPath = config.HLSStoragePath
-	transcoder.segmentFormat = resolveSegmentFormat(configRepository.GetVideoSegmentFormat(), channelID)
+	transcoder.segmentFormat = resolveSegmentFormat(channelrepository.GetEffectiveSegmentFormat(channelID), channelID)
 
 	transcoder.input = "pipe:0" // stdin
 

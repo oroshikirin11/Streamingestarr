@@ -62,6 +62,10 @@
     background: linear-gradient(140deg, #4a3322, #4a2230 50%, #22304a);
     background-size: 300% 300%;
   }
+  .live .screen .preview.p3 {
+    background: linear-gradient(100deg, #22443a, #223c4a 55%, #3a2a4a);
+    background-size: 300% 300%;
+  }
   @keyframes drift { to { background-position: 100% 100%; } }
 
   /* ambilight halo behind live screens */
@@ -116,7 +120,7 @@
 </style>
 </head>
 <body>
-<div class="tag">lobby sample 03 · screen wall</div>
+<div class="tag">lobby sample 03 · screen wall · n rooms</div>
 <div class="wall">
   <header class="top">
     <div class="kicker">pick a screen</div>
@@ -163,9 +167,36 @@
       </div>
       <div class="meta"><span class="name">Watchparty</span><span class="path">/t/watchparty</span><span class="enter">Wait inside →</span></div>
     </a>
+
+    <a class="screen-card live" href="#">
+      <div class="halo-wrap">
+        <div class="halo"></div>
+        <div class="screen">
+          <div class="preview p3"></div>
+          <span class="live-chip">Live</span>
+          <span class="viewers-chip">2 watching</span>
+          <div class="nowbar"><small>Now playing</small>Frieren — Beyond Journey's End</div>
+        </div>
+      </div>
+      <div class="meta"><span class="name">Balcony</span><span class="path">/t/balcony</span><span class="enter">Enter →</span></div>
+    </a>
+
+    <a class="screen-card empty" href="#">
+      <div class="halo-wrap">
+        <div class="screen"><div class="off">the lights are low</div></div>
+      </div>
+      <div class="meta"><span class="name">Retro Corner</span><span class="path">/t/retro-corner</span><span class="enter">Wait inside →</span></div>
+    </a>
+
+    <a class="screen-card empty" href="#">
+      <div class="halo-wrap">
+        <div class="screen"><div class="off">the room is resting</div></div>
+      </div>
+      <div class="meta"><span class="name">Docs &amp; Chill</span><span class="path">/t/docs-chill</span><span class="enter">Wait inside →</span></div>
+    </a>
   </div>
 
-  <footer class="hint">live screens show the room's real preview and glow with its colours — empty ones rest until a stream wakes them</footer>
+  <footer class="hint">live tiles are the rooms' REAL previews (/preview.gif per room, refreshed every 20s) glowing with their own colours — the grid grows with however many rooms exist</footer>
 </div>
 </body>
 </html>

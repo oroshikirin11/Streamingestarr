@@ -64,8 +64,9 @@ as Docker.
   metadata API, HDR badge, sound-on join.
 - **The room stays together**: every viewer is anchored to the same
   wall-clock moment — within ~100 ms of each other, stalls self-heal.
-- **Up to five rooms**: extra theaters (own page, own chat, own stream key)
-  created live from the admin — streams route by key, no extra ports.
+- **Rooms**: any number of independent theaters — own page, own chat, own
+  stream keys, own title/latency/output config — created live from the
+  admin. Streams route by key; no extra ports.
 - **Private by construction**: the login gate covers everything, including
   the video segments and the chat socket.
 - **Operator's cockpit**: live inbound bitrate graph, receive-health

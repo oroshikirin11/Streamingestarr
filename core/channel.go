@@ -93,9 +93,6 @@ func ChannelRuntimeForStreamKey(streamKey string) *ChannelRuntime {
 // AddChannel creates a new room end to end: the data row (with a freshly
 // minted stream key), its runtime, and its offline state — live, no restart.
 func AddChannel(id, name string) (*models.Channel, error) {
-	if channelrepository.CountChannels() >= channelrepository.MaxChannels {
-		return nil, fmt.Errorf("the room limit is %d", channelrepository.MaxChannels)
-	}
 	key, err := utils.GenerateAccessToken()
 	if err != nil {
 		return nil, err

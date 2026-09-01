@@ -472,12 +472,10 @@ func (s *Server) eventReceived(event chatClientEvent) {
 }
 
 func (s *Server) sendWelcomeMessageToClient(c *Client) {
-	configRepository := configrepository.Get()
-
 	// Add an artificial delay so people notice this message come in.
 	time.Sleep(7 * time.Second)
 
-	welcomeMessage := utils.RenderSimpleMarkdown(configRepository.GetServerWelcomeMessage())
+	welcomeMessage := utils.RenderSimpleMarkdown(channelrepository.GetEffectiveWelcomeMessage(c.ChannelID))
 
 	if welcomeMessage != "" {
 		s.sendSystemMessageToClient(c, welcomeMessage)
@@ -485,9 +483,7 @@ func (s *Server) sendWelcomeMessageToClient(c *Client) {
 }
 
 func (s *Server) sendAllWelcomeMessage(channelID string) {
-	configRepository := configrepository.Get()
-
-	welcomeMessage := utils.RenderSimpleMarkdown(configRepository.GetServerWelcomeMessage())
+	welcomeMessage := utils.RenderSimpleMarkdown(channelrepository.GetEffectiveWelcomeMessage(channelID))
 
 	if welcomeMessage != "" {
 		clientMessage := events.SystemMessageEvent{

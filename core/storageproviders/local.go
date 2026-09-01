@@ -11,6 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"streamingestarr/config"
 	"streamingestarr/core/avsync"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/persistence/configrepository"
 )
 
@@ -113,8 +114,7 @@ func fixDegenerateMasterPlaylist(localFilePath, channelID string) {
 		return
 	}
 
-	configRepository := configrepository.Get()
-	variants := configRepository.GetStreamOutputVariants()
+	variants := channelrepository.GetEffectiveOutputVariants(channelID)
 
 	var b strings.Builder
 	b.WriteString(text)
@@ -163,7 +163,7 @@ func stripLyingCodecs(text, channelID string) string {
 		return text // unknown inbound codec: nothing to compare against
 	}
 	hdrForced := config.GetInboundVideoRange(channelID) != config.VideoRangeSDR
-	variants := configrepository.Get().GetStreamOutputVariants()
+	variants := channelrepository.GetEffectiveOutputVariants(channelID)
 
 	lines := strings.Split(text, "\n")
 	variantIdx := 0
@@ -212,8 +212,7 @@ func (s *LocalStorage) Save(filePath string, retryCount int) (string, error) {
 // Cleanup will remove old files from the storage provider.
 func (s *LocalStorage) Cleanup() error {
 	// Determine how many files we should keep on disk
-	configRepository := configrepository.Get()
-	maxNumber := configRepository.GetStreamLatencyLevel().SegmentCount
+	maxNumber := channelrepository.GetEffectiveLatencyLevel(s.channelID).SegmentCount
 	buffer := 10
 	return localCleanup(s.baseDir, maxNumber+buffer)
 }

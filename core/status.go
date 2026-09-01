@@ -3,7 +3,7 @@ package core
 import (
 	"streamingestarr/config"
 	"streamingestarr/models"
-	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/channelrepository"
 )
 
 // GetStatus gets the status of a channel.
@@ -17,7 +17,6 @@ func (c *ChannelRuntime) GetStatus() models.Status {
 		viewerCount = len(c.stats.Viewers)
 	}
 
-	configRepository := configrepository.Get()
 	return models.Status{
 		ChannelID:             c.ID,
 		Online:                c.IsStreamConnected(),
@@ -27,7 +26,7 @@ func (c *ChannelRuntime) GetStatus() models.Status {
 		LastDisconnectTime:    c.stats.LastDisconnectTime,
 		LastConnectTime:       c.stats.LastConnectTime,
 		VersionNumber:         config.VersionNumber,
-		StreamTitle:           configRepository.GetStreamTitle(),
+		StreamTitle:           channelrepository.GetEffectiveStreamTitle(c.ID),
 	}
 }
 

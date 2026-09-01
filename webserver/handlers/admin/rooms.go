@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -24,14 +25,30 @@ type roomResponse struct {
 	Online      bool                `json:"online"`
 	ViewerCount int                 `json:"viewerCount"`
 	IsDefault   bool                `json:"isDefault"`
+
+	// Per-room broadcast configuration; zero values inherit the server
+	// defaults from the Video/Settings sections.
+	Title          string                       `json:"title"`
+	WelcomeMessage string                       `json:"welcomeMessage"`
+	LatencyLevel   int                          `json:"latencyLevel"`
+	SegmentFormat  string                       `json:"segmentFormat"`
+	OutputVariants []models.StreamOutputVariant `json:"outputVariants"`
 }
 
 func roomToResponse(ch models.Channel) roomResponse {
 	out := roomResponse{
-		ID:        ch.ID,
-		Name:      ch.Name,
-		Keys:      ch.Keys,
-		IsDefault: ch.ID == channelrepository.DefaultChannelID,
+		ID:             ch.ID,
+		Name:           ch.Name,
+		Keys:           ch.Keys,
+		IsDefault:      ch.ID == channelrepository.DefaultChannelID,
+		Title:          ch.Title,
+		WelcomeMessage: ch.WelcomeMessage,
+		LatencyLevel:   ch.LatencyLevel,
+		SegmentFormat:  ch.SegmentFormat,
+		OutputVariants: ch.OutputVariants,
+	}
+	if out.OutputVariants == nil {
+		out.OutputVariants = []models.StreamOutputVariant{}
 	}
 	if out.Keys == nil {
 		out.Keys = []models.ChannelKey{}
@@ -51,10 +68,7 @@ func GetRooms(w http.ResponseWriter, r *http.Request) {
 		rooms = append(rooms, roomToResponse(c))
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"rooms": rooms,
-		"max":   channelrepository.MaxChannels,
-	})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"rooms": rooms})
 }
 
 var roomSlugStrip = regexp.MustCompile(`[^a-z0-9-]+`)
@@ -73,8 +87,8 @@ func roomIDFromName(name string) string {
 	if channelrepository.GetChannel(slug) == nil && channelrepository.ValidChannelID.MatchString(slug) {
 		return slug
 	}
-	for i := 2; i < 10; i++ {
-		candidate := slug + "-" + string(rune('0'+i))
+	for i := 2; i < 100; i++ {
+		candidate := fmt.Sprintf("%s-%d", slug, i)
 		if channelrepository.GetChannel(candidate) == nil && channelrepository.ValidChannelID.MatchString(candidate) {
 			return candidate
 		}
@@ -185,4 +199,43 @@ func SetRoomKeys(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webutils.WriteSimpleResponse(w, true, "keys saved")
+}
+
+// SetRoomConfig stores a room's broadcast configuration. The whole config
+// is replaced at once (the UI sends its full state). Zero values — "" for
+// text and format, -1 for latency, [] for variants — mean "inherit the
+// server defaults". Takes effect on the room's NEXT broadcast.
+func SetRoomConfig(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID             string                       `json:"id"`
+		Title          string                       `json:"title"`
+		WelcomeMessage string                       `json:"welcomeMessage"`
+		LatencyLevel   *int                         `json:"latencyLevel"`
+		SegmentFormat  string                       `json:"segmentFormat"`
+		OutputVariants []models.StreamOutputVariant `json:"outputVariants"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
+		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\", ...config}")
+		return
+	}
+	if channelrepository.GetChannel(req.ID) == nil {
+		webutils.WriteSimpleResponse(w, false, "no such room")
+		return
+	}
+	latency := -1
+	if req.LatencyLevel != nil {
+		latency = *req.LatencyLevel
+	}
+	cfg := models.Channel{
+		Title:          strings.TrimSpace(req.Title),
+		WelcomeMessage: strings.TrimSpace(req.WelcomeMessage),
+		LatencyLevel:   latency,
+		SegmentFormat:  req.SegmentFormat,
+		OutputVariants: req.OutputVariants,
+	}
+	if err := channelrepository.SetChannelConfig(req.ID, cfg); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "room configuration saved")
 }

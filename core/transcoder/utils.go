@@ -3,12 +3,13 @@ package transcoder
 import (
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
-	"streamingestarr/persistence/configrepository"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/utils"
 )
 
@@ -98,11 +99,13 @@ func handleTranscoderMessage(message string) {
 }
 
 func createVariantDirectories(baseDir string) {
-	// Create private hls data dirs
+	// Create private hls data dirs. The final path element of baseDir IS
+	// the channel ID (data/hls/<channel>), so the room's own ladder decides
+	// how many variant dirs exist.
 	utils.CleanupDirectory(baseDir)
-	configRepository := configrepository.Get()
-	if len(configRepository.GetStreamOutputVariants()) != 0 {
-		for index := range configRepository.GetStreamOutputVariants() {
+	variants := channelrepository.GetEffectiveOutputVariants(filepath.Base(baseDir))
+	if len(variants) != 0 {
+		for index := range variants {
 			if err := os.MkdirAll(path.Join(baseDir, strconv.Itoa(index)), 0o750); err != nil {
 				log.Fatalln(err)
 			}

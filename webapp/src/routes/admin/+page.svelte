@@ -46,7 +46,6 @@
 	let tokens = $state([]);
 	let newTokenName = $state('');
 	let rooms = $state([]);
-	let maxRooms = $state(5);
 	let newRoomName = $state('');
 	let roomSel = $state('main');
 
@@ -112,7 +111,6 @@
 		try {
 			const d = await api.getRooms();
 			rooms = d.rooms ?? [];
-			maxRooms = d.max ?? 5;
 			if (!rooms.some((r) => r.id === roomSel)) roomSel = 'main';
 		} catch {}
 	}
@@ -122,10 +120,33 @@
 	let roomsEdit = $state([]);
 	async function loadRoomsEdit() {
 		await loadRooms();
-		roomsEdit = rooms.map((r) => ({
+		roomsEdit = $state.snapshot(rooms).map((r) => ({
 			...r,
-			keys: (r.keys ?? []).map((k) => ({ key: k.key ?? '', comment: k.comment ?? '' }))
+			keys: (r.keys ?? []).map((k) => ({ key: k.key ?? '', comment: k.comment ?? '' })),
+			title: r.title ?? '',
+			welcomeMessage: r.welcomeMessage ?? '',
+			latencyLevel: r.latencyLevel ?? -1,
+			segmentFormat: r.segmentFormat ?? '',
+			customOutput: (r.outputVariants ?? []).length > 0,
+			outputVariants: r.outputVariants ?? []
 		}));
+	}
+
+	function saveRoom(r) {
+		return run(async () => {
+			const rn = await api.renameRoom(r.id, r.name.trim());
+			if (rn?.success === false) return rn;
+			const cf = await api.setRoomConfig(r.id, {
+				title: r.title,
+				welcomeMessage: r.welcomeMessage,
+				latencyLevel: Number(r.latencyLevel),
+				segmentFormat: r.segmentFormat,
+				outputVariants: r.customOutput ? r.outputVariants : []
+			});
+			if (cf?.success === false) return cf;
+			if (!r.isDefault) return api.setRoomKeys(r.id, r.keys.filter((k) => k.key));
+			return cf;
+		}, 'Room saved');
 	}
 	const roomStatus = (id) => rooms.find((r) => r.id === id);
 
@@ -327,7 +348,7 @@
 			{/if}
 
 		{:else if section === 'rooms'}
-			<hgroup><h1>Rooms</h1><p>Up to {maxRooms} theaters, all sharing the same ingest ports — the stream key decides which room a broadcast lands in.</p></hgroup>
+			<hgroup><h1>Rooms</h1><p>Independent theaters on the same ingest ports — the stream key decides which room a broadcast lands in. Empty settings inherit the server defaults from Video and Settings.</p></hgroup>
 
 			{#each roomsEdit as r (r.id)}
 				<div class="card">
@@ -342,7 +363,58 @@
 							<label for={'roomname-' + r.id}>Name</label>
 							<input id={'roomname-' + r.id} bind:value={r.name} />
 						</div>
+						<div class="field">
+							<label for={'roomtitle-' + r.id}>Stream title — empty inherits the default</label>
+							<input id={'roomtitle-' + r.id} bind:value={r.title} placeholder="what this theater shows" />
+						</div>
 					</div>
+					<div class="field-row">
+						<div class="field">
+							<label for={'roomwelcome-' + r.id}>Chat welcome — empty inherits the default</label>
+							<input id={'roomwelcome-' + r.id} bind:value={r.welcomeMessage} placeholder="welcome to this room" />
+						</div>
+					</div>
+					<div class="field-row">
+						<div class="field">
+							<label for={'roomseg-' + r.id}>Segment container</label>
+							<select id={'roomseg-' + r.id} bind:value={r.segmentFormat}>
+								<option value="">Server default</option>
+								<option value="auto">Auto — fMP4 when the codec needs it</option>
+								<option value="ts">mpegts — always</option>
+								<option value="fmp4">fMP4 — always</option>
+							</select>
+						</div>
+						<div class="field">
+							<label for={'roomlat-' + r.id}>Latency</label>
+							<select id={'roomlat-' + r.id} bind:value={r.latencyLevel}>
+								<option value={-1}>Server default</option>
+								<option value={0}>Lowest</option><option value={1}>Low</option>
+								<option value={2}>Default</option><option value={3}>High</option>
+								<option value={4}>Highest buffer</option>
+							</select>
+						</div>
+					</div>
+					<label class="switch">
+						<input type="checkbox" bind:checked={r.customOutput} onchange={() => { if (r.customOutput && r.outputVariants.length === 0) r.outputVariants = [{ name: 'passthrough', videoPassthrough: true, audioPassthrough: true, cpuUsageLevel: 2 }]; }} />
+						<span class="track"></span> Custom output for this room — off inherits the Video section's variants
+					</label>
+					{#if r.customOutput}
+						{#each r.outputVariants as v, i}
+							<div class="variant">
+								<div class="field"><label for={'rvn' + r.id + i}>Name</label><input id={'rvn' + r.id + i} bind:value={v.name} /></div>
+								<label class="switch"><input type="checkbox" bind:checked={v.videoPassthrough} /><span class="track"></span> Video passthrough</label>
+								<label class="switch"><input type="checkbox" bind:checked={v.audioPassthrough} /><span class="track"></span> Audio passthrough</label>
+								{#if !v.videoPassthrough}
+									<div class="field compact"><label for={'rvb' + r.id + i}>kbps</label><input id={'rvb' + r.id + i} type="number" bind:value={v.videoBitrate} /></div>
+									<div class="field compact"><label for={'rvf' + r.id + i}>fps</label><input id={'rvf' + r.id + i} type="number" bind:value={v.framerate} /></div>
+								{/if}
+								<button class="ghost tiny danger-text remove" onclick={() => (r.outputVariants = r.outputVariants.filter((_, j) => j !== i))}>Remove</button>
+							</div>
+						{/each}
+						<footer>
+							<button class="ghost" onclick={() => (r.outputVariants = [...r.outputVariants, { name: 'passthrough', videoPassthrough: true, audioPassthrough: true, cpuUsageLevel: 2 }])}>Add a variant</button>
+						</footer>
+					{/if}
 					{#if r.isDefault}
 						<p class="hint">This is the main room — the front page. Its stream keys are the list in <b>Stream</b>.</p>
 					{:else}
@@ -355,38 +427,26 @@
 								<button class="ghost tiny danger-text" onclick={() => (r.keys = r.keys.filter((_, j) => j !== i))}>Remove</button>
 							</div>
 						{/each}
-						<footer>
+					{/if}
+					<footer>
+						{#if !r.isDefault}
 							<button class="ghost" onclick={() => (r.keys = [...r.keys, { key: randomKey(), comment: '' }])}>Add a key</button>
-							{#if !r.isDefault}
-								<button class="ghost danger-text" onclick={() => { if (confirm(`Delete the room “${r.name}”? A live broadcast in it ends immediately.`)) run(async () => { const res = await api.deleteRoom(r.id); await loadRoomsEdit(); return res; }, 'Room deleted'); }}>Delete room</button>
-							{/if}
-							<button onclick={() => run(async () => {
-								const rn = await api.renameRoom(r.id, r.name.trim());
-								if (rn?.success === false) return rn;
-								return api.setRoomKeys(r.id, r.keys.filter((k) => k.key));
-							}, 'Room saved')}>Save</button>
-						</footer>
-					{/if}
-					{#if r.isDefault}
-						<footer>
-							<button onclick={() => run(() => api.renameRoom(r.id, r.name.trim()), 'Room renamed')}>Save</button>
-						</footer>
-					{/if}
+							<button class="ghost danger-text" onclick={() => { if (confirm(`Delete the room “${r.name}”? A live broadcast in it ends immediately.`)) run(async () => { const res = await api.deleteRoom(r.id); await loadRoomsEdit(); return res; }, 'Room deleted'); }}>Delete room</button>
+						{/if}
+						<button onclick={() => saveRoom(r)}>Save</button>
+					</footer>
+					<p class="hint">Latency, container and output changes apply to the room's next broadcast.</p>
 				</div>
 			{/each}
 
 			<div class="card">
-				<header><h2>New room</h2><p>Each room gets its own theater page at /t/&lt;id&gt;, its own chat, and its own stream keys.</p></header>
-				{#if roomsEdit.length < maxRooms}
-					<div class="field-row">
-						<div class="field"><label for="roomname">Room name</label><input id="roomname" bind:value={newRoomName} placeholder="Second Screen" /></div>
-					</div>
-					<footer>
-						<button disabled={!newRoomName.trim()} onclick={() => run(async () => { const res = await api.createRoom(newRoomName.trim()); newRoomName = ''; await loadRoomsEdit(); return res; }, 'Room created — copy its key')}>Create room</button>
-					</footer>
-				{:else}
-					<p class="hint">Room limit reached ({maxRooms}).</p>
-				{/if}
+				<header><h2>New room</h2><p>Each room gets its own theater page at /t/&lt;id&gt;, its own chat, its own keys, and its own configuration.</p></header>
+				<div class="field-row">
+					<div class="field"><label for="roomname">Room name</label><input id="roomname" bind:value={newRoomName} placeholder="Second Screen" /></div>
+				</div>
+				<footer>
+					<button disabled={!newRoomName.trim()} onclick={() => run(async () => { const res = await api.createRoom(newRoomName.trim()); newRoomName = ''; await loadRoomsEdit(); return res; }, 'Room created — copy its key')}>Create room</button>
+				</footer>
 				<p class="hint">Point a sender at the SAME ingest address as always and use one of the room's keys — RTMP, SRT and TCP all route by it. Viewers pick a room at /t/&lt;id&gt;; the front page is the main room.</p>
 			</div>
 

@@ -6,22 +6,19 @@ package channelrepository
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"regexp"
 
 	log "github.com/sirupsen/logrus"
 
 	"streamingestarr/models"
+	"streamingestarr/persistence/configrepository"
 )
 
 // DefaultChannelID is the channel every fresh install gets, and the one
 // legacy unscoped URLs (/hls/stream.m3u8) resolve to.
 const DefaultChannelID = "main"
-
-// MaxChannels caps how many rooms can exist at once. Passthrough keeps the
-// CPU cost of a room near zero, but every live room still carries a
-// transcoder process and an ingest session — five is the designed ceiling.
-const MaxChannels = 5
 
 var _db *sql.DB
 
@@ -59,6 +56,21 @@ func Setup(db *sql.DB) {
 			log.Errorln("unable to clear migrated room keys:", err)
 		}
 	}
+	// Per-room broadcast configuration; zero values inherit the server
+	// defaults, so existing rooms behave exactly as before.
+	for col, ddl := range map[string]string{
+		"title":           `ALTER TABLE channels ADD COLUMN title TEXT NOT NULL DEFAULT ''`,
+		"welcome_message": `ALTER TABLE channels ADD COLUMN welcome_message TEXT NOT NULL DEFAULT ''`,
+		"latency_level":   `ALTER TABLE channels ADD COLUMN latency_level INTEGER NOT NULL DEFAULT -1`,
+		"segment_format":  `ALTER TABLE channels ADD COLUMN segment_format TEXT NOT NULL DEFAULT ''`,
+		"output_variants": `ALTER TABLE channels ADD COLUMN output_variants TEXT NOT NULL DEFAULT ''`,
+	} {
+		if !columnExists(db, "channels", col) {
+			if _, err := db.Exec(ddl); err != nil {
+				log.Fatalln("unable to add", col, "column to channels:", err)
+			}
+		}
+	}
 	if _, err := db.Exec(`INSERT OR IGNORE INTO channels(id, name) VALUES(?, ?)`,
 		DefaultChannelID, "Main Theater"); err != nil {
 		log.Fatalln("unable to seed default channel:", err)
@@ -84,9 +96,13 @@ func columnExists(db *sql.DB, table, column string) bool {
 // not exist.
 func GetChannel(id string) *models.Channel {
 	var c models.Channel
-	row := _db.QueryRow("SELECT id, name FROM channels WHERE id = ?", id)
-	if err := row.Scan(&c.ID, &c.Name); err != nil {
+	var variantsJSON string
+	row := _db.QueryRow("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants FROM channels WHERE id = ?", id)
+	if err := row.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON); err != nil {
 		return nil
+	}
+	if variantsJSON != "" {
+		_ = json.Unmarshal([]byte(variantsJSON), &c.OutputVariants)
 	}
 	c.Keys = ListChannelKeys(id)
 	return &c
@@ -94,7 +110,7 @@ func GetChannel(id string) *models.Channel {
 
 // ListChannels returns all channels with their keys, oldest first.
 func ListChannels() []models.Channel {
-	rows, err := _db.Query("SELECT id, name FROM channels ORDER BY created_at")
+	rows, err := _db.Query("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants FROM channels ORDER BY created_at")
 	if err != nil {
 		return nil
 	}
@@ -102,7 +118,11 @@ func ListChannels() []models.Channel {
 	var channels []models.Channel
 	for rows.Next() {
 		var c models.Channel
-		if err := rows.Scan(&c.ID, &c.Name); err == nil {
+		var variantsJSON string
+		if err := rows.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON); err == nil {
+			if variantsJSON != "" {
+				_ = json.Unmarshal([]byte(variantsJSON), &c.OutputVariants)
+			}
 			channels = append(channels, c)
 		}
 	}
@@ -236,4 +256,77 @@ func ReplaceChannelKeys(id string, keys []models.ChannelKey) error {
 		}
 	}
 	return tx.Commit()
+}
+
+// SetChannelConfig stores a room's broadcast configuration. Zero values
+// ("" / -1 / empty variants) mean "inherit the server defaults".
+func SetChannelConfig(id string, c models.Channel) error {
+	variantsJSON := ""
+	if len(c.OutputVariants) > 0 {
+		b, err := json.Marshal(c.OutputVariants)
+		if err != nil {
+			return err
+		}
+		variantsJSON = string(b)
+	}
+	if c.LatencyLevel < -1 || c.LatencyLevel > 4 {
+		c.LatencyLevel = -1
+	}
+	switch c.SegmentFormat {
+	case "", "auto", "ts", "fmp4":
+	default:
+		return errors.New("segment format must be auto, ts or fmp4 (or empty to inherit)")
+	}
+	_, err := _db.Exec(`UPDATE channels SET title = ?, welcome_message = ?, latency_level = ?, segment_format = ?, output_variants = ? WHERE id = ?`,
+		c.Title, c.WelcomeMessage, c.LatencyLevel, c.SegmentFormat, variantsJSON, id)
+	return err
+}
+
+// The effective-config lens: what a room ACTUALLY broadcasts with — its own
+// setting when one is stored, the server default otherwise. Every consumer
+// that used to read the global config for a live broadcast reads these.
+
+// GetEffectiveStreamTitle returns the room's title, falling back to the
+// global stream title.
+func GetEffectiveStreamTitle(channelID string) string {
+	if c := GetChannel(channelID); c != nil && c.Title != "" {
+		return c.Title
+	}
+	return configrepository.Get().GetStreamTitle()
+}
+
+// GetEffectiveWelcomeMessage returns the room's chat welcome message,
+// falling back to the global one.
+func GetEffectiveWelcomeMessage(channelID string) string {
+	if c := GetChannel(channelID); c != nil && c.WelcomeMessage != "" {
+		return c.WelcomeMessage
+	}
+	return configrepository.Get().GetServerWelcomeMessage()
+}
+
+// GetEffectiveLatencyLevel returns the room's latency level, falling back
+// to the global one.
+func GetEffectiveLatencyLevel(channelID string) models.LatencyLevel {
+	if c := GetChannel(channelID); c != nil && c.LatencyLevel >= 0 {
+		return models.GetLatencyLevel(c.LatencyLevel)
+	}
+	return configrepository.Get().GetStreamLatencyLevel()
+}
+
+// GetEffectiveSegmentFormat returns the room's stored segment format
+// ("auto"/"ts"/"fmp4"), falling back to the global one.
+func GetEffectiveSegmentFormat(channelID string) string {
+	if c := GetChannel(channelID); c != nil && c.SegmentFormat != "" {
+		return c.SegmentFormat
+	}
+	return configrepository.Get().GetVideoSegmentFormat()
+}
+
+// GetEffectiveOutputVariants returns the room's output ladder, falling back
+// to the global one.
+func GetEffectiveOutputVariants(channelID string) []models.StreamOutputVariant {
+	if c := GetChannel(channelID); c != nil && len(c.OutputVariants) > 0 {
+		return c.OutputVariants
+	}
+	return configrepository.Get().GetStreamOutputVariants()
 }

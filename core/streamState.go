@@ -12,6 +12,7 @@ import (
 	"streamingestarr/core/transcoder"
 	"streamingestarr/core/webhooks"
 	"streamingestarr/models"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/utils"
 )
@@ -31,10 +32,11 @@ func (c *ChannelRuntime) setStreamAsConnected(rtmpOut *io.PipeReader) {
 	c.stats.SessionMaxViewerCount = 0
 
 	configRepository := configrepository.Get()
+	_ = configRepository
 
 	c.currentBroadcast = &models.CurrentBroadcast{
-		LatencyLevel:   configRepository.GetStreamLatencyLevel(),
-		OutputSettings: configRepository.GetStreamOutputVariants(),
+		LatencyLevel:   channelrepository.GetEffectiveLatencyLevel(c.ID),
+		OutputSettings: channelrepository.GetEffectiveOutputVariants(c.ID),
 	}
 
 	c.StopOfflineCleanupTimer()
@@ -99,7 +101,7 @@ func (c *ChannelRuntime) SetStreamAsDisconnected() {
 		return
 	}
 
-	if configrepository.Get().GetVideoSegmentFormat() == "fmp4" {
+	if channelrepository.GetEffectiveSegmentFormat(c.ID) == "fmp4" {
 		// The offline clip is an mpegts segment; appending it to an fMP4
 		// playlist is invalid. Transition straight to the offline state
 		// instead, which re-runs the transcoder in the configured format.

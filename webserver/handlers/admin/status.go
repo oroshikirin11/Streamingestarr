@@ -9,15 +9,12 @@ import (
 	"streamingestarr/metrics"
 	"streamingestarr/models"
 	"streamingestarr/persistence/channelrepository"
-	"streamingestarr/persistence/configrepository"
 	"streamingestarr/webserver/router/middleware"
 )
 
 // Status gets the details of a room's inbound broadcaster. ?channel=
 // scopes it; the default room otherwise.
 func Status(w http.ResponseWriter, r *http.Request) {
-	configRepository := configrepository.Get()
-
 	channelID := r.URL.Query().Get("channel")
 	if channelID == "" || channelrepository.GetChannel(channelID) == nil {
 		channelID = channelrepository.DefaultChannelID
@@ -41,7 +38,7 @@ func Status(w http.ResponseWriter, r *http.Request) {
 		OverallPeakViewerCount: status.OverallMaxViewerCount,
 		SessionPeakViewerCount: status.SessionMaxViewerCount,
 		VersionNumber:          status.VersionNumber,
-		StreamTitle:            configRepository.GetStreamTitle(),
+		StreamTitle:            channelrepository.GetEffectiveStreamTitle(channelID),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
