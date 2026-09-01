@@ -75,8 +75,6 @@ as Docker.
 [PolyForm Noncommercial 1.0.0](LICENSE.md) — free to use, run, and modify for
 any **noncommercial** purpose. Forks and derived versions are welcome, but
 they inherit the same noncommercial terms: nobody can take this and sell it.
-Contains code derived from [Owncast](https://github.com/owncast/owncast)
-(MIT — see [NOTICE.md](NOTICE.md)).
 
 If Streamingestarr runs your theater and you want to say thanks:
 
