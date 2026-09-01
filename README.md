@@ -11,6 +11,14 @@ server, which turns it into a watch-together theater. Install Streamerr on a
 machine with **direct directory access to your media library** (preferred) —
 SMB shares are supported as well. Any RTMP/SRT encoder (OBS included) works too.
 
+## Rooms
+
+<p align="center"><img src="docs/media/rooms.png" alt="The lobby — two rooms live, one resting, each glowing with its own screen" width="920"></p>
+
+One server, many theaters: every room takes its own inbound stream on the
+same ports — the stream key decides where a broadcast lands. Own page, own
+chat, own configuration; viewers pick a screen in the lobby.
+
 ## Setup — Docker
 
 ```sh
@@ -64,9 +72,8 @@ as Docker.
   metadata API, HDR badge, sound-on join.
 - **The room stays together**: every viewer is anchored to the same
   wall-clock moment — within ~100 ms of each other, stalls self-heal.
-- **Rooms**: any number of independent theaters — own page, own chat, own
-  stream keys, own title/latency/output config — created live from the
-  admin. Streams route by key; no extra ports.
+- **Rooms**: any number of independent theaters, created live from the
+  admin — streams route by key, no extra ports.
 - **Private by construction**: the login gate covers everything, including
   the video segments and the chat socket.
 - **Operator's cockpit**: live inbound bitrate graph, receive-health
