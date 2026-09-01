@@ -111,7 +111,7 @@ Streamingestarr mode.
 ## 4. Point Jellystreamerr at it
 
 - Add the ingest URL as an extra destination (Tailscale or public):
-  `rtmp://<host>:1935/live/<key>`
+  `rtmp://<host>:1935/<key>` (any application path works — `/live/<key>` too)
 - Streamingestarr mode: receiver URL + the access token.
 
 Both Owncast and Streamingestarr now carry the broadcast. Watch on the new

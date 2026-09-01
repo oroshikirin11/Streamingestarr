@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/nareix/joy5/format/flv/flvio"
-	log "github.com/sirupsen/logrus"
 	"streamingestarr/models"
 )
 
@@ -82,15 +81,15 @@ func getVideoCodec(codec interface{}) string {
 }
 
 func secretMatch(configStreamKey string, path string) bool {
-	prefix := "/live/"
-
-	if !strings.HasPrefix(path, prefix) {
-		log.Debug("RTMP path does not start with " + prefix)
-		return false // We need the path to begin with $prefix
+	// Only the final path segment is the key. The application path before
+	// it is whatever the encoder chose — "/live" (the RTMP convention and
+	// what Owncast demanded), something else, or nothing at all. Demanding
+	// a specific app name bought nothing; the key is the lock.
+	path = strings.TrimSuffix(path, "/")
+	idx := strings.LastIndex(path, "/")
+	if idx < 0 || idx == len(path)-1 {
+		return false
 	}
-
-	streamingKey := path[len(prefix):] // Remove $prefix
-
-	matches := subtle.ConstantTimeCompare([]byte(streamingKey), []byte(configStreamKey)) == 1
-	return matches
+	streamingKey := path[idx+1:]
+	return subtle.ConstantTimeCompare([]byte(streamingKey), []byte(configStreamKey)) == 1
 }

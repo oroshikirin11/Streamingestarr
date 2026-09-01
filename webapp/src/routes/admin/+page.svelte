@@ -162,7 +162,7 @@
 	const host = typeof location !== 'undefined' ? location.hostname : 'localhost';
 	// Bare addresses — the stream key lives in its own card with its own
 	// Copy button; senders take address and key as separate fields anyway.
-	const rtmpURL = $derived(`rtmp://${host}:${cfg?.rtmpServerPort ?? 1935}/live`);
+	const rtmpURL = $derived(`rtmp://${host}:${cfg?.rtmpServerPort ?? 1935}`);
 	const srtURL = $derived(`srt://${host}:${srtPort}`);
 	const tcpURL = $derived(`tcp://${host}:${tcpIngestPort}`);
 
