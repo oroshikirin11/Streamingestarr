@@ -1,3 +1,9 @@
+# Third-party notices
+
+Streamingestarr contains code derived from
+[Owncast](https://github.com/owncast/owncast), used under the MIT license.
+The required notice follows.
+
 MIT License
 
 Copyright (c) 2020-2023 Gabe Kangas

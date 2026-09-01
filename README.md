@@ -76,7 +76,7 @@ as Docker.
 any **noncommercial** purpose. Forks and derived versions are welcome, but
 they inherit the same noncommercial terms: nobody can take this and sell it.
 Contains code derived from [Owncast](https://github.com/owncast/owncast)
-(MIT — see [LICENSE](LICENSE)).
+(MIT — see [NOTICE.md](NOTICE.md)).
 
 If Streamingestarr runs your theater and you want to say thanks:
 
