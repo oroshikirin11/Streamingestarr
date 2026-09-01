@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,14 +29,30 @@ import (
 	"streamingestarr/persistence/channelrepository"
 )
 
-// Measurement is one segment's A/V offset. Delta is audio minus video in
-// milliseconds: positive = audio starts later than video.
+// Measurement is one segment's A/V offset plus its place in the two
+// timelines that must agree for playback to feel smooth:
+//
+//   - DeltaMs: audio minus video first-PTS inside the segment (positive =
+//     audio starts later). Skew here = the sender's A/V glue.
+//   - PtsStepMs: how far the MEDIA advanced since the previous measured
+//     segment (first video PTS delta). Wobble here — negative, or jumping
+//     around the segment duration — is a timeline seam in the source.
+//   - WallStepMs: how much WALL time passed between those segments being
+//     written. Media steps steady while wall steps stretch = the feed is
+//     arriving late (sender starving or the uplink); that is the
+//     rubberband signature viewers feel as stall-then-jump.
+//
+// StepSegments is how many segments the step spans (probes are skipped
+// while one is running) — divide the steps by it to normalize.
 type Measurement struct {
-	Time    time.Time `json:"time"`
-	Segment string    `json:"segment"`
-	VideoMs float64   `json:"videoMs"`
-	AudioMs float64   `json:"audioMs"`
-	DeltaMs float64   `json:"deltaMs"`
+	Time         time.Time `json:"time"`
+	Segment      string    `json:"segment"`
+	VideoMs      float64   `json:"videoMs"`
+	AudioMs      float64   `json:"audioMs"`
+	DeltaMs      float64   `json:"deltaMs"`
+	PtsStepMs    float64   `json:"ptsStepMs"`
+	WallStepMs   float64   `json:"wallStepMs"`
+	StepSegments int       `json:"stepSegments"`
 }
 
 const keep = 90 // ~a few minutes of segments
@@ -46,6 +63,12 @@ type ledger struct {
 	ring    []Measurement
 	busy    atomic.Bool
 	initSeg atomic.Value // string: the session's fMP4 init file, "" for ts
+
+	// The previous measured segment, for the step fields.
+	lastVideoMs float64
+	lastWall    time.Time
+	lastSeq     int
+	haveLast    bool
 }
 
 var (
@@ -101,10 +124,24 @@ func MeasureSegment(path string) {
 	if !l.busy.CompareAndSwap(false, true) {
 		return
 	}
+	seq := segmentSeq(base)
+	written := time.Now()
 	go func() {
 		defer l.busy.Store(false)
 		if m, ok := l.probe(path, base); ok {
 			l.mu.Lock()
+			if l.haveLast {
+				m.PtsStepMs = m.VideoMs - l.lastVideoMs
+				m.WallStepMs = float64(written.Sub(l.lastWall).Milliseconds())
+				m.StepSegments = 1
+				if seq > 0 && l.lastSeq > 0 && seq > l.lastSeq {
+					m.StepSegments = seq - l.lastSeq
+				}
+			}
+			l.lastVideoMs = m.VideoMs
+			l.lastWall = written
+			l.lastSeq = seq
+			l.haveLast = true
 			l.ring = append(l.ring, m)
 			if len(l.ring) > keep {
 				l.ring = l.ring[len(l.ring)-keep:]
@@ -130,8 +167,25 @@ func Reset(channelID string) {
 	l := ledgerFor(channelID)
 	l.mu.Lock()
 	l.ring = nil
+	l.haveLast = false
 	l.mu.Unlock()
 	l.initSeg.Store("")
+}
+
+// segmentSeq parses the trailing sequence number ffmpeg stamps on segment
+// filenames (stream-XXXX-N.ts / .m4s), or 0 when the shape is unfamiliar.
+var segSeqRE = regexp.MustCompile(`-(\d+)\.(?:ts|m4s)$`)
+
+func segmentSeq(base string) int {
+	m := segSeqRE.FindStringSubmatch(base)
+	if m == nil {
+		return 0
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 type ffprobePacket struct {

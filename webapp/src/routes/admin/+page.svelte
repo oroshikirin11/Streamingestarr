@@ -41,6 +41,8 @@
 	let ingestStats = $state(null);
 	let avSyncLatest = $state(null);
 	let avSyncWorst = $state(0);
+	let cadence = $state(null);
+	let incidents = $state([]);
 	let tokens = $state([]);
 	let newTokenName = $state('');
 	let rooms = $state([]);
@@ -99,6 +101,8 @@
 				const av = status?.broadcaster ? await api.getAVSync(roomSel) : null;
 				avSyncLatest = av?.length ? av[av.length - 1] : null;
 				avSyncWorst = av?.length ? av.reduce((w, m) => (Math.abs(m.deltaMs) > Math.abs(w) ? m.deltaMs : w), 0) : 0;
+				cadence = summarizeCadence(av);
+				incidents = ((await api.getPlayerIncidents(roomSel).catch(() => [])) ?? []);
 			}
 		} catch {}
 	}
@@ -145,6 +149,55 @@
 		}, 'Room saved');
 	}
 	const roomStatus = (id) => rooms.find((r) => r.id === id);
+
+	// The rubberband verdict, from the segment ledger. Each measured step
+	// spans the SAME segments in two clocks: how far the MEDIA advanced
+	// (first-PTS delta) and how much WALL time passed while those segments
+	// were written. Healthy live: the two match, whatever the segment
+	// sizes. Wall ahead of media = the feed arrived late (sender starving
+	// or the uplink). Media ahead of wall = a burst/catch-up. Negative
+	// media = the source timeline stepped backwards (a seam).
+	function summarizeCadence(av) {
+		const per = (av ?? []).filter((m) => m.stepSegments > 0);
+		if (per.length < 4) return null;
+		const med = (xs) => {
+			const a = [...xs].sort((x, y) => x - y);
+			return a[Math.floor(a.length / 2)];
+		};
+		// Pairing subtlety: a segment's wall timestamp marks its END (when
+		// it was written), its PTS marks its START. So the wall step of
+		// segment N spans the same real span as the PTS step of segment
+		// N+1 — pairing them makes the lag exact even when segment
+		// durations alternate (keyframe-aligned cutting does that).
+		let late = 0, bursts = 0, worstLateMs = 0;
+		for (let i = 0; i < per.length - 1; i++) {
+			if (per[i].stepSegments !== 1 || per[i + 1].stepSegments !== 1) continue;
+			const lag = per[i].wallStepMs - per[i + 1].ptsStepMs;
+			if (lag > 1500) { late++; worstLateMs = Math.max(worstLateMs, lag); }
+			else if (lag < -1500) bursts++;
+		}
+		const seams = per.filter((s) => s.ptsStepMs < 0).length;
+		return {
+			medPts: Math.round(med(per.map((s) => s.ptsStepMs / s.stepSegments))),
+			worstLateMs: Math.round(worstLateMs),
+			late,
+			seams,
+			bursts
+		};
+	}
+
+	const incidentSummary = $derived.by(() => {
+		const cutoff = Date.now() - 10 * 60 * 1000;
+		const recent = (incidents ?? []).filter((i) => new Date(i.time).getTime() > cutoff);
+		if (!recent.length) return null;
+		const counts = {};
+		const clients = new Set();
+		for (const i of recent) {
+			counts[i.type] = (counts[i.type] ?? 0) + 1;
+			clients.add(i.client);
+		}
+		return { counts, clients: clients.size, last: recent[recent.length - 1], total: recent.length };
+	});
 
 	const latest = (series) => {
 		const v = series?.[series.length - 1]?.value;
@@ -293,6 +346,24 @@
 							· link loss: {ingestStats.srtPktRecvLoss} (recovered {ingestStats.srtPktRecvRetrans})
 							· buffer drops: {ingestStats.bufferDroppedBytes > 0 ? `${Math.round(ingestStats.bufferDroppedBytes / 1024)} KB` : '0'}
 						</p>
+					{/if}
+					{#if cadence}
+						<p class="hint" class:danger-text={cadence.seams > 0 || cadence.late > 0}>
+							Segment cadence — pacing ~{cadence.medPts} ms/segment
+							{#if cadence.late > 0}&nbsp;· {cadence.late} late arrivals, worst {(cadence.worstLateMs / 1000).toFixed(1)}s (the feed fell behind — sender starving or uplink){/if}
+							{#if cadence.bursts > 0}&nbsp;· {cadence.bursts} catch-up bursts{/if}
+							{#if cadence.seams > 0}&nbsp;· {cadence.seams} timeline seams (source timestamps stepped backwards){/if}
+							{#if !cadence.late && !cadence.seams && !cadence.bursts}&nbsp;· steady — arrival matches the media clock{/if}
+						</p>
+					{/if}
+					{#if incidentSummary}
+						<p class="hint danger-text">
+							Viewer incidents (10 min) — {Object.entries(incidentSummary.counts).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+							· {incidentSummary.clients} viewer{incidentSummary.clients === 1 ? '' : 's'}
+							· last: {incidentSummary.last.type}{incidentSummary.last.magMs ? ` ${Math.round(incidentSummary.last.magMs)}ms` : ''} at {new Date(incidentSummary.last.time).toLocaleTimeString()}
+						</p>
+					{:else if status?.online}
+						<p class="hint">Viewer incidents (10 min) — none reported. Rubberbanding without incidents here means the viewer never told us; with incidents but a clean cadence line, blame that viewer's network.</p>
 					{/if}
 					{#if avSyncLatest}
 						<p class="hint" class:danger-text={Math.abs(avSyncWorst) > 45}>

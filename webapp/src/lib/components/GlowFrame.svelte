@@ -25,6 +25,46 @@
 	let dead = false;
 	let retryTimer;
 
+	// ---- playback incident watchdog ----
+	// Records the moments playback misbehaves — audio replays (backward
+	// jumps), forward discontinuities, stalls, and the sync controller's
+	// own snaps — and ships them to the server every 10s so the admin can
+	// read them NEXT TO the segment ledger: incidents while the ledger
+	// shows stretched wall-steps = the feed arrived late; incidents over a
+	// clean ledger = this viewer's network or player. Also mirrored on
+	// window.__sgrSync.incidents for console forensics.
+	let incidentRing = [];
+	let incidentPending = [];
+	let lastDrift = null;
+	let lastControllerSeek = 0;
+	function bufferedAhead() {
+		try {
+			const b = videoEl.buffered;
+			for (let i = 0; i < b.length; i++) {
+				if (videoEl.currentTime >= b.start(i) - 0.5 && videoEl.currentTime <= b.end(i)) {
+					return b.end(i) - videoEl.currentTime;
+				}
+			}
+		} catch {}
+		return 0;
+	}
+	function noteIncident(type, magMs, detail = '') {
+		if (!videoEl) return;
+		const ev = {
+			t: Date.now(),
+			type,
+			magMs: Math.round(magMs),
+			posS: +videoEl.currentTime.toFixed(1),
+			bufferS: +bufferedAhead().toFixed(1),
+			driftS: lastDrift == null ? 0 : +lastDrift.toFixed(2),
+			rate: videoEl.playbackRate,
+			detail
+		};
+		incidentRing = [...incidentRing.slice(-59), ev];
+		incidentPending.push(ev);
+		window.__sgrSync = { ...(window.__sgrSync ?? {}), incidents: incidentRing };
+	}
+
 	// Touch devices have no hover: a tap on the frame reveals the
 	// controls, which then fade after a few seconds of stillness.
 	let uiVisible = $state(false);
@@ -100,7 +140,14 @@
 			hls.attachMedia(videoEl);
 			hls.on(Hls.Events.MANIFEST_PARSED, startPlayback);
 			hls.on(Hls.Events.ERROR, (_e, data) => {
-				if (!data.fatal) return;
+				if (!data.fatal) {
+					// Buffer stalls and nudges are exactly the rubberband
+					// moments — worth a line in the incident feed.
+					if (/stall|nudge|gap|hole/i.test(String(data.details ?? ''))) {
+						noteIncident('hls-error', 0, String(data.details ?? ''));
+					}
+					return;
+				}
 				clearTimeout(retryTimer);
 				retryTimer = setTimeout(initPlayer, 3000);
 			});
@@ -165,7 +212,8 @@
 			}
 			// Debug handle: read window.__sgrSync in a console to see what
 			// the controller sees. Costs nothing, settles arguments.
-			window.__sgrSync = { drift, mode, rate: videoEl.playbackRate, skewMs: clockSkewMs };
+			lastDrift = drift;
+			window.__sgrSync = { ...(window.__sgrSync ?? {}), drift, mode, rate: videoEl.playbackRate, skewMs: clockSkewMs };
 			if (drift == null || !Number.isFinite(drift)) return;
 			if (Math.abs(drift) > SYNC.snapAt) {
 				// One clean seek instead of minutes of crawling — both
@@ -178,11 +226,15 @@
 				const want = videoEl.currentTime + drift;
 				const s = videoEl.seekable;
 				if (s.length && want > s.start(0) + 1 && want < s.end(s.length - 1) - 0.5) {
+					lastControllerSeek = performance.now();
+					noteIncident('sync-snap', drift * 1000);
 					videoEl.currentTime = want;
 					videoEl.playbackRate = 1;
 					return;
 				}
 				if (drift > 0 && Number.isFinite(hls.liveSyncPosition)) {
+					lastControllerSeek = performance.now();
+					noteIncident('sync-snap', drift * 1000);
 					videoEl.currentTime = hls.liveSyncPosition;
 					videoEl.playbackRate = 1;
 					return;
@@ -195,6 +247,65 @@
 			videoEl.playbackRate = Math.max(SYNC.rateMin, Math.min(SYNC.rateMax, 1 + drift * SYNC.gain));
 		}, 1000);
 		return () => clearInterval(driftTimer);
+	});
+
+	// The watchdog itself: four times a second, compare how far the MEDIA
+	// moved against how much WALL time passed. Backward movement the sync
+	// controller did not order = the browser replayed (repeated words);
+	// forward movement beyond real time = a gap jump; no movement while
+	// playing = a stall (reported with its duration when it ends).
+	let wdTimer;
+	let shipTimer;
+	onMount(() => {
+		let wd = { wall: 0, media: 0, rate: 1 };
+		let stallStart = 0;
+		wdTimer = setInterval(() => {
+			if (!videoEl || dead) return;
+			const now = performance.now();
+			const media = videoEl.currentTime;
+			const playing = !videoEl.paused && !videoEl.seeking;
+			if (wd.wall && playing) {
+				const wallDt = (now - wd.wall) / 1000;
+				const mediaDt = media - wd.media;
+				const ordered = now - lastControllerSeek < 1500;
+				if (wallDt < 2) {
+					if (mediaDt < -0.25 && !ordered) {
+						noteIncident('backjump', -mediaDt * 1000);
+					} else if (mediaDt - wallDt * wd.rate > 1.0 && !ordered) {
+						noteIncident('forwardjump', (mediaDt - wallDt * wd.rate) * 1000);
+					}
+					if (mediaDt < 0.02 && wallDt > 0.2) {
+						if (!stallStart) stallStart = now;
+					} else if (stallStart) {
+						const dur = now - stallStart;
+						stallStart = 0;
+						if (dur > 500) noteIncident('stall', dur);
+					}
+				}
+			} else {
+				stallStart = 0;
+			}
+			wd = { wall: now, media, rate: videoEl.playbackRate };
+		}, 250);
+
+		shipTimer = setInterval(() => {
+			if (!incidentPending.length) return;
+			const batch = incidentPending.splice(0, 30);
+			fetch('/api/metrics/player', {
+				method: 'POST',
+				credentials: 'include',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ channel: channelId, incidents: batch })
+			}).catch(() => {
+				// Lost reports rejoin the queue; the ring stays bounded.
+				incidentPending = batch.concat(incidentPending).slice(-60);
+			});
+		}, 10000);
+
+		return () => {
+			clearInterval(wdTimer);
+			clearInterval(shipTimer);
+		};
 	});
 
 	// Ambilight: the video is drawn tiny (32×18) into a canvas that sits
