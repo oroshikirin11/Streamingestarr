@@ -1,6 +1,6 @@
 <script>
 	import '../app.css';
-	import { status, config, role, reachable } from '$lib/stores.js';
+	import { status, config, role, reachable, clockSkewMs } from '$lib/stores.js';
 	import { dedupeSubtitle } from '$lib/text.js';
 	import { logout } from '$lib/api.js';
 	import GlowFrame from '$lib/components/GlowFrame.svelte';
@@ -69,7 +69,7 @@
 	{#if live}
 		<div class="lounge" class:chat-hidden={chatHidden}>
 			<div class="screen-zone">
-				<GlowFrame bind:this={frame} channelId={$status?.channelId || 'main'} />
+				<GlowFrame bind:this={frame} channelId={$status?.channelId || 'main'} clockSkewMs={$clockSkewMs} />
 				<NowTray status={$status} />
 			</div>
 			{#if !chatHidden}

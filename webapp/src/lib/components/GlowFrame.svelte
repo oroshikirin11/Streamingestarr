@@ -2,7 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import Hls from 'hls.js';
 
-	let { channelId = 'main' } = $props();
+	let { channelId = 'main', clockSkewMs = 0 } = $props();
 
 	let videoEl;
 	let frameEl;
@@ -88,12 +88,9 @@
 				// this is a broadcast, not a call.
 				liveSyncDurationCount: 5,
 				liveMaxLatencyDurationCount: 12,
-				// Room sync, part 1: a client that fell behind (a stall, a
-				// slow start) plays 5% fast until it is back at the target
-				// distance from the live edge, instead of parking wherever
-				// the stall left it. Everyone continuously converges to the
-				// same latency — inaudible, invisible, no jumps.
-				maxLiveSyncPlaybackRate: 1.05,
+				// Rate steering is OWNED by the room-sync controller below —
+				// hls.js's own latency controller stays off (default rate 1)
+				// so two steering loops never fight over playbackRate.
 				maxBufferLength: 45,
 				maxMaxBufferLength: 90,
 				backBufferLength: 30,
@@ -119,22 +116,84 @@
 
 	onMount(initPlayer);
 
-	// Room sync, part 2: the hard bound. Rate catch-up recovers ~3s per
-	// minute — fine for drift, hopeless after a long stall. A client more
-	// than 8s behind the shared target snaps to the sync position once,
-	// then the rate controller holds it there. Checked on a slow clock so
-	// the snap stays a rare correction, not a metronome.
+	// Room sync: every client steers to the same ABSOLUTE moment — the
+	// server's wall clock (EXT-X-PROGRAM-DATE-TIME in the playlists,
+	// local-clock skew corrected via the status poll's serverTime) minus
+	// one shared target latency. "My playlist edge minus five segments"
+	// differed between viewers by fetch timing; the wall clock does not.
+	//
+	// Steering is gentle and bounded: ±2%/s of drift within [0.97, 1.05]
+	// (browsers pitch-correct — inaudible), a dead band so rate sits at
+	// exactly 1 when in sync, and the hard snap only for gross drift after
+	// a real stall. When PDT or the skew is unavailable the controller
+	// falls back to hls.js's edge-based latency — the exact behaviour that
+	// shipped before wall-clock sync existed.
+	const SYNC = {
+		deadband: 0.35, // s — inside this, rate is exactly 1
+		snapAt: 8, // s behind target — jump instead of crawling
+		rateMax: 1.05,
+		rateMin: 0.97,
+		gain: 0.02 // rate delta per second of drift
+	};
+	// The shared wall-clock anchor. PDT is stamped when a segment is
+	// WRITTEN, so it runs ~1.5 segment durations newer than the media —
+	// wall latency at the player's natural join position measures about
+	// 0.7x the edge target (verified live: 10.8s vs edge target 15).
+	// Anchoring there means a fresh join starts already in the dead band
+	// instead of sinking for minutes; the exact factor only shifts the
+	// room's shared depth, never its uniformity — every client uses the
+	// same number.
+	const wallAnchor = (edgeTarget) => edgeTarget * 0.7;
 	let driftTimer;
 	onMount(() => {
 		driftTimer = setInterval(() => {
-			if (!hls || !videoEl || videoEl.paused || dead) return;
-			const target = hls.targetLatency;
-			const latency = hls.latency;
-			if (!Number.isFinite(target) || !Number.isFinite(latency)) return;
-			if (latency - target > 8 && Number.isFinite(hls.liveSyncPosition)) {
-				videoEl.currentTime = hls.liveSyncPosition;
+			if (!hls || !videoEl || dead) return;
+			if (videoEl.paused || videoEl.seeking || videoEl.readyState < 3) {
+				if (videoEl.playbackRate !== 1) videoEl.playbackRate = 1;
+				return;
 			}
-		}, 3000);
+			const edgeTarget = Number.isFinite(hls.targetLatency) ? hls.targetLatency : 15;
+			let drift = null;
+			let mode = 'wall';
+			const pd = hls.playingDate;
+			if (pd instanceof Date && Number.isFinite(pd.getTime())) {
+				const wallLatency = (Date.now() + clockSkewMs - pd.getTime()) / 1000;
+				drift = wallLatency - wallAnchor(edgeTarget);
+			} else if (Number.isFinite(hls.latency)) {
+				mode = 'edge';
+				drift = hls.latency - edgeTarget;
+			}
+			// Debug handle: read window.__sgrSync in a console to see what
+			// the controller sees. Costs nothing, settles arguments.
+			window.__sgrSync = { drift, mode, rate: videoEl.playbackRate, skewMs: clockSkewMs };
+			if (drift == null || !Number.isFinite(drift)) return;
+			if (Math.abs(drift) > SYNC.snapAt) {
+				// One clean seek instead of minutes of crawling — both
+				// directions. drift > 0 = too latent, seek forward;
+				// drift < 0 = ahead of the room (an early join near the
+				// edge of a young session), seek back into the playlist
+				// window. Guarded by the seekable range so it can never
+				// jump outside what actually exists; when the range can't
+				// take it, fall through to bounded rate steering.
+				const want = videoEl.currentTime + drift;
+				const s = videoEl.seekable;
+				if (s.length && want > s.start(0) + 1 && want < s.end(s.length - 1) - 0.5) {
+					videoEl.currentTime = want;
+					videoEl.playbackRate = 1;
+					return;
+				}
+				if (drift > 0 && Number.isFinite(hls.liveSyncPosition)) {
+					videoEl.currentTime = hls.liveSyncPosition;
+					videoEl.playbackRate = 1;
+					return;
+				}
+			}
+			if (Math.abs(drift) <= SYNC.deadband) {
+				if (videoEl.playbackRate !== 1) videoEl.playbackRate = 1;
+				return;
+			}
+			videoEl.playbackRate = Math.max(SYNC.rateMin, Math.min(SYNC.rateMax, 1 + drift * SYNC.gain));
+		}, 1000);
 		return () => clearInterval(driftTimer);
 	});
 

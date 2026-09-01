@@ -9,6 +9,20 @@ getConfig().then(config.set).catch(() => {});
 // can say "connection lost" instead of showing a stale live view.
 export const reachable = writable(true);
 
+// Server-clock skew (serverTime minus local now, ms), smoothed across
+// polls. The player's room-sync anchors every viewer to the SERVER's
+// wall clock; local clocks being minutes off must not matter. Includes
+// half the request time as noise — the EMA and the steering deadband
+// both absorb that comfortably.
+export const clockSkewMs = writable(0);
+let skewSeeded = false;
+function noteServerTime(s) {
+	const t = new Date(s?.serverTime ?? NaN).getTime();
+	if (!Number.isFinite(t)) return;
+	const sample = t - Date.now();
+	clockSkewMs.update((prev) => (skewSeeded ? prev * 0.8 + sample * 0.2 : ((skewSeeded = true), sample)));
+}
+
 export const status = readable(null, (set) => {
 	let stopped = false;
 	let failures = 0;
@@ -17,6 +31,7 @@ export const status = readable(null, (set) => {
 			const s = await getStatus();
 			failures = 0;
 			reachable.set(true);
+			noteServerTime(s);
 			if (!stopped) set(s);
 		} catch {
 			failures += 1;
