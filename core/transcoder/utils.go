@@ -68,6 +68,12 @@ var ignoredErrors = []string{
 	// detection reports the same fact once, with a verdict.
 	"timestamp discontinuity",
 	"out of order",
+	// A mid-stream codec break (seen: a sender pause card encoded H.264
+	// inside an HEVC broadcast) makes the parser print one line per
+	// packet; the player-incident and cadence lines carry the verdict.
+	"Failed to parse header of NALU",
+	"is not hvc1, you should use tag:v hvc1",
+	"Packet corrupt",
 	"frames duplicated",
 	"To ignore this",
 	"Driver does not support some wanted packed headers (wanted 0xd, found 0x1)",
