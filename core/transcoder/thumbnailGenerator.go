@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,7 +34,10 @@ func ThumbnailPath(channelID string) string {
 	return path.Join(config.TempDir, "thumbnail-"+channelID+".jpg")
 }
 
-// PreviewGifPath returns where a channel's animated preview lives.
+// PreviewGifPath returns where a channel's animated preview would live.
+// Nothing generates these anymore — a still frame every generator tick
+// replaced the looping gif (calmer on the room wall, far cheaper to make) —
+// but the path keeps the legacy endpoint and cleanup honest.
 func PreviewGifPath(channelID string) string {
 	if channelID == "" || channelID == "main" {
 		return path.Join(config.TempDir, "preview.gif")
@@ -82,7 +86,6 @@ func StartThumbnailGenerator(chunkPath string, variantIndex int, isVideoPassthro
 func fireThumbnailGenerator(segmentPath string, variantIndex int, channelID string) error {
 	// JPG takes less time to encode than PNG
 	outputFile := ThumbnailPath(channelID)
-	previewGifFile := PreviewGifPath(channelID)
 
 	framePath := path.Join(segmentPath, strconv.Itoa(variantIndex))
 	files, err := os.ReadDir(framePath)
@@ -90,8 +93,11 @@ func fireThumbnailGenerator(segmentPath string, variantIndex int, channelID stri
 		return err
 	}
 
-	var modTime time.Time
-	var names []string
+	type seg struct {
+		name string
+		mod  time.Time
+	}
+	var segs []seg
 	initSegment := ""
 	for _, f := range files {
 		if strings.HasPrefix(f.Name(), "init-") && path.Ext(f.Name()) == ".mp4" {
@@ -103,26 +109,20 @@ func fireThumbnailGenerator(segmentPath string, variantIndex int, channelID stri
 		}
 
 		fi, err := f.Info()
-		if err != nil {
+		if err != nil || !fi.Mode().IsRegular() {
 			continue
 		}
-
-		if fi.Mode().IsRegular() {
-			if !fi.ModTime().Before(modTime) {
-				if fi.ModTime().After(modTime) {
-					modTime = fi.ModTime()
-					names = names[:0]
-				}
-				names = append(names, fi.Name())
-			}
-		}
+		segs = append(segs, seg{f.Name(), fi.ModTime()})
 	}
 
-	if len(names) == 0 {
+	if len(segs) == 0 {
 		return nil
 	}
+	sort.Slice(segs, func(i, j int) bool { return segs[i].mod.After(segs[j].mod) })
+
 	configRepository := configrepository.Get()
-	mostRecentFile := path.Join(framePath, names[0])
+	mostRecentFile := path.Join(framePath, segs[0].name)
+
 	// An fMP4 media segment cannot be decoded on its own — prepend the
 	// variant's init segment via ffmpeg's concat protocol.
 	if path.Ext(mostRecentFile) == ".m4s" {
@@ -153,30 +153,6 @@ func fireThumbnailGenerator(segmentPath string, variantIndex int, channelID stri
 		log.Errorln(err)
 	}
 
-	makeAnimatedGifPreview(mostRecentFile, previewGifFile, channelID)
-
 	return nil
 }
 
-func makeAnimatedGifPreview(sourceFile string, outputFile string, channelID string) {
-	configRepository := configrepository.Get()
-	ffmpegPath := utils.ValidatedFfmpegPath(configRepository.GetFfMpegPath())
-	outputFileTemp := path.Join(config.TempDir, "temppreview-"+channelID+".gif")
-
-	// Filter is pulled from https://engineering.giphy.com/how-to-make-gifs-with-ffmpeg/
-	animatedGifFlags := []string{
-		"-y",            // Overwrite file
-		"-threads", "1", // Low priority processing
-		"-i", sourceFile, // Input
-		"-t", "1", // Output is one second in length
-		"-filter_complex", "[0:v] fps=8,scale=w=480:h=-1:flags=lanczos,split [a][b];[a] palettegen=stats_mode=full [p];[b][p] paletteuse=new=1",
-		outputFileTemp,
-	}
-
-	if _, err := exec.Command(ffmpegPath, animatedGifFlags...).Output(); err != nil {
-		log.Errorln(err)
-		// rename temp file
-	} else if err := utils.Move(outputFileTemp, outputFile); err != nil {
-		log.Errorln(err)
-	}
-}

@@ -1,9 +1,8 @@
 <script>
 	// The room overview — mockup 03 "screen wall" made real. One tile per
-	// room: live tiles show the room's actual preview (/preview.gif, which
-	// the server regenerates every ~20s per room) glowing with its own
-	// colours; resting tiles wait in the dark. The grid flows with however
-	// many rooms exist.
+	// room: live tiles show the room's latest thumbnail frame (regenerated
+	// every ~20s per room) glowing with its own colours; resting tiles wait
+	// in the dark. The grid flows with however many rooms exist.
 	import { dedupeSubtitle } from '../text.js';
 
 	let { rooms = [] } = $props();
@@ -15,9 +14,10 @@
 		'the room is resting'
 	];
 
-	// Refresh previews on the generator's own cadence. A room that just
-	// went live has no gif for its first seconds — the error fallback shows
-	// a soft gradient until the next tick finds one.
+	// One still frame per room, refreshed on the thumbnail generator's own
+	// cadence — a calm slideshow instead of a looping gif. A room that just
+	// went live has no frame for its first seconds — the error fallback
+	// shows a soft gradient until the next tick finds one.
 	let tick = $state(Date.now());
 	let broken = $state({});
 	$effect(() => {
@@ -27,7 +27,7 @@
 		}, 20000);
 		return () => clearInterval(t);
 	});
-	const previewSrc = (id) => `/preview.gif?channel=${encodeURIComponent(id)}&t=${tick}`;
+	const previewSrc = (id) => `/thumbnail.jpg?channel=${encodeURIComponent(id)}&t=${tick}`;
 
 	const nowLine = (np) => {
 		if (!np?.title) return '';
