@@ -14,6 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"streamingestarr/models"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/persistence/configrepository"
 )
 
@@ -22,10 +23,6 @@ var (
 	_setBroadcaster       func(models.Broadcaster, string)
 	_isStreamBusy         func(string) bool
 	_wireOnce             sync.Once
-
-	_mu         sync.Mutex
-	_activeConn io.Closer
-	_activePipe *io.PipeWriter
 )
 
 // wire installs the core callbacks exactly once — SRT and TCP listeners
@@ -108,6 +105,8 @@ func acceptConnection(req gosrt.ConnRequest) gosrt.ConnType {
 }
 
 // streamKeyFromStreamID returns the matched stream key, or "" if invalid.
+// Both key stores open the door: the global list (feeding the default
+// channel) and each room's own key.
 func streamKeyFromStreamID(streamID string) string {
 	streamID = strings.TrimPrefix(streamID, "publish:")
 	streamID = strings.TrimPrefix(streamID, "publish/")
@@ -116,6 +115,9 @@ func streamKeyFromStreamID(streamID string) string {
 		if key.Key != nil && *key.Key != "" && *key.Key == streamID {
 			return *key.Key
 		}
+	}
+	if streamID != "" && channelrepository.GetChannelIDForKey(streamID) != "" {
+		return streamID
 	}
 	return ""
 }

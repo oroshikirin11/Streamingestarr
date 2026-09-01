@@ -2,8 +2,10 @@ package config
 
 import "sync"
 
-// Inbound codecs, sniffed from the stream head by the SRT ingest before the
-// transcoder spawns. Two consumers, both of which must not guess:
+// Inbound codecs, sniffed from the stream head by the ingest before the
+// transcoder spawns — PER CHANNEL, because rooms broadcast concurrently and
+// one room's AV1 must not reroute another room's H.264. Two consumers, both
+// of which must not guess:
 //
 //   - The fMP4 path has to choose a bitstream filter per AUDIO codec at
 //     spawn time, and choosing wrong is fatal to the session.
@@ -18,39 +20,41 @@ import "sync"
 // leaves the master alone. Held in the config leaf for the same reason as
 // the video range: neither consumer may import core.
 var (
-	_inboundCodecsLock sync.RWMutex
-	_inboundAudioCodec = ""
-	_inboundVideoCodec = ""
+	_inboundCodecsLock  sync.RWMutex
+	_inboundAudioCodecs = map[string]string{}
+	_inboundVideoCodecs = map[string]string{}
 )
 
-// SetInboundAudioCodec records the audio codec of the current broadcast
-// (ffprobe's lowercase name: "aac", "opus", "eac3", …), or "" for unknown.
-func SetInboundAudioCodec(v string) {
+// SetInboundAudioCodec records the audio codec of a channel's current
+// broadcast (ffprobe's lowercase name: "aac", "opus", "eac3", …), or "" for
+// unknown.
+func SetInboundAudioCodec(channelID, v string) {
 	_inboundCodecsLock.Lock()
-	_inboundAudioCodec = v
+	_inboundAudioCodecs[channelID] = v
 	_inboundCodecsLock.Unlock()
 }
 
-// GetInboundAudioCodec returns the current broadcast's audio codec, or ""
+// GetInboundAudioCodec returns the channel's current audio codec, or ""
 // when it was never sniffed.
-func GetInboundAudioCodec() string {
+func GetInboundAudioCodec(channelID string) string {
 	_inboundCodecsLock.RLock()
 	defer _inboundCodecsLock.RUnlock()
-	return _inboundAudioCodec
+	return _inboundAudioCodecs[channelID]
 }
 
-// SetInboundVideoCodec records the video codec of the current broadcast
-// (ffprobe's lowercase name: "h264", "hevc", "av1", …), or "" for unknown.
-func SetInboundVideoCodec(v string) {
+// SetInboundVideoCodec records the video codec of a channel's current
+// broadcast (ffprobe's lowercase name: "h264", "hevc", "av1", …), or "" for
+// unknown.
+func SetInboundVideoCodec(channelID, v string) {
 	_inboundCodecsLock.Lock()
-	_inboundVideoCodec = v
+	_inboundVideoCodecs[channelID] = v
 	_inboundCodecsLock.Unlock()
 }
 
-// GetInboundVideoCodec returns the current broadcast's video codec, or ""
+// GetInboundVideoCodec returns the channel's current video codec, or ""
 // when it was never sniffed.
-func GetInboundVideoCodec() string {
+func GetInboundVideoCodec(channelID string) string {
 	_inboundCodecsLock.RLock()
 	defer _inboundCodecsLock.RUnlock()
-	return _inboundVideoCodec
+	return _inboundVideoCodecs[channelID]
 }

@@ -7,4 +7,8 @@ package models
 type Channel struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+	// StreamKey is the room's own inbound key — how a stream on the shared
+	// ingest ports finds this room. Empty for the default channel, whose
+	// keys are the global stream-key list.
+	StreamKey string `json:"streamKey,omitempty"`
 }

@@ -33,6 +33,9 @@ type Client struct {
 	accessToken  string
 	IPAddress    string `json:"-"`
 	UserAgent    string `json:"userAgent"`
+	// ChannelID is the room this connection sits in; broadcasts are scoped
+	// to it.
+	ChannelID    string `json:"channelId"`
 	MessageCount int    `json:"messageCount"`
 	Id           uint   `json:"-"`
 	mu           sync.RWMutex

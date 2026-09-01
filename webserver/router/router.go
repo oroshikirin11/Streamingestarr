@@ -16,6 +16,7 @@ import (
 	"streamingestarr/config"
 	"streamingestarr/core/chat"
 	"streamingestarr/webserver/handlers"
+	"streamingestarr/webserver/handlers/admin"
 	"streamingestarr/webserver/router/middleware"
 )
 
@@ -73,6 +74,15 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/config/tcp/enabled", middleware.RequireAdminAuth(handlers.SetTCPIngestEnabled))
 	r.Post("/api/admin/config/tcp/port", middleware.RequireAdminAuth(handlers.SetTCPIngestPort))
 	r.Post("/api/admin/config/tcp/passphrase", middleware.RequireAdminAuth(handlers.SetTCPIngestPassphrase))
+
+	// Rooms: the viewer lobby list, and the admin CRUD (cap 5, key-routed —
+	// no per-room ports).
+	r.Get("/api/rooms", handlers.GetRooms)
+	r.Get("/api/admin/rooms", middleware.RequireAdminAuth(admin.GetRooms))
+	r.Post("/api/admin/rooms", middleware.RequireAdminAuth(admin.CreateRoom))
+	r.Post("/api/admin/rooms/delete", middleware.RequireAdminAuth(admin.DeleteRoom))
+	r.Post("/api/admin/rooms/rename", middleware.RequireAdminAuth(admin.RenameRoom))
+	r.Post("/api/admin/rooms/regenerate-key", middleware.RequireAdminAuth(admin.RegenerateRoomKey))
 
 	// mount the api
 	r.Mount("/api/", handlers.New().Handler())

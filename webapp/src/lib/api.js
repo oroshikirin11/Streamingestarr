@@ -19,8 +19,16 @@ async function request(path, options = {}) {
 	return res.json();
 }
 
-export const getStatus = () => request('/api/status');
+// The room this page views: /t/<room> is a scoped theater, everything else
+// is the default room. The whole app keys its status, HLS, and chat on it.
+export function currentChannel() {
+	const m = window.location.pathname.match(/^\/t\/([a-z][a-z0-9-]*)/);
+	return m ? m[1] : 'main';
+}
+
+export const getStatus = () => request(`/api/status?channel=${currentChannel()}`);
 export const getConfig = () => request('/api/config');
+export const getRooms = () => request('/api/rooms');
 
 export const registerChatUser = (displayName) =>
 	request('/api/chat/register', {
@@ -30,7 +38,7 @@ export const registerChatUser = (displayName) =>
 	});
 
 export const getChatHistory = (accessToken) =>
-	request(`/api/chat?accessToken=${encodeURIComponent(accessToken)}`);
+	request(`/api/chat?accessToken=${encodeURIComponent(accessToken)}&channel=${currentChannel()}`);
 
 export async function logout() {
 	try {

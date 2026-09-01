@@ -6,6 +6,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -15,46 +16,73 @@ import (
 	"streamingestarr/utils"
 )
 
-var _timer *time.Ticker
+// One generator per live channel, keyed by the channel's HLS directory —
+// rooms broadcast concurrently and each needs its own thumbnail ticker.
+var (
+	_thumbGenMu sync.Mutex
+	_thumbGens  = map[string]*time.Ticker{}
+)
 
-// StopThumbnailGenerator will stop the periodic generating of a thumbnail from video.
-func StopThumbnailGenerator() {
-	if _timer != nil {
-		_timer.Stop()
+// ThumbnailPath returns where a channel's live thumbnail lives. The default
+// channel keeps the legacy flat filename (the root page and social embeds
+// reference it); other rooms get suffixed files beside it.
+func ThumbnailPath(channelID string) string {
+	if channelID == "" || channelID == "main" {
+		return path.Join(config.TempDir, "thumbnail.jpg")
+	}
+	return path.Join(config.TempDir, "thumbnail-"+channelID+".jpg")
+}
+
+// PreviewGifPath returns where a channel's animated preview lives.
+func PreviewGifPath(channelID string) string {
+	if channelID == "" || channelID == "main" {
+		return path.Join(config.TempDir, "preview.gif")
+	}
+	return path.Join(config.TempDir, "preview-"+channelID+".gif")
+}
+
+// StopThumbnailGenerator stops the channel's periodic thumbnail generation.
+func StopThumbnailGenerator(chunkPath string) {
+	_thumbGenMu.Lock()
+	defer _thumbGenMu.Unlock()
+	if t, ok := _thumbGens[chunkPath]; ok {
+		t.Stop()
+		delete(_thumbGens, chunkPath)
 	}
 }
 
-// StartThumbnailGenerator starts generating thumbnails.
-func StartThumbnailGenerator(chunkPath string, variantIndex int, isVideoPassthrough bool) {
+// StartThumbnailGenerator starts generating thumbnails for one channel's
+// broadcast. channelID picks the output filenames so rooms never overwrite
+// each other's preview.
+func StartThumbnailGenerator(chunkPath string, variantIndex int, isVideoPassthrough bool, channelID string) {
 	// Every 20 seconds create a thumbnail from the most
 	// recent video segment.
-	_timer = time.NewTicker(20 * time.Second)
-	quit := make(chan struct{})
+	timer := time.NewTicker(20 * time.Second)
+
+	_thumbGenMu.Lock()
+	if old, ok := _thumbGens[chunkPath]; ok {
+		old.Stop()
+	}
+	_thumbGens[chunkPath] = timer
+	_thumbGenMu.Unlock()
 
 	go func() {
-		for {
-			select {
-			case <-_timer.C:
-				if err := fireThumbnailGenerator(chunkPath, variantIndex); err != nil {
-					logMsg := "Unable to generate thumbnail: " + err.Error()
-					if isVideoPassthrough {
-						logMsg += ". Video passthrough is enabled — the thumbnail has to decode whatever codec the sender pushes, which this ffmpeg may not support."
-					}
-					log.Errorln("Unable to generate thumbnail:", logMsg)
+		for range timer.C {
+			if err := fireThumbnailGenerator(chunkPath, variantIndex, channelID); err != nil {
+				logMsg := "Unable to generate thumbnail: " + err.Error()
+				if isVideoPassthrough {
+					logMsg += ". Video passthrough is enabled — the thumbnail has to decode whatever codec the sender pushes, which this ffmpeg may not support."
 				}
-			case <-quit:
-				log.Debug("thumbnail generator has stopped")
-				_timer.Stop()
-				return
+				log.Errorln("Unable to generate thumbnail:", logMsg)
 			}
 		}
 	}()
 }
 
-func fireThumbnailGenerator(segmentPath string, variantIndex int) error {
+func fireThumbnailGenerator(segmentPath string, variantIndex int, channelID string) error {
 	// JPG takes less time to encode than PNG
-	outputFile := path.Join(config.TempDir, "thumbnail.jpg")
-	previewGifFile := path.Join(config.TempDir, "preview.gif")
+	outputFile := ThumbnailPath(channelID)
+	previewGifFile := PreviewGifPath(channelID)
 
 	framePath := path.Join(segmentPath, strconv.Itoa(variantIndex))
 	files, err := os.ReadDir(framePath)
@@ -104,7 +132,7 @@ func fireThumbnailGenerator(segmentPath string, variantIndex int) error {
 		mostRecentFile = "concat:" + path.Join(framePath, initSegment) + "|" + mostRecentFile
 	}
 	ffmpegPath := utils.ValidatedFfmpegPath(configRepository.GetFfMpegPath())
-	outputFileTemp := path.Join(config.TempDir, "tempthumbnail.jpg")
+	outputFileTemp := path.Join(config.TempDir, "tempthumbnail-"+channelID+".jpg")
 
 	thumbnailCmdFlags := []string{
 		"-y",            // Overwrite file
@@ -125,15 +153,15 @@ func fireThumbnailGenerator(segmentPath string, variantIndex int) error {
 		log.Errorln(err)
 	}
 
-	makeAnimatedGifPreview(mostRecentFile, previewGifFile)
+	makeAnimatedGifPreview(mostRecentFile, previewGifFile, channelID)
 
 	return nil
 }
 
-func makeAnimatedGifPreview(sourceFile string, outputFile string) {
+func makeAnimatedGifPreview(sourceFile string, outputFile string, channelID string) {
 	configRepository := configrepository.Get()
 	ffmpegPath := utils.ValidatedFfmpegPath(configRepository.GetFfMpegPath())
-	outputFileTemp := path.Join(config.TempDir, "temppreview.gif")
+	outputFileTemp := path.Join(config.TempDir, "temppreview-"+channelID+".gif")
 
 	// Filter is pulled from https://engineering.giphy.com/how-to-make-gifs-with-ffmpeg/
 	animatedGifFlags := []string{

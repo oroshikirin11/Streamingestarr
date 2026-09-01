@@ -45,7 +45,7 @@ func (c *ChannelRuntime) setStreamAsConnected(rtmpOut *io.PipeReader) {
 	}
 
 	go func() {
-		c.transcoder = transcoder.NewTranscoder()
+		c.transcoder = transcoder.NewTranscoder(c.ID)
 		c.transcoder.SetOutputPath(c.HLSOutputPath)
 		c.transcoder.SetInternalHTTPPort(c.fileWriter.Port())
 		c.transcoder.TranscoderCompleted = func(error) {
@@ -59,15 +59,15 @@ func (c *ChannelRuntime) setStreamAsConnected(rtmpOut *io.PipeReader) {
 
 	go webhooks.SendStreamStatusEvent(models.StreamStarted, c.ID)
 	selectedThumbnailVideoQualityIndex, isVideoPassthrough := configRepository.FindHighestVideoQualityIndex(c.currentBroadcast.OutputSettings)
-	transcoder.StartThumbnailGenerator(c.HLSOutputPath, selectedThumbnailVideoQualityIndex, isVideoPassthrough)
+	transcoder.StartThumbnailGenerator(c.HLSOutputPath, selectedThumbnailVideoQualityIndex, isVideoPassthrough, c.ID)
 
-	_ = chat.SendSystemAction("Stay tuned, the stream is **starting**!", true)
-	chat.SendAllWelcomeMessage()
+	_ = chat.SendSystemAction(c.ID, "Stay tuned, the stream is **starting**!", true)
+	chat.SendAllWelcomeMessage(c.ID)
 }
 
 // SetStreamAsDisconnected sets the channel's stream as disconnected.
 func (c *ChannelRuntime) SetStreamAsDisconnected() {
-	_ = chat.SendSystemAction("The stream is ending.", true)
+	_ = chat.SendSystemAction(c.ID, "The stream is ending.", true)
 
 	now := utils.NullTime{Time: time.Now(), Valid: true}
 
@@ -85,9 +85,9 @@ func (c *ChannelRuntime) SetStreamAsDisconnected() {
 		return
 	}
 
-	transcoder.StopThumbnailGenerator()
-	rtmp.Disconnect()
-	srt.Disconnect()
+	transcoder.StopThumbnailGenerator(c.HLSOutputPath)
+	rtmp.Disconnect(c.ID)
+	srt.Disconnect(c.ID)
 
 	// If there is no current broadcast available the previous stream
 	// likely failed for some reason. Don't try to append to it.

@@ -187,7 +187,7 @@ func handleUserDisabling(userID string) error {
 	chat.DisconnectClients(clients)
 	userRepository := userrepository.Get()
 	disconnectedUser := userRepository.GetUserByID(userID)
-	_ = chat.SendSystemAction(fmt.Sprintf("**%s** has been removed from chat.", disconnectedUser.DisplayName), true)
+	_ = chat.SendSystemAction("", fmt.Sprintf("**%s** has been removed from chat.", disconnectedUser.DisplayName), true)
 
 	localIP4Address := "127.0.0.1"
 	localIP6Address := "::1"
@@ -275,7 +275,7 @@ func SendSystemMessage(integration models.ExternalAPIUser, w http.ResponseWriter
 		return
 	}
 
-	if err := chat.SendSystemMessage(message.Body, false); err != nil {
+	if err := chat.SendSystemMessage("", message.Body, false); err != nil {
 		webutils.BadRequestHandler(w, err)
 	}
 
@@ -358,7 +358,7 @@ func SendIntegrationChatMessage(integration models.ExternalAPIUser, w http.Respo
 	}
 
 	chatMessageRepository := chatmessagerepository.Get()
-	chatMessageRepository.SaveUserMessage(event)
+	chatMessageRepository.SaveUserMessage(event, "")
 
 	webutils.WriteSimpleResponse(w, true, "sent")
 }
@@ -376,7 +376,7 @@ func SendChatAction(integration models.ExternalAPIUser, w http.ResponseWriter, r
 	message.SetDefaults()
 	message.RenderBody()
 
-	if err := chat.SendSystemAction(message.Body, false); err != nil {
+	if err := chat.SendSystemAction("", message.Body, false); err != nil {
 		webutils.BadRequestHandler(w, err)
 		return
 	}

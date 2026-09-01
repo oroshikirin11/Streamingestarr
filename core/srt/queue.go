@@ -37,15 +37,15 @@ type pipeQueue struct {
 	// reader is exactly the stall-starves-the-window bug this queue fixed.
 	lossless bool
 
+	// dropped is the owning session's overflow counter, exposed in the
+	// admin ingest stats.
+	dropped *atomic.Int64
+
 	lastDropLog time.Time
 }
 
-// _queueDroppedBytes is the session's overflow counter, exposed in the
-// admin ingest stats; reset at each publisher connect.
-var _queueDroppedBytes atomic.Int64
-
-func newPipeQueue(maxBytes int, lossless bool) *pipeQueue {
-	q := &pipeQueue{max: maxBytes, lossless: lossless}
+func newPipeQueue(maxBytes int, lossless bool, dropped *atomic.Int64) *pipeQueue {
+	q := &pipeQueue{max: maxBytes, lossless: lossless, dropped: dropped}
 	q.cond = sync.NewCond(&q.mu)
 	return q
 }
@@ -74,7 +74,7 @@ func (q *pipeQueue) push(b []byte) {
 		q.chunks = q.chunks[1:]
 	}
 	if dropped > 0 {
-		_queueDroppedBytes.Add(int64(dropped))
+		q.dropped.Add(int64(dropped))
 		if time.Since(q.lastDropLog) > 10*time.Second {
 			q.lastDropLog = time.Now()
 			log.Warnf("ingest buffer overflowed — dropped %dKB of the oldest stream data; the transcoder is not consuming fast enough", dropped/1024)

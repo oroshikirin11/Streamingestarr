@@ -2,11 +2,10 @@ package handlers
 
 import (
 	"net/http"
-	"path/filepath"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
-	"streamingestarr/config"
+	"streamingestarr/core/transcoder"
 	"streamingestarr/utils"
 )
 
@@ -17,14 +16,14 @@ const (
 
 var previewThumbCache = ttlcache.New(
 	ttlcache.WithTTL[string, []byte](15),
-	ttlcache.WithCapacity[string, []byte](1),
+	ttlcache.WithCapacity[string, []byte](10),
 	ttlcache.WithDisableTouchOnHit[string, []byte](),
 )
 
-// GetThumbnail will return the thumbnail image as a response.
+// GetThumbnail will return the thumbnail image as a response. ?channel=
+// picks a room's thumbnail; default room otherwise.
 func GetThumbnail(w http.ResponseWriter, r *http.Request) {
-	imageFilename := "thumbnail.jpg"
-	imagePath := filepath.Join(config.TempDir, imageFilename)
+	imagePath := transcoder.ThumbnailPath(channelIDFromRequest(r))
 	httpCacheTime := utils.GetCacheDurationSecondsForPath(imagePath)
 	inMemoryCacheTime := time.Duration(15) * time.Second
 
@@ -52,8 +51,7 @@ func GetThumbnail(w http.ResponseWriter, r *http.Request) {
 
 // GetPreview will return the preview gif as a response.
 func GetPreview(w http.ResponseWriter, r *http.Request) {
-	imageFilename := "preview.gif"
-	imagePath := filepath.Join(config.TempDir, imageFilename)
+	imagePath := transcoder.PreviewGifPath(channelIDFromRequest(r))
 	httpCacheTime := utils.GetCacheDurationSecondsForPath(imagePath)
 	inMemoryCacheTime := time.Duration(15) * time.Second
 

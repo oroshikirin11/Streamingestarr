@@ -45,6 +45,10 @@
 	let avSyncWorst = $state(0);
 	let tokens = $state([]);
 	let newTokenName = $state('');
+	let rooms = $state([]);
+	let maxRooms = $state(5);
+	let newRoomName = $state('');
+	let roomSel = $state('main');
 
 	function toast(text, ok = true) {
 		const id = crypto.randomUUID();
@@ -86,18 +90,30 @@
 
 	async function refreshStatus() {
 		try {
-			status = await api.getAdminStatus();
+			status = await api.getAdminStatus(roomSel);
+			if (section === 'status' || section === 'rooms') {
+				await loadRooms();
+			}
 			if (section === 'status') {
 				hw = await api.getHardwareStats();
 				// Last 4 hours of viewer counts — sampled every 2 minutes
 				// server-side, so this stays a tiny payload.
 				viewersSeries = await api.getViewersOverTime(Math.floor(Date.now() / 1000) - 4 * 3600);
-				bitrateSeries = status?.broadcaster ? await api.getIngestBitrate() : null;
-				ingestStats = status?.broadcaster ? await api.getIngestStats() : null;
-				const av = status?.broadcaster ? await api.getAVSync() : null;
+				bitrateSeries = status?.broadcaster ? await api.getIngestBitrate(roomSel) : null;
+				ingestStats = status?.broadcaster ? await api.getIngestStats(roomSel) : null;
+				const av = status?.broadcaster ? await api.getAVSync(roomSel) : null;
 				avSyncLatest = av?.length ? av[av.length - 1] : null;
 				avSyncWorst = av?.length ? av.reduce((w, m) => (Math.abs(m.deltaMs) > Math.abs(w) ? m.deltaMs : w), 0) : 0;
 			}
+		} catch {}
+	}
+
+	async function loadRooms() {
+		try {
+			const d = await api.getRooms();
+			rooms = d.rooms ?? [];
+			maxRooms = d.max ?? 5;
+			if (!rooms.some((r) => r.id === roomSel)) roomSel = 'main';
 		} catch {}
 	}
 
@@ -149,6 +165,7 @@
 		if (s === 'chat') loadModeration();
 		if (s === 'logs') loadLogs();
 		if (s === 'stream') loadTokens();
+		if (s === 'rooms' || s === 'status') loadRooms();
 	}
 
 	$effect(() => {
@@ -175,6 +192,7 @@
 
 	const SECTIONS = [
 		['status', 'Status'],
+		['rooms', 'Rooms'],
 		['stream', 'Stream'],
 		['video', 'Video'],
 		['chat', 'Chat'],
@@ -200,6 +218,16 @@
 	<main>
 		{#if section === 'status'}
 			<hgroup><h1>Status</h1><p>What the ingest and the room are doing right now.</p></hgroup>
+
+			{#if rooms.length > 1}
+				<div class="roompick">
+					{#each rooms as r (r.id)}
+						<button class="ghost tiny" class:on={roomSel === r.id} onclick={() => { roomSel = r.id; refreshStatus(); }}>
+							<span class="dot" class:live={r.online}></span>{r.name}
+						</button>
+					{/each}
+				</div>
+			{/if}
 
 			<div class="card">
 				<div class="statusline">
@@ -244,7 +272,7 @@
 						</p>
 					{/if}
 					<footer>
-						<button class="danger" onclick={() => run(api.disconnectStream, 'Stream disconnected')}>Disconnect the stream</button>
+						<button class="danger" onclick={() => run(() => api.disconnectStream(roomSel), 'Stream disconnected')}>Disconnect the stream</button>
 					</footer>
 				</div>
 			{/if}
@@ -284,6 +312,45 @@
 					{/if}
 				</div>
 			{/if}
+
+		{:else if section === 'rooms'}
+			<hgroup><h1>Rooms</h1><p>Up to {maxRooms} theaters, all sharing the same ingest ports — the stream key decides which room a broadcast lands in.</p></hgroup>
+
+			<div class="card">
+				<header><h2>Your rooms</h2><p>Each room has its own theater page at /t/&lt;id&gt;, its own chat, and (except the main room) its own stream key.</p></header>
+				{#each rooms as r (r.id)}
+					<div class="msgrow roomrow">
+						<span class="who"><span class="dot" class:live={r.online}></span> {r.name}</span>
+						<span class="body dim">
+							/t/{r.id}
+							{#if r.online}&nbsp;· live · {r.viewerCount} watching{/if}
+						</span>
+						<span class="actions">
+							{#if r.isDefault}
+								<span class="dim">keys in Stream →</span>
+							{:else}
+								<button class="ghost tiny" onclick={() => copy(r.streamKey)}>Copy key</button>
+								<button class="ghost tiny" onclick={() => run(async () => { const res = await api.regenerateRoomKey(r.id); await loadRooms(); return res; }, 'New key minted')}>New key</button>
+								<button class="ghost tiny danger-text" onclick={() => { if (confirm(`Delete the room “${r.name}”? A live broadcast in it ends immediately.`)) run(async () => { const res = await api.deleteRoom(r.id); await loadRooms(); return res; }, 'Room deleted'); }}>Delete</button>
+							{/if}
+						</span>
+					</div>
+					{#if !r.isDefault}
+						<p class="hint mono-text dim keyline">{r.streamKey}</p>
+					{/if}
+				{/each}
+				{#if rooms.length < maxRooms}
+					<div class="field-row">
+						<div class="field"><label for="roomname">New room name</label><input id="roomname" bind:value={newRoomName} placeholder="Second Screen" /></div>
+					</div>
+					<footer>
+						<button disabled={!newRoomName.trim()} onclick={() => run(async () => { const res = await api.createRoom(newRoomName.trim()); newRoomName = ''; await loadRooms(); return res; }, 'Room created — copy its key')}>Create room</button>
+					</footer>
+				{:else}
+					<p class="hint">Room limit reached ({maxRooms}).</p>
+				{/if}
+				<p class="hint">Point a sender at the SAME ingest address as always and use the room's key — RTMP, SRT and TCP all route by it. Viewers pick a room at /t/&lt;id&gt;; the front page is the main room.</p>
+			</div>
 
 		{:else if section === 'stream'}
 			<hgroup><h1>Stream</h1><p>Where your source connects, and the keys that open the door.</p></hgroup>
@@ -690,6 +757,13 @@
 	.statusline .sep { color: var(--muted); }
 	.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
 	.dot.live { background: #5fc493; box-shadow: 0 0 10px #5fc493; }
+	.roompick { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+	.roompick button { display: inline-flex; align-items: center; gap: 7px; }
+	.roompick button.on { border-color: var(--accent, #dd6a4d); color: var(--text); }
+	.roompick .dot { width: 7px; height: 7px; }
+	.msgrow .who .dot { display: inline-block; margin-right: 4px; }
+	.roomrow .who { width: 160px; }
+	.keyline { word-break: break-all; margin-top: -6px; }
 
 	/* ---------- definition rows ---------- */
 	dl { display: flex; flex-direction: column; gap: 2px; }
@@ -735,6 +809,7 @@
 	.msgrow .body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 	.msgrow .actions { flex: none; display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; }
 	.msgrow:hover .actions { opacity: 1; }
+	.msgrow.roomrow .actions { opacity: 1; }
 	.msgrow.hidden-msg .body { opacity: 0.35; text-decoration: line-through; }
 	.msgrow.hidden-msg .actions { opacity: 1; }
 

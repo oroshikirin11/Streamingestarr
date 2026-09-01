@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"streamingestarr/core/rtmp"
+	"streamingestarr/core/srt"
 	"streamingestarr/webserver/handlers/admin"
 	"streamingestarr/webserver/handlers/generated"
 	"streamingestarr/webserver/router/middleware"
@@ -225,8 +226,11 @@ func (*ServerInterfaceImpl) GetVideoPlaybackMetricsOptions(w http.ResponseWriter
 	middleware.RequireAdminAuth(admin.GetVideoPlaybackMetrics)(w, r)
 }
 
-// DisconnectInboundConnection will force-disconnect an inbound stream.
+// DisconnectInboundConnection force-disconnects a room's inbound stream,
+// whichever protocol carries it. ?channel= picks the room.
 func DisconnectInboundConnection(w http.ResponseWriter, r *http.Request) {
-	rtmp.Disconnect()
+	channelID := channelIDFromRequest(r)
+	rtmp.Disconnect(channelID)
+	srt.Disconnect(channelID)
 	w.WriteHeader(http.StatusOK)
 }

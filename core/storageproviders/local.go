@@ -17,13 +17,15 @@ import (
 // LocalStorage represents an instance of the local storage provider for HLS video.
 type LocalStorage struct {
 	host string
-	// baseDir is the channel's HLS directory this provider manages.
-	baseDir string
+	// baseDir is the channel's HLS directory this provider manages; its
+	// final path element IS the channel ID (data/hls/<channel>).
+	baseDir   string
+	channelID string
 }
 
 // NewLocalStorage returns a new LocalStorage instance rooted at baseDir.
 func NewLocalStorage(baseDir string) *LocalStorage {
-	return &LocalStorage{baseDir: baseDir}
+	return &LocalStorage{baseDir: baseDir, channelID: filepath.Base(baseDir)}
 }
 
 // Setup configures this storage provider.
@@ -53,7 +55,7 @@ func (s *LocalStorage) VariantPlaylistWritten(localFilePath string) {
 
 // MasterPlaylistWritten is called when the master hls playlist is written.
 func (s *LocalStorage) MasterPlaylistWritten(localFilePath string) {
-	fixDegenerateMasterPlaylist(localFilePath)
+	fixDegenerateMasterPlaylist(localFilePath, s.channelID)
 
 	// If we're using a remote serving endpoint, we need to rewrite the master playlist
 	if s.host != "" {
@@ -70,8 +72,8 @@ func (s *LocalStorage) MasterPlaylistWritten(localFilePath string) {
 // RepairMasterPlaylist re-applies the master-playlist fixes below to an
 // already-written master. core calls it when the inbound video range changes
 // mid-broadcast, after ffmpeg has already written the master once.
-func RepairMasterPlaylist(localFilePath string) {
-	fixDegenerateMasterPlaylist(localFilePath)
+func RepairMasterPlaylist(localFilePath, channelID string) {
+	fixDegenerateMasterPlaylist(localFilePath, channelID)
 }
 
 // fixDegenerateMasterPlaylist repairs a master playlist that carries no
@@ -81,13 +83,13 @@ func RepairMasterPlaylist(localFilePath string) {
 // rewrites it when the stream ends — useless for live viewers. The CODECS
 // attribute is optional in HLS (players derive codecs from the fMP4 init
 // segment), so entries with just a bandwidth are valid and sufficient.
-func fixDegenerateMasterPlaylist(localFilePath string) {
+func fixDegenerateMasterPlaylist(localFilePath, channelID string) {
 	contents, err := os.ReadFile(localFilePath) // nolint: gosec
 	if err != nil {
 		return
 	}
 	text := string(contents)
-	videoRange := config.HLSVideoRangeToken()
+	videoRange := config.HLSVideoRangeToken(channelID)
 
 	// ffmpeg wrote a real master. Nothing to synthesize, but two repairs may
 	// still apply: an HDR broadcast needs VIDEO-RANGE on each variant or
@@ -99,7 +101,7 @@ func fixDegenerateMasterPlaylist(localFilePath string) {
 	// codec the ingest sniffed from the actual stream, the attribute is
 	// dropped and players derive the truth from the fMP4 init segment.
 	if strings.Contains(text, "#EXT-X-STREAM-INF") {
-		patched := stripLyingCodecs(text)
+		patched := stripLyingCodecs(text, channelID)
 		if videoRange != "" && !strings.Contains(patched, "VIDEO-RANGE=") {
 			patched = injectVideoRange(patched, videoRange)
 		}
@@ -154,13 +156,13 @@ var codecsAttr = regexp.MustCompile(`,?CODECS="[^"]*"`)
 // transcoded variant really is the H.264 ffmpeg claims — so the check is
 // per-variant, in the order ffmpeg writes them, honouring the HDR guard
 // that forces passthrough regardless of variant config.
-func stripLyingCodecs(text string) string {
-	inbound := config.GetInboundVideoCodec()
+func stripLyingCodecs(text, channelID string) string {
+	inbound := config.GetInboundVideoCodec(channelID)
 	prefixes := hlsCodecPrefixes[inbound]
 	if len(prefixes) == 0 {
 		return text // unknown inbound codec: nothing to compare against
 	}
-	hdrForced := config.GetInboundVideoRange() != config.VideoRangeSDR
+	hdrForced := config.GetInboundVideoRange(channelID) != config.VideoRangeSDR
 	variants := configrepository.Get().GetStreamOutputVariants()
 
 	lines := strings.Split(text, "\n")

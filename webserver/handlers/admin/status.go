@@ -8,17 +8,29 @@ import (
 	"streamingestarr/core"
 	"streamingestarr/metrics"
 	"streamingestarr/models"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/webserver/router/middleware"
 )
 
-// Status gets the details of the inbound broadcaster.
+// Status gets the details of a room's inbound broadcaster. ?channel=
+// scopes it; the default room otherwise.
 func Status(w http.ResponseWriter, r *http.Request) {
 	configRepository := configrepository.Get()
 
-	broadcaster := core.GetBroadcaster()
-	status := core.GetStatus()
-	currentBroadcast := core.GetCurrentBroadcast()
+	channelID := r.URL.Query().Get("channel")
+	if channelID == "" || channelrepository.GetChannel(channelID) == nil {
+		channelID = channelrepository.DefaultChannelID
+	}
+	channel := core.GetChannelRuntime(channelID)
+	if channel == nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	broadcaster := channel.GetBroadcaster()
+	status := channel.GetStatus()
+	currentBroadcast := channel.GetCurrentBroadcast()
 	health := metrics.GetStreamHealthOverview()
 	response := adminStatusResponse{
 		Broadcaster:            broadcaster,

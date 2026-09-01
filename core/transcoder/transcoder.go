@@ -35,6 +35,10 @@ func (e *execInfo) String() string {
 type Transcoder struct {
 	codec Codec
 
+	// channelID scopes the per-broadcast config reads (sniffed inbound
+	// codecs) to the room this transcoder serves.
+	channelID string
+
 	stdin *io.PipeReader
 
 	TranscoderCompleted  func(error)
@@ -261,7 +265,7 @@ func (t *Transcoder) getFlags() *execInfo {
 		// it only rides when the audio is AAC. The SRT ingest sniffs the
 		// codec from the stream head before this spawn; unknown ("") means
 		// RTMP or a failed sniff, both of which are AAC territory.
-		if audio := config.GetInboundAudioCodec(); audio == "" || audio == "aac" {
+		if audio := config.GetInboundAudioCodec(t.channelID); audio == "" || audio == "aac" {
 			ffmpegFlags = append(ffmpegFlags, "-bsf:a", "aac_adtstoasc")
 		}
 	} else {
@@ -294,7 +298,7 @@ func (t *Transcoder) getFlags() *execInfo {
 	}
 }
 
-func getVariantFromConfigQuality(quality models.StreamOutputVariant, index int) HLSVariant {
+func getVariantFromConfigQuality(quality models.StreamOutputVariant, index int, channelID string) HLSVariant {
 	variant := HLSVariant{}
 	variant.index = index
 	variant.isAudioPassthrough = quality.IsAudioPassthrough
@@ -303,8 +307,8 @@ func getVariantFromConfigQuality(quality models.StreamOutputVariant, index int) 
 	// Never transcode HDR. Every encoder here targets 8-bit yuv420p, which
 	// would clip PQ/HLG to washed-out SDR with no tone-mapping. Force
 	// passthrough so the HDR bitstream is copied through intact.
-	if !variant.isVideoPassthrough && config.GetInboundVideoRange() != config.VideoRangeSDR {
-		log.Warnf("inbound stream is HDR (%s); forcing video passthrough for variant %d to preserve it", config.GetInboundVideoRange(), index)
+	if !variant.isVideoPassthrough && config.GetInboundVideoRange(channelID) != config.VideoRangeSDR {
+		log.Warnf("inbound stream is HDR (%s); forcing video passthrough for variant %d to preserve it", config.GetInboundVideoRange(channelID), index)
 		variant.isVideoPassthrough = true
 	}
 
@@ -338,11 +342,15 @@ func getVariantFromConfigQuality(quality models.StreamOutputVariant, index int) 
 }
 
 // NewTranscoder will return a new Transcoder, populated by the config.
-func NewTranscoder() *Transcoder {
+// NewTranscoder builds a transcoder for one channel's broadcast; channelID
+// scopes the sniffed-codec lookups that pick the segment container and
+// audio bitstream filter.
+func NewTranscoder(channelID string) *Transcoder {
 	configRepository := configrepository.Get()
 	ffmpegPath := utils.ValidatedFfmpegPath(configRepository.GetFfMpegPath())
 
 	transcoder := new(Transcoder)
+	transcoder.channelID = channelID
 	transcoder.ffmpegPath = ffmpegPath
 	transcoder.internalListenerPort = config.InternalHLSListenerPort
 
@@ -351,12 +359,12 @@ func NewTranscoder() *Transcoder {
 	transcoder.codec = getCodec(configRepository.GetVideoCodec())
 	transcoder.segmentOutputPath = config.HLSStoragePath
 	transcoder.playlistOutputPath = config.HLSStoragePath
-	transcoder.segmentFormat = resolveSegmentFormat(configRepository.GetVideoSegmentFormat())
+	transcoder.segmentFormat = resolveSegmentFormat(configRepository.GetVideoSegmentFormat(), channelID)
 
 	transcoder.input = "pipe:0" // stdin
 
 	for index, quality := range transcoder.currentStreamOutputSettings {
-		variant := getVariantFromConfigQuality(quality, index)
+		variant := getVariantFromConfigQuality(quality, index, channelID)
 		transcoder.AddVariant(variant)
 	}
 
@@ -533,11 +541,11 @@ func (t *Transcoder) SetInternalHTTPPort(port string) {
 // simply cannot carry it, and segmenting it into ts silently destroys the
 // video track while audio plays on. HEVC and H.264 keep the proven ts
 // path, and unknown (RTMP, or a failed sniff) is H.264 territory.
-func resolveSegmentFormat(stored string) string {
+func resolveSegmentFormat(stored, channelID string) string {
 	if stored == "ts" || stored == "fmp4" {
 		return stored
 	}
-	if config.GetInboundVideoCodec() == "av1" {
+	if config.GetInboundVideoCodec(channelID) == "av1" {
 		log.Infoln("segment container: auto chose fMP4 — the inbound stream is AV1, which mpegts cannot carry")
 		return "fmp4"
 	}

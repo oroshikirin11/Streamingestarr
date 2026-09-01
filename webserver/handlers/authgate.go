@@ -342,24 +342,26 @@ func SetVideoSegmentFormat(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetIngestBitrate returns the live inbound bitrate series (5s samples,
-// kbps, current session) measured at the SRT read loop.
+// kbps, current session) measured at the ingest read loop. ?channel= scopes
+// it to a room; default room otherwise.
 func GetIngestBitrate(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(srt.GetInboundBitrate())
+	_ = json.NewEncoder(w).Encode(srt.GetInboundBitrate(channelIDFromRequest(r)))
 }
 
 // GetIngestStatsAPI returns the SRT receive-health counters — drops, loss,
-// retransmissions — plus the ingest buffer's overflow counter.
+// retransmissions — plus the ingest buffer's overflow counter, per room.
 func GetIngestStatsAPI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(srt.GetIngestStats())
+	_ = json.NewEncoder(w).Encode(srt.GetIngestStats(channelIDFromRequest(r)))
 }
 
 // GetAVSync returns the per-segment audio/video first-PTS offsets of the
-// current broadcast — the ledger that tells sender seams from player drift.
+// room's current broadcast — the ledger that tells sender seams from player
+// drift.
 func GetAVSync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(avsync.Get())
+	_ = json.NewEncoder(w).Encode(avsync.Get(channelIDFromRequest(r)))
 }
 
 // SetSRTPassphrase stores the SRT encryption passphrase. Optional: an

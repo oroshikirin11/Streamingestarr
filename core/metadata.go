@@ -90,24 +90,23 @@ func (c *ChannelRuntime) SetNowPlaying(np models.NowPlaying) {
 		if np.Subtitle != "" {
 			line = fmt.Sprintf("%s · %s", np.Title, np.Subtitle)
 		}
-		_ = chat.SendSystemAction(fmt.Sprintf("Now playing — **%s**", line), false)
+		_ = chat.SendSystemAction(c.ID, fmt.Sprintf("Now playing — **%s**", line), false)
 	}
 }
 
-// SetVideoRange records the colour range the sender declared for the current
-// broadcast (sdr|pq|hlg). When it changes and a stream is already live it
-// re-signals the master playlist immediately, so HDR clients pick up
-// VIDEO-RANGE without waiting for the next master write. Single-theater
-// today: the range is global, matching config.
+// SetVideoRange records the colour range the sender declared for the
+// channel's current broadcast (sdr|pq|hlg). When it changes and a stream is
+// already live it re-signals the master playlist immediately, so HDR
+// clients pick up VIDEO-RANGE without waiting for the next master write.
 func (c *ChannelRuntime) SetVideoRange(v string) {
-	previous := config.GetInboundVideoRange()
-	config.SetInboundVideoRange(v)
-	if config.GetInboundVideoRange() == previous {
+	previous := config.GetInboundVideoRange(c.ID)
+	config.SetInboundVideoRange(c.ID, v)
+	if config.GetInboundVideoRange(c.ID) == previous {
 		return
 	}
 	masterPath := filepath.Join(c.HLSOutputPath, "stream.m3u8")
 	if _, err := os.Stat(masterPath); err == nil {
-		storageproviders.RepairMasterPlaylist(masterPath)
+		storageproviders.RepairMasterPlaylist(masterPath, c.ID)
 	}
 }
 
@@ -133,7 +132,7 @@ func (c *ChannelRuntime) clearNowPlaying() {
 	_metadataLock.Unlock()
 	// The colour range belongs to the broadcast that just ended; clear it so
 	// a following SDR stream isn't mis-signaled as HDR before its first push.
-	config.SetInboundVideoRange(config.VideoRangeSDR)
+	config.SetInboundVideoRange(c.ID, config.VideoRangeSDR)
 	persistMetadata()
 }
 

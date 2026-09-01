@@ -16,6 +16,7 @@ import (
 	"streamingestarr/core/webhooks"
 	"streamingestarr/models"
 	"streamingestarr/persistence/authrepository"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/persistence/configrepository"
 	"streamingestarr/persistence/userrepository"
 	"streamingestarr/services/geoip"
@@ -83,8 +84,8 @@ func (s *Server) Run() {
 	}
 }
 
-// Addclient registers new connection as a User.
-func (s *Server) Addclient(conn *websocket.Conn, user *models.User, accessToken string, userAgent string, ipAddress string) *Client {
+// Addclient registers new connection as a User, seated in one room.
+func (s *Server) Addclient(conn *websocket.Conn, user *models.User, accessToken string, userAgent string, ipAddress string, channelID string) *Client {
 	client := &Client{
 		server:      s,
 		conn:        conn,
@@ -94,17 +95,24 @@ func (s *Server) Addclient(conn *websocket.Conn, user *models.User, accessToken 
 		send:        make(chan []byte, 256),
 		UserAgent:   userAgent,
 		ConnectedAt: time.Now(),
+		ChannelID:   channelID,
 	}
 
 	configRepository := configrepository.Get()
 
 	shouldSendJoinedMessages := configRepository.GetChatJoinPartMessagesEnabled()
 
-	// If there are existing clients connected for this user do not send
-	// a user joined message. Do not put this under a mutex, as
-	// GetClientsForUser already has a lock.
+	// If this user is already connected to THIS room do not send a user
+	// joined message (another tab). A presence in a different room does not
+	// suppress it. Do not put this under a mutex, as GetClientsForUser
+	// already has a lock.
 	if existingConnectedClients, _ := GetClientsForUser(user.ID); len(existingConnectedClients) > 0 {
-		shouldSendJoinedMessages = false
+		for _, c := range existingConnectedClients {
+			if c.ChannelID == channelID {
+				shouldSendJoinedMessages = false
+				break
+			}
+		}
 	}
 
 	s.mu.Lock()
@@ -131,7 +139,7 @@ func (s *Server) Addclient(conn *websocket.Conn, user *models.User, accessToken 
 
 	client.sendConnectedClientInfo()
 
-	if getStatus().Online {
+	if getChannelStatus(channelID).Online {
 		if shouldSendJoinedMessages {
 			s.sendUserJoinedMessage(client)
 		}
@@ -152,7 +160,7 @@ func (s *Server) sendUserJoinedMessage(c *Client) {
 	userJoinedEvent.User = c.User
 	userJoinedEvent.ClientID = c.Id
 
-	if err := s.Broadcast(userJoinedEvent.GetBroadcastPayload()); err != nil {
+	if err := s.BroadcastToChannel(c.ChannelID, userJoinedEvent.GetBroadcastPayload()); err != nil {
 		log.Errorln("error adding client to chat server", err)
 	}
 
@@ -193,7 +201,7 @@ func (s *Server) sendUserPartedMessage(c *Client) {
 
 	// If part messages are disabled.
 	if configRepository.GetChatJoinPartMessagesEnabled() {
-		if err := s.Broadcast(userPartEvent.GetBroadcastPayload()); err != nil {
+		if err := s.BroadcastToChannel(c.ChannelID, userPartEvent.GetBroadcastPayload()); err != nil {
 			log.Errorln("error sending chat part message", err)
 		}
 	}
@@ -279,7 +287,14 @@ func (s *Server) HandleClientConnection(w http.ResponseWriter, r *http.Request) 
 
 	userAgent := r.UserAgent()
 
-	s.Addclient(conn, user, accessToken, userAgent, ipAddress)
+	// The room this client sits in: ?channel=<id>, validated against the
+	// channel list; anything unknown lands in the default room.
+	channelID := r.URL.Query().Get("channel")
+	if channelID == "" || channelrepository.GetChannel(channelID) == nil {
+		channelID = channelrepository.DefaultChannelID
+	}
+
+	s.Addclient(conn, user, accessToken, userAgent, ipAddress, channelID)
 }
 
 // Broadcast sends message to all connected clients.
@@ -294,6 +309,31 @@ func (s *Server) Broadcast(payload events.EventPayload) error {
 
 	for _, client := range s.clients {
 		if client == nil {
+			continue
+		}
+
+		select {
+		case client.send <- data:
+		default:
+			go client.close()
+		}
+	}
+
+	return nil
+}
+
+// BroadcastToChannel sends a message to the clients seated in one room.
+func (s *Server) BroadcastToChannel(channelID string, payload events.EventPayload) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, client := range s.clients {
+		if client == nil || client.ChannelID != channelID {
 			continue
 		}
 
@@ -444,7 +484,7 @@ func (s *Server) sendWelcomeMessageToClient(c *Client) {
 	}
 }
 
-func (s *Server) sendAllWelcomeMessage() {
+func (s *Server) sendAllWelcomeMessage(channelID string) {
 	configRepository := configrepository.Get()
 
 	welcomeMessage := utils.RenderSimpleMarkdown(configRepository.GetServerWelcomeMessage())
@@ -457,7 +497,7 @@ func (s *Server) sendAllWelcomeMessage() {
 			},
 		}
 		clientMessage.SetDefaults()
-		_ = s.Broadcast(clientMessage.GetBroadcastPayload())
+		_ = s.BroadcastToChannel(channelID, clientMessage.GetBroadcastPayload())
 	}
 }
 

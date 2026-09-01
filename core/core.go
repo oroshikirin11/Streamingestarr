@@ -53,9 +53,8 @@ func Start() error {
 
 	loadMetadata()
 
-	// Chat is a single global room for now; it becomes per-channel when a
-	// second theater actually exists (docs/design.md §8).
-	if err := chat.Start(GetStatus); err != nil {
+	// Chat rooms follow channels: each client sits in one channel's room.
+	if err := chat.Start(getChannelStatus); err != nil {
 		log.Errorln(err)
 	}
 
@@ -119,7 +118,7 @@ func (c *ChannelRuntime) createInitialOfflineState() error {
 func (c *ChannelRuntime) transitionToOfflineVideoStreamContent() {
 	log.Traceln("Firing transcoder with offline stream state")
 
-	_transcoder := transcoder.NewTranscoder()
+	_transcoder := transcoder.NewTranscoder(c.ID)
 	_transcoder.SetIdentifier("offline")
 	_transcoder.SetLatencyLevel(models.GetLatencyLevel(4))
 	_transcoder.SetIsEvent(true)
@@ -143,7 +142,7 @@ func (c *ChannelRuntime) transitionToOfflineVideoStreamContent() {
 	}
 
 	// Delete the preview Gif
-	_ = os.Remove(path.Join(config.DataDirectory, "preview.gif"))
+	_ = os.Remove(transcoder.PreviewGifPath(c.ID))
 }
 
 func (c *ChannelRuntime) resetDirectories() {

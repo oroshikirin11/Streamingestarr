@@ -2,7 +2,7 @@
 // same device token that carries the name reservation, design.md §6),
 // websocket with reconnect, and a small message store.
 import { writable } from 'svelte/store';
-import { registerChatUser, getChatHistory } from './api.js';
+import { registerChatUser, getChatHistory, currentChannel } from './api.js';
 
 const TOKEN_KEY = 'sgr_chat_token';
 const MAX_MESSAGES = 300;
@@ -85,7 +85,7 @@ export async function connectChat() {
 	}
 
 	const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-	socket = new WebSocket(`${proto}//${location.host}/ws?accessToken=${encodeURIComponent(token)}`);
+	socket = new WebSocket(`${proto}//${location.host}/ws?accessToken=${encodeURIComponent(token)}&channel=${currentChannel()}`);
 
 	socket.onopen = () => {
 		connected.set(true);

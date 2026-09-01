@@ -17,10 +17,10 @@ import (
 const maxBacklogNumber = 50 // Return max number of messages in history request
 
 type ChatMessageRepository interface {
-	SaveUserMessage(event events.UserMessageEvent)
-	SaveEvent(id string, userID *string, body string, eventType string, hidden *time.Time, timestamp time.Time, image *string, link *string, title *string, subtitle *string)
+	SaveUserMessage(event events.UserMessageEvent, channel string)
+	SaveEvent(id string, userID *string, body string, eventType string, hidden *time.Time, timestamp time.Time, image *string, link *string, title *string, subtitle *string, channel string)
 	GetChatModerationHistory() []interface{}
-	GetChatHistory() []interface{}
+	GetChatHistory(channel string) []interface{}
 	GetMessagesFromUser(userID string) ([]events.UserMessageEvent, error)
 	GetMessageIdsForUserID(userID string) ([]string, error)
 	SetMessageVisibilityForMessageIDs(messageIDs []string, visible bool) error
@@ -52,13 +52,14 @@ func New(datastore *data.Datastore) ChatMessageRepository {
 	return &r
 }
 
-// SaveUserMessage will save a single chat event to the messages database.
-func (r *SqlChatMessageRepository) SaveUserMessage(event events.UserMessageEvent) {
-	r.SaveEvent(event.ID, &event.User.ID, event.Body, event.Type, event.HiddenAt, event.Timestamp, nil, nil, nil, nil)
+// SaveUserMessage will save a single chat event to the messages database,
+// tagged with the room it was said in.
+func (r *SqlChatMessageRepository) SaveUserMessage(event events.UserMessageEvent, channel string) {
+	r.SaveEvent(event.ID, &event.User.ID, event.Body, event.Type, event.HiddenAt, event.Timestamp, nil, nil, nil, nil, channel)
 }
 
 // nolint: unparam
-func (r *SqlChatMessageRepository) SaveEvent(id string, userID *string, body string, eventType string, hidden *time.Time, timestamp time.Time, image *string, link *string, title *string, subtitle *string) {
+func (r *SqlChatMessageRepository) SaveEvent(id string, userID *string, body string, eventType string, hidden *time.Time, timestamp time.Time, image *string, link *string, title *string, subtitle *string, channel string) {
 	defer func() {
 		_historyCache = nil
 	}()
@@ -71,7 +72,7 @@ func (r *SqlChatMessageRepository) SaveEvent(id string, userID *string, body str
 
 	defer tx.Rollback() // nolint
 
-	stmt, err := tx.Prepare("INSERT INTO messages(id, user_id, body, eventType, hidden_at, timestamp, image, link, title, subtitle) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+	stmt, err := tx.Prepare("INSERT INTO messages(id, user_id, body, eventType, hidden_at, timestamp, image, link, title, subtitle, channel) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
 	if err != nil {
 		log.Errorln("error saving", eventType, err)
 		return
@@ -79,7 +80,7 @@ func (r *SqlChatMessageRepository) SaveEvent(id string, userID *string, body str
 
 	defer stmt.Close()
 
-	if _, err = stmt.Exec(id, userID, body, eventType, hidden, timestamp, image, link, title, subtitle); err != nil {
+	if _, err = stmt.Exec(id, userID, body, eventType, hidden, timestamp, image, link, title, subtitle, channel); err != nil {
 		log.Errorln("error saving", eventType, err)
 		return
 	}
@@ -303,8 +304,10 @@ func (r *SqlChatMessageRepository) GetChatModerationHistory() []interface{} {
 	return result
 }
 
-// GetChatHistory will return all the chat messages suitable for returning as user-facing chat history.
-func (r *SqlChatMessageRepository) GetChatHistory() []interface{} {
+// GetChatHistory returns the chat messages suitable for user-facing chat
+// history, scoped to one room ('' -tagged messages are global and included
+// everywhere).
+func (r *SqlChatMessageRepository) GetChatHistory(channel string) []interface{} {
 	tx, err := r.datastore.DB.Begin()
 	if err != nil {
 		log.Errorln("error fetching chat history", err)
@@ -314,7 +317,7 @@ func (r *SqlChatMessageRepository) GetChatHistory() []interface{} {
 	defer tx.Rollback() // nolint
 
 	// Get all visible messages
-	query := "SELECT messages.id, messages.user_id, messages.body, messages.title, messages.subtitle, messages.image, messages.link, messages.eventType, messages.hidden_at, messages.timestamp, users.display_name, users.display_color, users.created_at, users.disabled_at, users.previous_names, users.namechanged_at, users.authenticated_at, users.scopes, users.type FROM users JOIN messages ON users.id = messages.user_id WHERE hidden_at IS NULL AND disabled_at IS NULL ORDER BY timestamp DESC LIMIT ?"
+	query := "SELECT messages.id, messages.user_id, messages.body, messages.title, messages.subtitle, messages.image, messages.link, messages.eventType, messages.hidden_at, messages.timestamp, users.display_name, users.display_color, users.created_at, users.disabled_at, users.previous_names, users.namechanged_at, users.authenticated_at, users.scopes, users.type FROM users JOIN messages ON users.id = messages.user_id WHERE hidden_at IS NULL AND disabled_at IS NULL AND (messages.channel = ? OR messages.channel = '') ORDER BY timestamp DESC LIMIT ?"
 
 	stmt, err := tx.Prepare(query)
 	if err != nil {
@@ -322,7 +325,7 @@ func (r *SqlChatMessageRepository) GetChatHistory() []interface{} {
 		return nil
 	}
 
-	rows, err := stmt.Query(maxBacklogNumber)
+	rows, err := stmt.Query(channel, maxBacklogNumber)
 	if err != nil {
 		log.Errorln("error fetching chat history", err)
 		return nil

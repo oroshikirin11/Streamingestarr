@@ -16,17 +16,20 @@ import (
 )
 
 var (
-	getStatus               func() models.Status
+	// getChannelStatus reports one room's stream status — chat behavior
+	// (welcome messages, the offline gate) follows the room a client sits
+	// in, not a global notion of "the stream".
+	getChannelStatus        func(channelID string) models.Status
 	chatMessagesSentCounter prometheus.Gauge
 )
 
 // Start begins the chat server.
-func Start(getStatusFunc func() models.Status) error {
+func Start(getChannelStatusFunc func(channelID string) models.Status) error {
 	setupPersistence()
 
 	configRepository := configrepository.Get()
 
-	getStatus = getStatusFunc
+	getChannelStatus = getChannelStatusFunc
 	_server = NewChat()
 
 	go _server.Run()
@@ -89,8 +92,9 @@ func GetClients() []*Client {
 	return clients
 }
 
-// SendSystemMessage will send a message string as a system message to all clients.
-func SendSystemMessage(text string, ephemeral bool) error {
+// SendSystemMessage sends a message string as a system message to one
+// room's clients — or, with channelID "", to everyone in every room.
+func SendSystemMessage(channelID string, text string, ephemeral bool) error {
 	message := events.SystemMessageEvent{
 		MessageEvent: events.MessageEvent{
 			Body: text,
@@ -99,20 +103,21 @@ func SendSystemMessage(text string, ephemeral bool) error {
 	message.SetDefaults()
 	message.RenderBody()
 
-	if err := Broadcast(&message); err != nil {
+	if err := BroadcastToChannel(channelID, &message); err != nil {
 		log.Errorln("error sending system message", err)
 	}
 
 	if !ephemeral {
 		chatMessageRepository := chatmessagerepository.Get()
-		chatMessageRepository.SaveEvent(message.ID, nil, message.Body, message.GetMessageType(), nil, message.Timestamp, nil, nil, nil, nil)
+		chatMessageRepository.SaveEvent(message.ID, nil, message.Body, message.GetMessageType(), nil, message.Timestamp, nil, nil, nil, nil, channelID)
 	}
 
 	return nil
 }
 
-// SendSystemAction will send a system action string as an action event to all clients.
-func SendSystemAction(text string, ephemeral bool) error {
+// SendSystemAction sends a system action string as an action event to one
+// room's clients — or, with channelID "", to everyone in every room.
+func SendSystemAction(channelID string, text string, ephemeral bool) error {
 	message := events.ActionEvent{
 		MessageEvent: events.MessageEvent{
 			Body: text,
@@ -122,21 +127,21 @@ func SendSystemAction(text string, ephemeral bool) error {
 	message.SetDefaults()
 	message.RenderBody()
 
-	if err := Broadcast(&message); err != nil {
+	if err := BroadcastToChannel(channelID, &message); err != nil {
 		log.Errorln("error sending system chat action")
 	}
 
 	if !ephemeral {
 		chatMessageRepository := chatmessagerepository.Get()
-		chatMessageRepository.SaveEvent(message.ID, nil, message.Body, message.GetMessageType(), nil, message.Timestamp, nil, nil, nil, nil)
+		chatMessageRepository.SaveEvent(message.ID, nil, message.Body, message.GetMessageType(), nil, message.Timestamp, nil, nil, nil, nil, channelID)
 	}
 
 	return nil
 }
 
-// SendAllWelcomeMessage will send the chat message to all connected clients.
-func SendAllWelcomeMessage() {
-	_server.sendAllWelcomeMessage()
+// SendAllWelcomeMessage sends the welcome message to a room's clients.
+func SendAllWelcomeMessage(channelID string) {
+	_server.sendAllWelcomeMessage(channelID)
 }
 
 // SendSystemMessageToClient will send a single message to a single connected chat client.
@@ -149,6 +154,15 @@ func SendSystemMessageToClient(clientID uint, text string) {
 // Broadcast will send all connected clients the outbound object provided.
 func Broadcast(event events.OutboundEvent) error {
 	return _server.Broadcast(event.GetBroadcastPayload())
+}
+
+// BroadcastToChannel sends the outbound object to one room's clients; an
+// empty channelID falls back to everyone (global admin actions).
+func BroadcastToChannel(channelID string, event events.OutboundEvent) error {
+	if channelID == "" {
+		return _server.Broadcast(event.GetBroadcastPayload())
+	}
+	return _server.BroadcastToChannel(channelID, event.GetBroadcastPayload())
 }
 
 // HandleClientConnection handles a single inbound websocket connection.

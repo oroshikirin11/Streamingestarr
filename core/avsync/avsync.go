@@ -5,6 +5,9 @@
 // guilty; if the segments themselves skew after a stall or seam, the
 // sender's recovery glue is. Without this number the two are
 // indistinguishable from the couch.
+//
+// State is per channel — segment paths live under data/hls/<channel>/, and
+// the ledger of one room must never describe another's broadcast.
 package avsync
 
 import (
@@ -14,11 +17,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+
+	"streamingestarr/config"
+	"streamingestarr/persistence/channelrepository"
 )
 
 // Measurement is one segment's A/V offset. Delta is audio minus video in
@@ -33,23 +40,52 @@ type Measurement struct {
 
 const keep = 90 // ~a few minutes of segments
 
+// ledger is one channel's measurement state.
+type ledger struct {
+	mu      sync.Mutex
+	ring    []Measurement
+	busy    atomic.Bool
+	initSeg atomic.Value // string: the session's fMP4 init file, "" for ts
+}
+
 var (
-	_mu      sync.Mutex
-	_ring    []Measurement
-	_busy    atomic.Bool
-	_initSeg atomic.Value // string: the session's fMP4 init file, "" for ts
+	_ledgersMu sync.Mutex
+	_ledgers   = map[string]*ledger{}
 )
 
-// NoteInitSegment records the current session's fMP4 init file — a bare
-// .m4s cannot be parsed without it; concatenated they form a valid
-// fragmented MP4.
-func NoteInitSegment(path string) { _initSeg.Store(path) }
+func ledgerFor(channelID string) *ledger {
+	_ledgersMu.Lock()
+	defer _ledgersMu.Unlock()
+	l, ok := _ledgers[channelID]
+	if !ok {
+		l = &ledger{}
+		l.initSeg.Store("")
+		_ledgers[channelID] = l
+	}
+	return l
+}
+
+// channelFromPath derives which channel a segment path belongs to — the
+// first path component under the HLS root (data/hls/<channel>/...).
+func channelFromPath(path string) string {
+	rel, err := filepath.Rel(config.HLSStoragePath, path)
+	if err != nil || strings.HasPrefix(rel, "..") {
+		return channelrepository.DefaultChannelID
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	if len(parts) < 2 {
+		return channelrepository.DefaultChannelID
+	}
+	return parts[0]
+}
 
 // MeasureSegment probes one finished segment asynchronously. Non-reentrant
-// by design: if the previous probe is still running the measurement is
-// skipped, never queued — this is instrumentation, not bookkeeping.
+// per channel by design: if the channel's previous probe is still running
+// the measurement is skipped, never queued — this is instrumentation, not
+// bookkeeping.
 func MeasureSegment(path string) {
 	base := filepath.Base(path)
+	l := ledgerFor(channelFromPath(path))
 	switch filepath.Ext(base) {
 	case ".ts":
 		// fine as-is
@@ -58,42 +94,44 @@ func MeasureSegment(path string) {
 	default:
 		if filepath.Ext(base) == ".mp4" {
 			// The init segment itself — remember it, don't measure it.
-			NoteInitSegment(path)
+			l.initSeg.Store(path)
 		}
 		return
 	}
-	if !_busy.CompareAndSwap(false, true) {
+	if !l.busy.CompareAndSwap(false, true) {
 		return
 	}
 	go func() {
-		defer _busy.Store(false)
-		if m, ok := probe(path, base); ok {
-			_mu.Lock()
-			_ring = append(_ring, m)
-			if len(_ring) > keep {
-				_ring = _ring[len(_ring)-keep:]
+		defer l.busy.Store(false)
+		if m, ok := l.probe(path, base); ok {
+			l.mu.Lock()
+			l.ring = append(l.ring, m)
+			if len(l.ring) > keep {
+				l.ring = l.ring[len(l.ring)-keep:]
 			}
-			_mu.Unlock()
+			l.mu.Unlock()
 		}
 	}()
 }
 
-// Get returns the recent measurements, oldest first.
-func Get() []Measurement {
-	_mu.Lock()
-	defer _mu.Unlock()
-	out := make([]Measurement, len(_ring))
-	copy(out, _ring)
+// Get returns the channel's recent measurements, oldest first.
+func Get(channelID string) []Measurement {
+	l := ledgerFor(channelID)
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	out := make([]Measurement, len(l.ring))
+	copy(out, l.ring)
 	return out
 }
 
-// Reset clears the ring — called when a new broadcaster session begins so
-// the numbers always describe the current broadcast.
-func Reset() {
-	_mu.Lock()
-	_ring = nil
-	_mu.Unlock()
-	_initSeg.Store("")
+// Reset clears a channel's ledger — called when a new broadcaster session
+// begins so the numbers always describe the current broadcast.
+func Reset(channelID string) {
+	l := ledgerFor(channelID)
+	l.mu.Lock()
+	l.ring = nil
+	l.mu.Unlock()
+	l.initSeg.Store("")
 }
 
 type ffprobePacket struct {
@@ -102,10 +140,10 @@ type ffprobePacket struct {
 	DtsTime   string `json:"dts_time"`
 }
 
-func probe(path, base string) (Measurement, bool) {
+func (l *ledger) probe(path, base string) (Measurement, bool) {
 	input := path
 	if filepath.Ext(base) == ".m4s" {
-		init, _ := _initSeg.Load().(string)
+		init, _ := l.initSeg.Load().(string)
 		if init == "" {
 			return Measurement{}, false
 		}

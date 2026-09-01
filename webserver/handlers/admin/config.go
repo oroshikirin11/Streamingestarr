@@ -93,7 +93,7 @@ func ExternalGetStatus(integration models.ExternalAPIUser, w http.ResponseWriter
 }
 
 func sendSystemChatAction(messageText string, ephemeral bool) {
-	if err := chat.SendSystemAction(messageText, ephemeral); err != nil {
+	if err := chat.SendSystemAction("", messageText, ephemeral); err != nil {
 		log.Errorln(err)
 	}
 }

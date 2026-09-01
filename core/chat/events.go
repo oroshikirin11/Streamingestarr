@@ -107,7 +107,7 @@ func (s *Server) userNameChanged(eventData chatClientEvent) {
 	broadcastEvent.User = savedUser
 	broadcastEvent.SetDefaults()
 	payload := broadcastEvent.GetBroadcastPayload()
-	if err := s.Broadcast(payload); err != nil {
+	if err := s.BroadcastToChannel(eventData.client.ChannelID, payload); err != nil {
 		log.Errorln("error broadcasting NameChangeEvent", err)
 		return
 	}
@@ -163,9 +163,10 @@ func (s *Server) userMessageSent(eventData chatClientEvent) {
 		return
 	}
 
-	// Ignore if the stream has been offline
-	if !getStatus().Online && getStatus().LastDisconnectTime != nil {
-		disconnectedTime := getStatus().LastDisconnectTime.Time
+	// Ignore if the client's room has been offline
+	roomStatus := getChannelStatus(eventData.client.ChannelID)
+	if !roomStatus.Online && roomStatus.LastDisconnectTime != nil {
+		disconnectedTime := roomStatus.LastDisconnectTime.Time
 		if time.Since(disconnectedTime) > 5*time.Minute {
 			return
 		}
@@ -179,7 +180,7 @@ func (s *Server) userMessageSent(eventData chatClientEvent) {
 	}
 
 	payload := event.GetBroadcastPayload()
-	if err := s.Broadcast(payload); err != nil {
+	if err := s.BroadcastToChannel(eventData.client.ChannelID, payload); err != nil {
 		log.Errorln("error broadcasting UserMessageEvent payload", err)
 		return
 	}
@@ -188,7 +189,7 @@ func (s *Server) userMessageSent(eventData chatClientEvent) {
 	webhooks.SendChatEvent(&event)
 	chatMessagesSentCounter.Inc()
 	chatMessageRepository := chatmessagerepository.Get()
-	chatMessageRepository.SaveUserMessage(event)
+	chatMessageRepository.SaveUserMessage(event, eventData.client.ChannelID)
 	eventData.client.MessageCount++
 }
 

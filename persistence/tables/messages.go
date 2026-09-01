@@ -23,6 +23,23 @@ func CreateMessagesTable(db *sql.DB) {
 	);`
 	utils.MustExec(createTableSQL, db)
 
+	// Migration: chat messages belong to a room. '' means "all rooms" —
+	// global admin/system messages every room's history includes.
+	var hasChannel bool
+	rows, err := db.Query(`SELECT name FROM pragma_table_info('messages')`)
+	if err == nil {
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err == nil && name == "channel" {
+				hasChannel = true
+			}
+		}
+		rows.Close()
+	}
+	if !hasChannel {
+		utils.MustExec(`ALTER TABLE messages ADD COLUMN channel TEXT NOT NULL DEFAULT 'main'`, db)
+	}
+
 	// Create indexes
 	utils.MustExec(`CREATE INDEX IF NOT EXISTS user_id_hidden_at_timestamp ON messages (id, user_id, hidden_at, timestamp);`, db)
 	utils.MustExec(`CREATE INDEX IF NOT EXISTS idx_id ON messages (id);`, db)

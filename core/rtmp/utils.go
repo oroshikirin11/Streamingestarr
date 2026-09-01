@@ -80,16 +80,24 @@ func getVideoCodec(codec interface{}) string {
 	return unknownString
 }
 
-func secretMatch(configStreamKey string, path string) bool {
-	// Only the final path segment is the key. The application path before
-	// it is whatever the encoder chose — "/live" (the RTMP convention and
-	// what Owncast demanded), something else, or nothing at all. Demanding
-	// a specific app name bought nothing; the key is the lock.
+// streamKeyFromPath extracts the key an RTMP publisher presented: only the
+// final path segment is the key. The application path before it is whatever
+// the encoder chose — "/live" (the RTMP convention and what Owncast
+// demanded), something else, or nothing at all. Demanding a specific app
+// name bought nothing; the key is the lock. Returns "" for a shapeless path.
+func streamKeyFromPath(path string) string {
 	path = strings.TrimSuffix(path, "/")
 	idx := strings.LastIndex(path, "/")
 	if idx < 0 || idx == len(path)-1 {
+		return ""
+	}
+	return path[idx+1:]
+}
+
+func secretMatch(configStreamKey string, path string) bool {
+	streamingKey := streamKeyFromPath(path)
+	if streamingKey == "" {
 		return false
 	}
-	streamingKey := path[idx+1:]
 	return subtle.ConstantTimeCompare([]byte(streamingKey), []byte(configStreamKey)) == 1
 }

@@ -25,10 +25,22 @@ type ingestConn interface {
 }
 
 func pump(conn ingestConn, remoteAddr, transport, key string) {
-	log.Infoln("Inbound", transport, "stream connected from", remoteAddr)
+	channelID := channelIDForStreamKey(key)
+
+	// Claim the room's ingest slot atomically — the busy check the caller
+	// ran is advisory; two publishers connecting in the same instant both
+	// pass it, and only one may win.
+	s := registerSession(channelID, transport, conn)
+	if s == nil {
+		log.Errorln("room", channelID, "already has a live inbound stream; rejecting", transport, "publisher from", remoteAddr)
+		_ = conn.Close()
+		return
+	}
+
+	log.Infoln("Inbound", transport, "stream connected from", remoteAddr, "feeding room", channelID)
 	// A fresh session gets a fresh A/V ledger — the numbers must always
 	// describe THIS broadcast.
-	avsync.Reset()
+	avsync.Reset(channelID)
 
 	broadcaster := models.Broadcaster{
 		RemoteAddr: remoteAddr,
@@ -62,15 +74,11 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 		_ = conn.SetReadDeadline(time.Time{})
 	}
 	videoCodec, audioCodec := probeHeadCodecs(head)
-	config.SetInboundVideoCodec(videoCodec)
-	config.SetInboundAudioCodec(audioCodec)
+	config.SetInboundVideoCodec(channelID, videoCodec)
+	config.SetInboundAudioCodec(channelID, audioCodec)
 
 	pipeOut, pipeIn := io.Pipe()
-
-	_mu.Lock()
-	_activeConn = conn
-	_activePipe = pipeIn
-	_mu.Unlock()
+	s.setPipe(pipeIn)
 
 	_setStreamAsConnected(pipeOut, key)
 
@@ -99,8 +107,7 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 	// pipe writes happen on a drain goroutine, the reader only enqueues.
 	// ~10s of stream at 25 Mbps fits the budget; a stall longer than that
 	// drops oldest data audibly in the log instead of silently on the wire.
-	_queueDroppedBytes.Store(0)
-	q := newPipeQueue(32<<20, transport == "TCP")
+	q := newPipeQueue(32<<20, transport == "TCP", &s.queueDroppedBytes)
 	go func() {
 		for {
 			chunk, ok := q.pop()
@@ -123,7 +130,6 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 
 	// Live inbound rate: counted here where the bytes actually arrive,
 	// sampled on the read loop's own clock — no goroutine to race.
-	resetBitrate()
 	brBytes := int64(len(head))
 	brLast := time.Now()
 
@@ -140,7 +146,7 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 			q.push(buffer[:n])
 			brBytes += int64(n)
 			if since := time.Since(brLast); since >= bitrateSampleEvery {
-				recordBitrate(brBytes, since)
+				s.recordBitrate(brBytes, since)
 				brBytes = 0
 				brLast = time.Now()
 			}
@@ -177,37 +183,38 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 		}
 	}
 
-	log.Infoln("Inbound", transport, "stream disconnected.")
+	log.Infoln("Inbound", transport, "stream for room", channelID, "disconnected.")
 	q.close()
-	teardown(conn, pipeIn)
+	teardown(s)
 }
 
-func teardown(conn io.Closer, pipe *io.PipeWriter) {
-	_mu.Lock()
-	defer _mu.Unlock()
-	_ = conn.Close()
-	_ = pipe.Close()
-	if _activeConn == conn {
-		_activeConn = nil
-		_activePipe = nil
+func teardown(s *ingestSession) {
+	_ = s.conn.Close()
+	if s.pipe != nil {
+		_ = s.pipe.Close()
 	}
+	unregisterSession(s)
 	// The sniffed codecs belong to the session that just ended; a following
-	// RTMP broadcast must not inherit them.
-	config.SetInboundAudioCodec("")
-	config.SetInboundVideoCodec("")
+	// broadcast on this room must not inherit them.
+	config.SetInboundAudioCodec(s.channelID, "")
+	config.SetInboundVideoCodec(s.channelID, "")
 }
 
-// Disconnect will force disconnect the current inbound stream connection.
-func Disconnect() {
-	_mu.Lock()
-	conn, pipe := _activeConn, _activePipe
-	_activeConn = nil
-	_activePipe = nil
-	_mu.Unlock()
+// Disconnect force-disconnects the channel's inbound stream, if any. The
+// pump's read loop notices the closed connection and runs the teardown.
+func Disconnect(channelID string) {
+	_sessionsMu.Lock()
+	s := _sessions[channelID]
+	var conn io.Closer
+	var pipe *io.PipeWriter
+	if s != nil {
+		conn, pipe = s.conn, s.pipe
+	}
+	_sessionsMu.Unlock()
 	if conn == nil {
 		return
 	}
-	log.Traceln("Inbound stream disconnect requested.")
+	log.Traceln("Inbound stream disconnect requested for room", channelID)
 	_ = conn.Close()
 	if pipe != nil {
 		_ = pipe.Close()

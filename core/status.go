@@ -40,6 +40,16 @@ func GetStatus() models.Status {
 	return c.GetStatus()
 }
 
+// getChannelStatus returns one channel's status by ID — the per-room lens
+// the chat server sees the world through.
+func getChannelStatus(channelID string) models.Status {
+	c := GetChannelRuntime(channelID)
+	if c == nil {
+		return models.Status{}
+	}
+	return c.GetStatus()
+}
+
 // GetCurrentBroadcast will return the channel's currently active broadcast.
 func (c *ChannelRuntime) GetCurrentBroadcast() *models.CurrentBroadcast {
 	return c.currentBroadcast

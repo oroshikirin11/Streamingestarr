@@ -1,7 +1,6 @@
 package srt
 
 import (
-	"sync"
 	"time"
 
 	gosrt "github.com/datarhei/gosrt"
@@ -10,7 +9,8 @@ import (
 // Live inbound bitrate, measured where it cannot lie: the bytes the read
 // loop actually pulled off the socket, sampled every five seconds. This is
 // the raw container rate (video+audio+muxing overhead) — the number the
-// operator watches to see whether the sender is keeping up.
+// operator watches to see whether the sender is keeping up. One ring per
+// session, so concurrent rooms never mix their numbers.
 
 // BitrateSample is one point of the inbound rate series.
 type BitrateSample struct {
@@ -23,35 +23,33 @@ const (
 	bitrateKeep        = 360 // 30 minutes of 5s samples
 )
 
-var (
-	_brMu      sync.Mutex
-	_brSamples []BitrateSample
-)
-
-// resetBitrate starts a fresh series for a new publisher session.
-func resetBitrate() {
-	_brMu.Lock()
-	_brSamples = nil
-	_brMu.Unlock()
-}
-
-// recordBitrate appends one sample, trimming the ring.
-func recordBitrate(bytes int64, window time.Duration) {
+// recordBitrate appends one sample to the session's ring, trimming it.
+func (s *ingestSession) recordBitrate(bytes int64, window time.Duration) {
 	kbps := float64(bytes) * 8 / window.Seconds() / 1000
-	_brMu.Lock()
-	_brSamples = append(_brSamples, BitrateSample{Time: time.Now(), Value: kbps})
-	if len(_brSamples) > bitrateKeep {
-		_brSamples = _brSamples[len(_brSamples)-bitrateKeep:]
+	s.brMu.Lock()
+	s.brSamples = append(s.brSamples, BitrateSample{Time: time.Now(), Value: kbps})
+	if len(s.brSamples) > bitrateKeep {
+		s.brSamples = s.brSamples[len(s.brSamples)-bitrateKeep:]
 	}
-	_brMu.Unlock()
+	s.brMu.Unlock()
 }
 
-// GetInboundBitrate returns the current session's rate series.
-func GetInboundBitrate() []BitrateSample {
-	_brMu.Lock()
-	defer _brMu.Unlock()
-	out := make([]BitrateSample, len(_brSamples))
-	copy(out, _brSamples)
+// GetInboundBitrate returns the channel's current rate series — the live
+// session's, or the last finished one's so the graph survives a disconnect.
+func GetInboundBitrate(channelID string) []BitrateSample {
+	_sessionsMu.Lock()
+	s := _sessions[channelID]
+	if s == nil {
+		s = _lastSessions[channelID]
+	}
+	_sessionsMu.Unlock()
+	if s == nil {
+		return []BitrateSample{}
+	}
+	s.brMu.Lock()
+	defer s.brMu.Unlock()
+	out := make([]BitrateSample, len(s.brSamples))
+	copy(out, s.brSamples)
 	return out
 }
 
@@ -67,24 +65,31 @@ type IngestStats struct {
 	BufferDroppedBytes int64  `json:"bufferDroppedBytes"`
 }
 
-// GetIngestStats reads the live connection's accumulated SRT statistics.
-func GetIngestStats() IngestStats {
-	out := IngestStats{BufferDroppedBytes: _queueDroppedBytes.Load()}
-	_mu.Lock()
-	conn := _activeConn
-	_mu.Unlock()
-	if conn == nil {
+// GetIngestStats reads the channel's live receive statistics; after a
+// disconnect the last session's overflow counter stays visible.
+func GetIngestStats(channelID string) IngestStats {
+	_sessionsMu.Lock()
+	s := _sessions[channelID]
+	last := _lastSessions[channelID]
+	_sessionsMu.Unlock()
+
+	out := IngestStats{}
+	if s == nil {
+		if last != nil {
+			out.BufferDroppedBytes = last.queueDroppedBytes.Load()
+		}
 		return out
 	}
 	out.Connected = true
+	out.BufferDroppedBytes = s.queueDroppedBytes.Load()
 	// SRT counters only exist on an SRT session; a TCP ingest cannot lose
 	// packets by construction (the kernel retransmits), so zeros are truth.
-	if c, ok := conn.(gosrt.Conn); ok {
-		var s gosrt.Statistics
-		c.Stats(&s)
-		out.SrtPktRecvDrop = s.Accumulated.PktRecvDrop
-		out.SrtPktRecvLoss = s.Accumulated.PktRecvLoss
-		out.SrtPktRecvRetrans = s.Accumulated.PktRecvRetrans
+	if c, ok := s.conn.(gosrt.Conn); ok {
+		var st gosrt.Statistics
+		c.Stats(&st)
+		out.SrtPktRecvDrop = st.Accumulated.PktRecvDrop
+		out.SrtPktRecvLoss = st.Accumulated.PktRecvLoss
+		out.SrtPktRecvRetrans = st.Accumulated.PktRecvRetrans
 	}
 	return out
 }

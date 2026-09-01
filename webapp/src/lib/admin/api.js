@@ -20,7 +20,7 @@ const post = (path, payload) =>
 	});
 
 export const getServerConfig = () => req('/api/admin/serverconfig');
-export const getAdminStatus = () => req('/api/admin/status');
+export const getAdminStatus = (channel = 'main') => req(`/api/admin/status?channel=${channel}`);
 export const getChatMessages = () => req('/api/admin/chat/messages');
 export const getDisabledUsers = () => req('/api/admin/chat/users/disabled');
 export const getConnectedClients = () => req('/api/admin/chat/clients');
@@ -35,7 +35,7 @@ export const setRoomPassword = (viewerPassword) =>
 export const setNameReservationDays = (value) =>
 	post('/api/admin/config/chat/namereservationdays', { value });
 export const setSegmentFormat = (value) => post('/api/admin/config/video/segmentformat', { value });
-export const disconnectStream = () => post('/api/admin/disconnect', {});
+export const disconnectStream = (channel = 'main') => post(`/api/admin/disconnect?channel=${channel}`, {});
 export const setMessageVisibility = (idArray, visible) =>
 	post('/api/admin/chat/messagevisibility', { idArray, visible });
 export const setUserEnabled = (userId, enabled) =>
@@ -54,10 +54,16 @@ export const unbanIP = (ip) => post('/api/admin/chat/users/ipbans/remove', { val
 export const getHardwareStats = () => req('/api/admin/hardwarestats');
 export const getViewersOverTime = (windowStartUnix) =>
 	req(`/api/admin/viewersOverTime?windowStart=${windowStartUnix}`);
-export const getIngestBitrate = () => req('/api/admin/ingestbitrate');
-export const getIngestStats = () => req('/api/admin/ingeststats');
-export const getAVSync = () => req('/api/admin/avsync');
+export const getIngestBitrate = (channel = 'main') => req(`/api/admin/ingestbitrate?channel=${channel}`);
+export const getIngestStats = (channel = 'main') => req(`/api/admin/ingeststats?channel=${channel}`);
+export const getAVSync = (channel = 'main') => req(`/api/admin/avsync?channel=${channel}`);
 export const getAccessTokens = () => req('/api/admin/accesstokens');
 export const createAccessToken = (name) =>
 	post('/api/admin/accesstokens/create', { name, scopes: ['CAN_SEND_SYSTEM_MESSAGES'] });
 export const deleteAccessToken = (token) => post('/api/admin/accesstokens/delete', { token });
+
+export const getRooms = () => req('/api/admin/rooms');
+export const createRoom = (name) => post('/api/admin/rooms', { name });
+export const deleteRoom = (id) => post('/api/admin/rooms/delete', { id });
+export const renameRoom = (id, name) => post('/api/admin/rooms/rename', { id, name });
+export const regenerateRoomKey = (id) => post('/api/admin/rooms/regenerate-key', { id });

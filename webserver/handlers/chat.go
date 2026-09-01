@@ -35,7 +35,7 @@ func getChatMessages(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		chatMessageRepository := chatmessagerepository.Get()
-		messages := chatMessageRepository.GetChatHistory()
+		messages := chatMessageRepository.GetChatHistory(channelIDFromRequest(r))
 
 		if err := json.NewEncoder(w).Encode(messages); err != nil {
 			log.Debugln(err)
