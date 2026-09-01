@@ -11,8 +11,6 @@
 
 	// editable copies
 	let serverName = $state('');
-	let streamTitle = $state('');
-	let welcomeMessage = $state('');
 	let keys = $state([]);
 	let variants = $state([]);
 	let latency = $state(2);
@@ -69,8 +67,6 @@
 	async function loadConfig() {
 		cfg = await api.getServerConfig();
 		serverName = cfg.instanceDetails?.name ?? '';
-		streamTitle = cfg.instanceDetails?.streamTitle ?? '';
-		welcomeMessage = cfg.instanceDetails?.welcomeMessage ?? '';
 		keys = (cfg.streamKeys ?? []).map((k) => ({ key: k.key ?? '', comment: k.comment ?? '' }));
 		variants = structuredClone($state.snapshot(cfg.videoSettings?.videoQualityVariants ?? []));
 		latency = cfg.videoSettings?.latencyLevel ?? 2;
@@ -319,7 +315,7 @@
 					<div class="tile"><span class="num">{status?.overallPeakViewerCount ?? 0}</span><span class="lab">all-time peak</span></div>
 				</div>
 				{#if viewersSeries?.length > 1}
-					<p class="spark-label">last 4 hours</p>
+					<p class="spark-label">last 4 hours · all rooms</p>
 					<Spark data={viewersSeries} height={72} />
 				{/if}
 			</div>
@@ -551,7 +547,7 @@
 			</div>
 
 		{:else if section === 'video'}
-			<hgroup><h1>Video</h1><p>What happens between the ingest and the viewers.</p></hgroup>
+			<hgroup><h1>Video</h1><p>What happens between the ingest and the viewers — the defaults every room inherits unless its card sets its own.</p></hgroup>
 
 			<div class="card">
 				<header><h2>Output</h2><p>Passthrough relays the incoming stream untouched — the normal case when the sender controls its own encode.</p></header>
@@ -604,11 +600,7 @@
 					<label class="switch"><input type="checkbox" bind:checked={chatEnabled} onchange={() => run(() => api.setConfigValue('chat/disable', !chatEnabled))} /><span class="track"></span> Chat enabled</label>
 					<label class="switch"><input type="checkbox" bind:checked={joinMessages} onchange={() => run(() => api.setConfigValue('chat/joinmessagesenabled', joinMessages))} /><span class="track"></span> Join messages</label>
 				</div>
-				<div class="field">
-					<label for="welcome">Welcome message</label>
-					<input id="welcome" bind:value={welcomeMessage} placeholder="Shown to everyone who joins" />
-				</div>
-				<footer><button onclick={() => run(() => api.setConfigValue('welcomemessage', welcomeMessage))}>Save</button></footer>
+				<p class="hint">Each room's welcome message lives on its card in <b>Rooms</b>.</p>
 			</div>
 
 			<div class="card">
@@ -705,13 +697,10 @@
 					<label for="sname">Name</label>
 					<input id="sname" bind:value={serverName} />
 				</div>
-				<div class="field">
-					<label for="stitle">Stream title</label>
-					<input id="stitle" bind:value={streamTitle} placeholder="Shown as “now playing” while live" />
-				</div>
 				<footer>
-					<button onclick={() => run(async () => { await api.setConfigValue('name', serverName); return api.setConfigValue('streamtitle', streamTitle); })}>Save</button>
+					<button onclick={() => run(() => api.setConfigValue('name', serverName))}>Save</button>
 				</footer>
+				<p class="hint">Each room's stream title lives on its card in <b>Rooms</b>.</p>
 			</div>
 
 			<div class="card">

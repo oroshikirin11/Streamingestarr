@@ -29,13 +29,14 @@ func startViewerCollectionMetrics() {
 }
 
 func collectViewerCount() {
-	// Don't collect metrics for viewers if there's no stream active.
-	if !core.GetStatus().Online {
+	// Don't collect metrics for viewers if no room is broadcasting.
+	if !core.AnyChannelOnline() {
 		activeViewerCount.Set(0)
 		return
 	}
 
-	count := core.GetStatus().ViewerCount
+	// Every room's viewers together — rooms broadcast concurrently.
+	count := core.TotalViewerCount()
 
 	// Save active viewer count to our Prometheus collector.
 	activeViewerCount.Set(float64(count))

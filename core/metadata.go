@@ -15,6 +15,7 @@ import (
 	"streamingestarr/config"
 	"streamingestarr/core/chat"
 	"streamingestarr/core/storageproviders"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/models"
 )
 
@@ -24,7 +25,6 @@ import (
 var (
 	_metadataLock sync.RWMutex
 	_schedule     []models.ScheduleItem
-	_lastPlayed   *models.LastPlayed
 
 	_artwork      = map[string]artworkEntry{}
 	_artworkOrder []string
@@ -122,7 +122,7 @@ func (c *ChannelRuntime) GetNowPlaying() *models.NowPlaying {
 func (c *ChannelRuntime) clearNowPlaying() {
 	_metadataLock.Lock()
 	if c.nowPlaying != nil && c.nowPlaying.Title != "" {
-		_lastPlayed = &models.LastPlayed{
+		c.lastPlayed = &models.LastPlayed{
 			Title:    c.nowPlaying.Title,
 			Subtitle: c.nowPlaying.Subtitle,
 			EndedAt:  time.Now(),
@@ -136,11 +136,12 @@ func (c *ChannelRuntime) clearNowPlaying() {
 	persistMetadata()
 }
 
-// GetLastPlayed returns what the room watched most recently, or nil.
-func GetLastPlayed() *models.LastPlayed {
+// GetLastPlayed returns what THIS room watched most recently, or nil —
+// one room's ended movie must not haunt another room's lobby.
+func (c *ChannelRuntime) GetLastPlayed() *models.LastPlayed {
 	_metadataLock.RLock()
 	defer _metadataLock.RUnlock()
-	return _lastPlayed
+	return c.lastPlayed
 }
 
 // SetSchedule replaces the upcoming-showings list.
@@ -167,10 +168,13 @@ func GetSchedule() []models.ScheduleItem {
 // ---------- persistence ----------
 
 type persistedMetadata struct {
-	LastPlayed *models.LastPlayed            `json:"lastPlayed,omitempty"`
-	Schedule   []models.ScheduleItem         `json:"schedule,omitempty"`
-	NowPlaying map[string]*models.NowPlaying `json:"nowPlaying,omitempty"`
-	Artwork    map[string]string             `json:"artwork,omitempty"` // id -> content type
+	// LastPlayed is the legacy single-room field; read once at load and
+	// assigned to the default channel, never written anymore.
+	LastPlayed          *models.LastPlayed            `json:"lastPlayed,omitempty"`
+	LastPlayedByChannel map[string]*models.LastPlayed `json:"lastPlayedByChannel,omitempty"`
+	Schedule            []models.ScheduleItem         `json:"schedule,omitempty"`
+	NowPlaying          map[string]*models.NowPlaying `json:"nowPlaying,omitempty"`
+	Artwork             map[string]string             `json:"artwork,omitempty"` // id -> content type
 }
 
 func metadataStatePath() string {
@@ -186,15 +190,18 @@ func artworkFilePath(id string) string {
 func persistMetadata() {
 	_metadataLock.RLock()
 	state := persistedMetadata{
-		LastPlayed: _lastPlayed,
-		Schedule:   _schedule,
-		NowPlaying: map[string]*models.NowPlaying{},
-		Artwork:    map[string]string{},
+		LastPlayedByChannel: map[string]*models.LastPlayed{},
+		Schedule:            _schedule,
+		NowPlaying:          map[string]*models.NowPlaying{},
+		Artwork:             map[string]string{},
 	}
 	_channelsLock.RLock()
 	for id, c := range _channels {
 		if c.nowPlaying != nil {
 			state.NowPlaying[id] = c.nowPlaying
+		}
+		if c.lastPlayed != nil {
+			state.LastPlayedByChannel[id] = c.lastPlayed
 		}
 	}
 	_channelsLock.RUnlock()
@@ -228,7 +235,6 @@ func loadMetadata() {
 	}
 
 	_metadataLock.Lock()
-	_lastPlayed = state.LastPlayed
 	_schedule = state.Schedule
 	for id, contentType := range state.Artwork {
 		bytes, err := os.ReadFile(artworkFilePath(id))
@@ -244,6 +250,17 @@ func loadMetadata() {
 	for id, np := range state.NowPlaying {
 		if c, ok := _channels[id]; ok {
 			c.nowPlaying = np
+		}
+	}
+	for id, lp := range state.LastPlayedByChannel {
+		if c, ok := _channels[id]; ok {
+			c.lastPlayed = lp
+		}
+	}
+	// Legacy single-room value: it belonged to the only room there was.
+	if state.LastPlayed != nil {
+		if c, ok := _channels[channelrepository.DefaultChannelID]; ok && c.lastPlayed == nil {
+			c.lastPlayed = state.LastPlayed
 		}
 	}
 	_channelsLock.RUnlock()

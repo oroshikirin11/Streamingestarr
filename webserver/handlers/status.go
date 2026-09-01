@@ -47,7 +47,7 @@ func getStatusResponse(channelID string) webStatusResponse {
 	status := channel.GetStatus()
 	response := webStatusResponse{
 		NowPlaying:         channel.GetNowPlaying(),
-		LastPlayed:         core.GetLastPlayed(),
+		LastPlayed:         channel.GetLastPlayed(),
 		Schedule:           core.GetSchedule(),
 		ChannelID:          status.ChannelID,
 		Online:             status.Online,

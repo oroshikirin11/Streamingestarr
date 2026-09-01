@@ -127,6 +127,9 @@ schedule ticks both work).
 
 ## 4. Stream title — `POST /api/integrations/streamtitle`
 
+Titles are per-room; this legacy endpoint writes the MAIN room's title.
+Prefer the `nowplaying` push, which carries richer data and a `channel`.
+
 The inherited Owncast API still works and remains the fallback shown when
 no structured metadata has arrived. A Streamingestarr-mode sender should
 prefer §2 and may skip this entirely.

@@ -5,6 +5,7 @@ import (
 
 	"github.com/teris-io/shortid"
 	"streamingestarr/models"
+	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/persistence/configrepository"
 )
 
@@ -24,7 +25,7 @@ func sendStreamStatusEvent(eventType models.EventType, channelID string, id stri
 			"channel":     channelID,
 			"name":        configRepository.GetServerName(),
 			"summary":     configRepository.GetServerSummary(),
-			"streamTitle": configRepository.GetStreamTitle(),
+			"streamTitle": channelrepository.GetEffectiveStreamTitle(channelID),
 			"status":      getStatus(),
 			"serverURL":   getServerURL(),
 			"timestamp":   timestamp,

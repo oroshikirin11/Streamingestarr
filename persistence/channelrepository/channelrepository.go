@@ -75,6 +75,28 @@ func Setup(db *sql.DB) {
 		DefaultChannelID, "Main Theater"); err != nil {
 		log.Fatalln("unable to seed default channel:", err)
 	}
+
+	// One-time migration: the pre-rooms GLOBAL stream title and welcome
+	// message move into the main room, which is now the only place they
+	// live — the Settings/Chat sections stopped editing the global copies.
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS channel_meta (
+		"key" TEXT NOT NULL PRIMARY KEY,
+		"value" TEXT NOT NULL DEFAULT ''
+	)`); err != nil {
+		log.Fatalln("unable to create channel_meta table:", err)
+	}
+	var done string
+	_ = db.QueryRow(`SELECT value FROM channel_meta WHERE key = 'identity_migrated'`).Scan(&done)
+	if done == "" {
+		cfg := configrepository.Get()
+		if t := cfg.GetStreamTitle(); t != "" {
+			_, _ = db.Exec(`UPDATE channels SET title = ? WHERE id = ? AND title = ''`, t, DefaultChannelID)
+		}
+		if wm := cfg.GetServerWelcomeMessage(); wm != "" {
+			_, _ = db.Exec(`UPDATE channels SET welcome_message = ? WHERE id = ? AND welcome_message = ''`, wm, DefaultChannelID)
+		}
+		_, _ = db.Exec(`INSERT OR REPLACE INTO channel_meta(key, value) VALUES('identity_migrated', 'yes')`)
+	}
 }
 
 func columnExists(db *sql.DB, table, column string) bool {
@@ -286,22 +308,29 @@ func SetChannelConfig(id string, c models.Channel) error {
 // setting when one is stored, the server default otherwise. Every consumer
 // that used to read the global config for a live broadcast reads these.
 
-// GetEffectiveStreamTitle returns the room's title, falling back to the
-// global stream title.
+// GetEffectiveStreamTitle returns the room's title. Titles are per-room
+// only — the old global title migrated into the main room at Setup.
 func GetEffectiveStreamTitle(channelID string) string {
-	if c := GetChannel(channelID); c != nil && c.Title != "" {
+	if c := GetChannel(channelID); c != nil {
 		return c.Title
 	}
-	return configrepository.Get().GetStreamTitle()
+	return ""
 }
 
-// GetEffectiveWelcomeMessage returns the room's chat welcome message,
-// falling back to the global one.
+// GetEffectiveWelcomeMessage returns the room's chat welcome message —
+// per-room only, same migration story as the title.
 func GetEffectiveWelcomeMessage(channelID string) string {
-	if c := GetChannel(channelID); c != nil && c.WelcomeMessage != "" {
+	if c := GetChannel(channelID); c != nil {
 		return c.WelcomeMessage
 	}
-	return configrepository.Get().GetServerWelcomeMessage()
+	return ""
+}
+
+// SetChannelTitle updates just a room's stream title — the surface the
+// legacy streamtitle API endpoints write through now.
+func SetChannelTitle(id, title string) error {
+	_, err := _db.Exec(`UPDATE channels SET title = ? WHERE id = ?`, title, id)
+	return err
 }
 
 // GetEffectiveLatencyLevel returns the room's latency level, falling back

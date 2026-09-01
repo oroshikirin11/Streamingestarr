@@ -68,14 +68,14 @@ func SetStreamTitle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	value := configValue.Value.(string)
-	configRepository := configrepository.Get()
 
-	if err := configRepository.SetStreamTitle(value); err != nil {
+	// Titles are per-room now; the legacy endpoint addresses the main room.
+	if err := channelrepository.SetChannelTitle(channelrepository.DefaultChannelID, value); err != nil {
 		webutils.WriteSimpleResponse(w, false, err.Error())
 		return
 	}
 	if value != "" {
-		sendSystemChatAction(fmt.Sprintf("Stream title changed to **%s**", value), true)
+		_ = chat.SendSystemAction(channelrepository.DefaultChannelID, fmt.Sprintf("Stream title changed to **%s**", value), true)
 		go webhooks.SendStreamStatusEvent(models.StreamTitleUpdated, channelrepository.DefaultChannelID)
 	}
 	webutils.WriteSimpleResponse(w, true, "changed")

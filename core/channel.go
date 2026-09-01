@@ -34,6 +34,7 @@ type ChannelRuntime struct {
 	broadcaster      *models.Broadcaster
 	currentBroadcast *models.CurrentBroadcast
 	nowPlaying       *models.NowPlaying
+	lastPlayed       *models.LastPlayed
 
 	offlineCleanupTimer *time.Timer
 	onlineCleanupTicker *time.Ticker
@@ -67,6 +68,33 @@ func GetChannelRuntime(id string) *ChannelRuntime {
 	_channelsLock.RLock()
 	defer _channelsLock.RUnlock()
 	return _channels[id]
+}
+
+// TotalViewerCount sums the live viewers of every room — the number the
+// viewers-over-time metric records now that rooms broadcast concurrently.
+func TotalViewerCount() int {
+	_channelsLock.RLock()
+	defer _channelsLock.RUnlock()
+	total := 0
+	for _, c := range _channels {
+		s := c.GetStatus()
+		if s.Online {
+			total += s.ViewerCount
+		}
+	}
+	return total
+}
+
+// AnyChannelOnline reports whether at least one room is broadcasting.
+func AnyChannelOnline() bool {
+	_channelsLock.RLock()
+	defer _channelsLock.RUnlock()
+	for _, c := range _channels {
+		if c.GetStatus().Online {
+			return true
+		}
+	}
+	return false
 }
 
 // isStreamKeyBusy reports whether the channel a stream key feeds already
