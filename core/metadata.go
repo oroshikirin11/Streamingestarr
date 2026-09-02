@@ -77,15 +77,28 @@ func GetArtwork(id string) ([]byte, string) {
 func (c *ChannelRuntime) SetNowPlaying(np models.NowPlaying) {
 	np.ReceivedAt = time.Now()
 
+	onAir := c.stats != nil && c.stats.StreamConnected
+
 	_metadataLock.Lock()
 	previous := c.nowPlaying
 	c.nowPlaying = &np
+	// Only what this room actually aired can become its memory. A push
+	// for a room with no stream connected is metadata about somewhere
+	// else, and remembering it is how one room's film turned up in
+	// another room's lobby.
+	if onAir && np.Title != "" {
+		c.lastOnAir = &models.LastPlayed{
+			Title:    np.Title,
+			Subtitle: np.Subtitle,
+			EndedAt:  time.Now(),
+		}
+	}
 	_metadataLock.Unlock()
 
 	persistMetadata()
 
 	changed := previous == nil || previous.Title != np.Title || previous.Subtitle != np.Subtitle
-	if np.Announce && changed && np.Title != "" && c.stats != nil && c.stats.StreamConnected {
+	if np.Announce && changed && np.Title != "" && onAir {
 		line := np.Title
 		if np.Subtitle != "" {
 			line = fmt.Sprintf("%s · %s", np.Title, np.Subtitle)
@@ -121,14 +134,16 @@ func (c *ChannelRuntime) GetNowPlaying() *models.NowPlaying {
 // title for the lobby's "last watched together" line.
 func (c *ChannelRuntime) clearNowPlaying() {
 	_metadataLock.Lock()
-	if c.nowPlaying != nil && c.nowPlaying.Title != "" {
+	// What aired HERE, not whatever the metadata slot happens to hold.
+	if c.lastOnAir != nil && c.lastOnAir.Title != "" {
 		c.lastPlayed = &models.LastPlayed{
-			Title:    c.nowPlaying.Title,
-			Subtitle: c.nowPlaying.Subtitle,
+			Title:    c.lastOnAir.Title,
+			Subtitle: c.lastOnAir.Subtitle,
 			EndedAt:  time.Now(),
 		}
 	}
 	c.nowPlaying = nil
+	c.lastOnAir = nil
 	_metadataLock.Unlock()
 	// The colour range belongs to the broadcast that just ended; clear it so
 	// a following SDR stream isn't mis-signaled as HDR before its first push.

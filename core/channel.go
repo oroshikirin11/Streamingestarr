@@ -35,6 +35,13 @@ type ChannelRuntime struct {
 	currentBroadcast *models.CurrentBroadcast
 	nowPlaying       *models.NowPlaying
 	lastPlayed       *models.LastPlayed
+	// lastOnAir is what genuinely PLAYED in this room: metadata seen
+	// while a stream was actually connected here. nowPlaying alone
+	// cannot serve — a push can arrive for a room with nothing running
+	// (a sender whose room resolution fell back to the default), and
+	// promoting that at stream end put another room's film in this
+	// room's "previously in this room" line.
+	lastOnAir *models.LastPlayed
 
 	offlineCleanupTimer *time.Timer
 	onlineCleanupTicker *time.Ticker

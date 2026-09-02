@@ -1,6 +1,7 @@
 <script>
 	import { onMount, onDestroy } from 'svelte';
 	import Hls from 'hls.js';
+	import { sound, setSoundVolume, setSoundMuted, setForcedMute } from '../sound.js';
 
 	let { channelId = 'main', clockSkewMs = 0, paused = false } = $props();
 
@@ -12,9 +13,12 @@
 	// the user gesture browsers want before unmuted autoplay. startPlayback
 	// tries with sound and falls back to muted only when the browser
 	// actually refuses (e.g. a restored tab with no interaction yet).
-	let muted = $state(false);
-	// Default quiet: a first-time viewer gets 5%, not a full-volume blast.
-	let volume = $state(Number(localStorage.getItem('sgr_volume') ?? 0.05) || 0.05);
+	// Sound preference lives above this component (lib/sound.js) so it
+	// survives the remounts an offline->online cycle causes — a new
+	// episode with a different frame shape is exactly that, and rebuilding
+	// from defaults there reset the slider and re-muted the viewer.
+	let muted = $state(sound.muted);
+	let volume = $state(sound.volume);
 
 	const src = () => `/hls/${channelId}/stream.m3u8`;
 
@@ -94,6 +98,7 @@
 			if (e.target?.closest?.('.snd-btn, .vol')) return;
 			disarmUnmute();
 			muted = false;
+			setForcedMute(false);
 			videoEl.muted = false;
 			videoEl.volume = volume;
 			videoEl.play().catch(() => {});
@@ -104,7 +109,10 @@
 		videoEl.muted = muted;
 		videoEl.volume = volume;
 		videoEl.play().catch(() => {
+			// The browser's constraint, not the viewer's wish — see
+			// setForcedMute. Remembering it would mute every later visit.
 			muted = true;
+			setForcedMute(true);
 			videoEl.muted = true;
 			armUnmuteOnGesture();
 			videoEl.play().catch(() => {});
@@ -396,16 +404,18 @@
 		// An explicit choice either way retires the first-gesture unmute.
 		disarmUnmute();
 		muted = !muted;
+		setSoundMuted(muted);
 		videoEl.muted = muted;
 		if (!muted) videoEl.volume = volume;
 	}
 
 	function setVolume(e) {
 		volume = Number(e.target.value);
+		setSoundVolume(volume);
 		videoEl.volume = volume;
-		localStorage.setItem('sgr_volume', String(volume));
 		if (volume > 0 && muted) {
 			muted = false;
+			setSoundMuted(false);
 			videoEl.muted = false;
 		}
 	}
