@@ -122,11 +122,14 @@
 					xhr.withCredentials = true;
 				},
 				liveDurationInfinity: true,
-				// Cinema trade-off: sit further behind the live edge with a
-				// deep buffer so sender-side splices (overlay applies,
-				// track changes) ride through invisibly. Delay is fine —
-				// this is a broadcast, not a call.
-				liveSyncDurationCount: 5,
+				// Three segments behind the live edge (hls.js's own default).
+				// This sat at 5 while sender-side splices were rough seams
+				// the buffer had to absorb; the sender now splices on exact
+				// sent-frontier pts (overlay applies, track changes,
+				// pause/resume all measured seam-free), so the extra two
+				// segments bought nothing but ~6s of glass-to-glass delay.
+				// Revert to 5 if a sender older than that ever feeds this.
+				liveSyncDurationCount: 3,
 				liveMaxLatencyDurationCount: 12,
 				// Rate steering is OWNED by the room-sync controller below —
 				// hls.js's own latency controller stays off (default rate 1)
@@ -194,14 +197,18 @@
 		gain: 0.02 // rate delta per second of drift
 	};
 	// The shared wall-clock anchor. PDT is stamped when a segment is
-	// WRITTEN, so it runs ~1.5 segment durations newer than the media —
-	// wall latency at the player's natural join position measures about
-	// 0.7x the edge target (verified live: 10.8s vs edge target 15).
-	// Anchoring there means a fresh join starts already in the dead band
-	// instead of sinking for minutes; the exact factor only shifts the
-	// room's shared depth, never its uniformity — every client uses the
-	// same number.
-	const wallAnchor = (edgeTarget) => edgeTarget * 0.7;
+	// WRITTEN, so it runs ~1.5 SEGMENT DURATIONS newer than the media —
+	// an absolute offset, not a fraction of the target. The old 0.7
+	// factor encoded exactly that at five segments (1 - 1.5/5) and was
+	// verified live (10.8s wall vs edge target 15); expressing it per
+	// segment keeps the same physics at any sync depth, so a fresh join
+	// still starts inside the dead band instead of sinking for minutes.
+	// The exact anchor only shifts the room's shared depth, never its
+	// uniformity — every client computes the same number.
+	const wallAnchor = (edgeTarget) => {
+		const count = hls?.config?.liveSyncDurationCount || 3;
+		return edgeTarget * (1 - 1.5 / count);
+	};
 	let driftTimer;
 	let lastSnapEdge = -1;
 	onMount(() => {
@@ -239,7 +246,8 @@
 				if (videoEl.playbackRate !== 1) videoEl.playbackRate = 1;
 				return;
 			}
-			const edgeTarget = Number.isFinite(hls.targetLatency) ? hls.targetLatency : 15;
+			// The fallback mirrors the configured depth (3 x 3s segments).
+			const edgeTarget = Number.isFinite(hls.targetLatency) ? hls.targetLatency : 9;
 			let drift = null;
 			let mode = 'wall';
 			const pd = hls.playingDate;
