@@ -163,6 +163,17 @@
 
 	onMount(initPlayer);
 
+	// Belt and braces: should any navigation path ever swap the channel
+	// prop on a LIVE instance instead of remounting, rebuild the player —
+	// an hls session is bound to one room's playlist forever.
+	let bootedChannel = channelId;
+	$effect(() => {
+		if (channelId !== bootedChannel) {
+			bootedChannel = channelId;
+			initPlayer();
+		}
+	});
+
 	// Room sync: every client steers to the same ABSOLUTE moment — the
 	// server's wall clock (EXT-X-PROGRAM-DATE-TIME in the playlists,
 	// local-clock skew corrected via the status poll's serverTime) minus
@@ -242,7 +253,7 @@
 			// Debug handle: read window.__sgrSync in a console to see what
 			// the controller sees. Costs nothing, settles arguments.
 			lastDrift = drift;
-			window.__sgrSync = { ...(window.__sgrSync ?? {}), drift, mode, rate: videoEl.playbackRate, skewMs: clockSkewMs };
+			window.__sgrSync = { ...(window.__sgrSync ?? {}), channel: channelId, drift, mode, rate: videoEl.playbackRate, skewMs: clockSkewMs };
 			if (drift == null || !Number.isFinite(drift)) return;
 			if (Math.abs(drift) > SYNC.snapAt) {
 				// One clean seek instead of minutes of crawling — both

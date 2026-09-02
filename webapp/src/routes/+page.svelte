@@ -18,6 +18,12 @@
 	// going live — no refresh.
 	const scoped =
 		typeof location !== 'undefined' && location.pathname.startsWith('/t/');
+	// The room THIS mount serves, read from the URL once — the {#key} in
+	// t/[room] guarantees a fresh mount per room, so mount-time is correct,
+	// and unlike the status poll it can never lag a navigation.
+	const roomId = scoped
+		? (location.pathname.match(/^\/t\/([a-z][a-z0-9-]*)/)?.[1] ?? 'main')
+		: 'main';
 	let roomsList = $state(null);
 	$effect(() => {
 		let stopped = false;
@@ -111,7 +117,7 @@
 	{:else if live}
 		<div class="lounge" class:chat-hidden={chatHidden}>
 			<div class="screen-zone">
-				<GlowFrame bind:this={frame} channelId={$status?.channelId || 'main'} clockSkewMs={$clockSkewMs} paused={$status?.nowPlaying?.paused === true} />
+				<GlowFrame bind:this={frame} channelId={roomId} clockSkewMs={$clockSkewMs} paused={$status?.nowPlaying?.paused === true} />
 				<NowTray status={$status} />
 			</div>
 			{#if !chatHidden}
