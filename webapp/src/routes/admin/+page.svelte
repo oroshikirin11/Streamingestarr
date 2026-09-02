@@ -577,7 +577,12 @@
 					</div>
 					<div class="field">
 						<label for="srtpass">Passphrase — optional ({srtPassphraseSet ? 'set' : 'not set'})</label>
-						<input id="srtpass" type="password" bind:value={srtPassphrase} placeholder={srtPassphraseSet ? 'unchanged — type to replace, clear to disable' : '10–79 chars; empty = no encryption'} autocomplete="new-password" />
+						<div class="pw-row">
+							<input id="srtpass" type="password" bind:value={srtPassphrase} placeholder={srtPassphraseSet ? 'unchanged — type to replace' : '10–79 chars; empty = no encryption'} autocomplete="new-password" />
+							{#if srtPassphraseSet}
+								<button class="ghost tiny danger-text" onclick={() => run(async () => { const r = await api.setSRTPassphrase(''); if (r?.success !== false) { srtPassphraseSet = false; srtPassphrase = ''; } return r; }, 'SRT passphrase removed — the ingest accepts unencrypted callers again')}>Remove</button>
+							{/if}
+						</div>
 					</div>
 				</div>
 				<p class="hint">With a passphrase the ingest only accepts encrypted callers carrying it — worth having when the port faces the internet. Give the sender the same passphrase. Applies to the next connection, no restart.</p>
@@ -592,9 +597,14 @@
 					</div>
 					<div class="field">
 						<label for="tcppass">Passphrase — optional ({tcpPassphraseSet ? 'set' : 'not set'})</label>
-						<input id="tcppass" type="password" bind:value={tcpPassphrase} autocomplete="new-password"
-							placeholder={tcpPassphraseSet ? 'unchanged — type to replace, clear to disable' : '10–79 chars, no spaces; empty = key only'}
-							onchange={() => run(async () => { const r = await api.setTCPIngestPassphrase(tcpPassphrase); tcpPassphraseSet = tcpPassphrase !== ''; tcpPassphrase = ''; return r; })} />
+						<div class="pw-row">
+							<input id="tcppass" type="password" bind:value={tcpPassphrase} autocomplete="new-password"
+								placeholder={tcpPassphraseSet ? 'unchanged — type to replace' : '10–79 chars, no spaces; empty = key only'}
+								onchange={() => { if (tcpPassphrase !== '') run(async () => { const r = await api.setTCPIngestPassphrase(tcpPassphrase); if (r?.success !== false) { tcpPassphraseSet = true; tcpPassphrase = ''; } return r; }); }} />
+							{#if tcpPassphraseSet}
+								<button class="ghost tiny danger-text" onclick={() => run(async () => { const r = await api.setTCPIngestPassphrase(''); if (r?.success !== false) { tcpPassphraseSet = false; tcpPassphrase = ''; } return r; }, 'TCP passphrase removed — the stream key alone opens the door again')}>Remove</button>
+							{/if}
+						</div>
 					</div>
 				</div>
 				<p class="hint">Raw container over TCP: retransmits forever, so uplink loss becomes delay instead of artifacts — carries HEVC/AV1 like SRT, survives lossy links like RTMP. The sender authenticates with the stream key (Jellystreamerr: protocol TCP + this host + port); key and media travel in plaintext, so keep it tailnet-bound. Restart to apply.</p>
@@ -901,6 +911,8 @@
 	.field { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
 	.field label { font-size: 12px; color: var(--muted); }
 	.field input, .field select { width: 100%; }
+	.pw-row { display: flex; gap: 8px; align-items: center; }
+	.pw-row input { flex: 1; }
 	.field.compact { max-width: 240px; }
 	.field-row { display: flex; gap: 26px; align-items: flex-end; flex-wrap: wrap; margin: 12px 0; }
 	.field-row .field { flex: 1; min-width: 180px; margin: 0; }
