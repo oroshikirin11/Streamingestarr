@@ -134,6 +134,20 @@ func (c *ChannelRuntime) GetNowPlaying() *models.NowPlaying {
 // title for the lobby's "last watched together" line.
 func (c *ChannelRuntime) clearNowPlaying() {
 	_metadataLock.Lock()
+	// A sender that pushes once, a moment BEFORE its stream connects,
+	// would otherwise leave no memory at all. Its push still belongs to
+	// this broadcast when it arrived after the connection began — which
+	// the receiver's own ReceivedAt stamp settles, and which a push for
+	// a room that never connected can never satisfy.
+	if c.lastOnAir == nil && c.nowPlaying != nil && c.nowPlaying.Title != "" &&
+		c.stats != nil && c.stats.LastConnectTime != nil &&
+		!c.nowPlaying.ReceivedAt.Before(c.stats.LastConnectTime.Time) {
+		c.lastOnAir = &models.LastPlayed{
+			Title:    c.nowPlaying.Title,
+			Subtitle: c.nowPlaying.Subtitle,
+			EndedAt:  time.Now(),
+		}
+	}
 	// What aired HERE, not whatever the metadata slot happens to hold.
 	if c.lastOnAir != nil && c.lastOnAir.Title != "" {
 		c.lastPlayed = &models.LastPlayed{
