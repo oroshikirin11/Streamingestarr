@@ -118,7 +118,7 @@
 		<div class="lounge" class:chat-hidden={chatHidden}>
 			<div class="screen-zone">
 				<GlowFrame bind:this={frame} channelId={roomId} clockSkewMs={$clockSkewMs} paused={$status?.nowPlaying?.paused === true} />
-				<NowTray status={$status} />
+				<NowTray status={$status} clockSkewMs={$clockSkewMs} />
 			</div>
 			{#if !chatHidden}
 				<ChatPanel />

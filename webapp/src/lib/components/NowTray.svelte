@@ -3,7 +3,11 @@
 	// shows the real film, true progress, up next and tonight's showing;
 	// without, it falls back to the stream title and time-live.
 	import { dedupeSubtitle } from '../text.js';
-	let { status } = $props();
+	// clockSkewMs: server clock minus this device's, measured by the store.
+	// Every stamp below is the server's, so the arithmetic runs on server
+	// time — a viewer whose clock lagged the server saw a negative drift
+	// clamped to zero, and a ring frozen at the last push.
+	let { status, clockSkewMs = 0 } = $props();
 
 	let now = $state(Date.now());
 	$effect(() => {
@@ -16,6 +20,7 @@
 	const subtitle = $derived(dedupeSubtitle(np?.title, np?.subtitle));
 
 	// True position: pushed position + time since the push.
+	const serverNow = $derived(now + (Number.isFinite(clockSkewMs) ? clockSkewMs : 0));
 	const position = $derived.by(() => {
 		// Guard everything a sender could get wrong — the ring must never
 		// show NaN.
@@ -23,7 +28,7 @@
 		const base = Number.isFinite(np.position) ? np.position : 0;
 		if (np.paused) return Math.min(base, np.duration);
 		const received = new Date(np.receivedAt).getTime();
-		const drift = Number.isFinite(received) ? (now - received) / 1000 : 0;
+		const drift = Number.isFinite(received) ? (serverNow - received) / 1000 : 0;
 		return Math.min(base + Math.max(drift, 0), np.duration);
 	});
 
@@ -40,7 +45,7 @@
 
 	const elapsedLive = $derived.by(() => {
 		if (!status?.lastConnectTime) return null;
-		const ms = now - new Date(status.lastConnectTime).getTime();
+		const ms = serverNow - new Date(status.lastConnectTime).getTime();
 		return ms >= 0 ? fmt(ms / 1000) : null;
 	});
 
@@ -49,7 +54,7 @@
 	const ringOffset = $derived.by(() => {
 		if (position != null && np?.duration) return CIRC - (position / np.duration) * CIRC;
 		if (!status?.lastConnectTime) return CIRC;
-		const mins = ((now - new Date(status.lastConnectTime).getTime()) / 60000) % 60;
+		const mins = ((serverNow - new Date(status.lastConnectTime).getTime()) / 60000) % 60;
 		return CIRC - (mins / 60) * CIRC;
 	});
 	const ringText = $derived(np?.paused ? '⏸' : position != null ? fmt(position) : (elapsedLive ?? ''));
