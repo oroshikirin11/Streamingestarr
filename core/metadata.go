@@ -172,7 +172,6 @@ func (c *ChannelRuntime) dropNowPlaying() {
 	config.SetInboundVideoRange(c.ID, config.VideoRangeSDR)
 	persistMetadata()
 }
-}
 
 // GetLastPlayed returns what THIS room watched most recently, or nil —
 // one room's ended movie must not haunt another room's lobby.
