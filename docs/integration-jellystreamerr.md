@@ -44,7 +44,11 @@ Rules a sender should apply:
 
 Send on: clip start, seek, pause/resume, and queue changes (upNext). The
 receiver stamps `receivedAt`; viewers extrapolate position client-side, so
-there is no need to push progress on a timer.
+progress need not ride a fast timer. A slow heartbeat (every ~30 s) is
+worth sending anyway: it guards against a push lost to a reconnect or a
+receiver restart. Metadata outlives a stream session by 90 s, so a sender
+that opens a new session (a frame-size change, say) keeps its now-playing
+across the switch — restate it after the reconnect regardless.
 
 ```json
 {
@@ -142,7 +146,8 @@ integration, one extra destination). On enable:
 1. `GET capabilities` — validate the token, pick ingest protocol/container
    per codec, warn on segment-format mismatch for AV1.
 2. Push `nowplaying` on clip start / seek / queue change (it already knows
-   all of this — it drives the Owncast title sync today). Include
+   all of this — it drives the Owncast title sync today), plus a ~30 s
+   heartbeat and a restate after every publisher reconnect. Include
    `videoRange` on the broadcast's first push when the source is HDR, and
    send passthrough (no transcode) for that broadcast.
 3. Push `schedule` from its scheduled starts.

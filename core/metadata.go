@@ -130,9 +130,10 @@ func (c *ChannelRuntime) GetNowPlaying() *models.NowPlaying {
 	return c.nowPlaying
 }
 
-// clearNowPlaying drops metadata when the stream ends, remembering the
-// title for the lobby's "last watched together" line.
-func (c *ChannelRuntime) clearNowPlaying() {
+// rememberNowPlaying keeps the title for the lobby's "last watched
+// together" line. Called at the disconnect, while the memory is fresh; the
+// metadata itself stays for a grace period, see deferNowPlayingDrop.
+func (c *ChannelRuntime) rememberNowPlaying() {
 	_metadataLock.Lock()
 	// A sender that pushes once, a moment BEFORE its stream connects,
 	// would otherwise leave no memory at all. Its push still belongs to
@@ -156,13 +157,21 @@ func (c *ChannelRuntime) clearNowPlaying() {
 			EndedAt:  time.Now(),
 		}
 	}
-	c.nowPlaying = nil
 	c.lastOnAir = nil
+	_metadataLock.Unlock()
+	persistMetadata()
+}
+
+// dropNowPlaying forgets the metadata: the stream stayed gone.
+func (c *ChannelRuntime) dropNowPlaying() {
+	_metadataLock.Lock()
+	c.nowPlaying = nil
 	_metadataLock.Unlock()
 	// The colour range belongs to the broadcast that just ended; clear it so
 	// a following SDR stream isn't mis-signaled as HDR before its first push.
 	config.SetInboundVideoRange(c.ID, config.VideoRangeSDR)
 	persistMetadata()
+}
 }
 
 // GetLastPlayed returns what THIS room watched most recently, or nil —

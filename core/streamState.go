@@ -30,6 +30,8 @@ func (c *ChannelRuntime) setStreamAsConnected(rtmpOut *io.PipeReader) {
 	c.stats.LastDisconnectTime = nil
 	c.stats.LastConnectTime = &now
 	c.stats.SessionMaxViewerCount = 0
+	// A session replacing one that just ended keeps its metadata.
+	c.cancelNowPlayingDrop()
 
 	configRepository := configrepository.Get()
 	_ = configRepository
@@ -77,7 +79,8 @@ func (c *ChannelRuntime) SetStreamAsDisconnected() {
 	c.stats.LastDisconnectTime = &now
 	c.stats.LastConnectTime = nil
 	c.broadcaster = nil
-	c.clearNowPlaying()
+	c.rememberNowPlaying()
+	c.deferNowPlayingDrop()
 
 	offlineFilename := "offline-v2.ts"
 
@@ -134,6 +137,33 @@ func (c *ChannelRuntime) StartOfflineCleanupTimer() {
 			c.transitionToOfflineVideoStreamContent()
 		}
 	}()
+}
+
+// nowPlayingGrace is how long a stream's metadata outlives its session.
+// A sender that changes frame size opens a new session within seconds,
+// and dropping the metadata at the disconnect wiped what its restate had
+// just delivered — the viewer's ring fell back to a stopwatch until the
+// next clip. Only a stream that stays gone loses its now-playing.
+const nowPlayingGrace = 90 * time.Second
+
+// deferNowPlayingDrop drops the now-playing once the grace has passed
+// with no new session; a reconnect cancels it.
+func (c *ChannelRuntime) deferNowPlayingDrop() {
+	c.cancelNowPlayingDrop()
+	c.nowPlayingDropTimer = time.AfterFunc(nowPlayingGrace, func() {
+		if c.stats != nil && c.stats.StreamConnected {
+			return
+		}
+		c.dropNowPlaying()
+	})
+}
+
+// cancelNowPlayingDrop keeps the metadata: the stream is back.
+func (c *ChannelRuntime) cancelNowPlayingDrop() {
+	if c.nowPlayingDropTimer != nil {
+		c.nowPlayingDropTimer.Stop()
+		c.nowPlayingDropTimer = nil
+	}
 }
 
 // StopOfflineCleanupTimer will stop the previous cleanup timer.

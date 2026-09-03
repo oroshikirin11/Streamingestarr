@@ -44,6 +44,8 @@ type ChannelRuntime struct {
 	lastOnAir *models.LastPlayed
 
 	offlineCleanupTimer *time.Timer
+	// Pending drop of now-playing after a disconnect; see deferNowPlayingDrop.
+	nowPlayingDropTimer *time.Timer
 	onlineCleanupTicker *time.Ticker
 
 	handler    transcoder.HLSHandler
@@ -180,6 +182,7 @@ func RemoveChannel(id string) error {
 	srt.Disconnect(id)
 	c.StopOfflineCleanupTimer()
 	c.stopOnlineCleanupTimer()
+	c.cancelNowPlayingDrop()
 
 	go func() {
 		for attempt := 0; attempt < 10; attempt++ {
