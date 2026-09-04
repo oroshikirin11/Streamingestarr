@@ -69,6 +69,11 @@ func Start(enableVerboseLogging bool) error {
 	// Hand-registered API routes — endpoints added after the generated
 	// chi-server snapshot; the spec in openapi.yaml still documents them.
 	r.Post("/api/admin/config/srt/passphrase", middleware.RequireAdminAuth(handlers.SetSRTPassphrase))
+	// The inherited spec declares the disconnect as GET, and the generated
+	// router serves it that way; the panel sends POST for an action that
+	// ends a broadcast, which answered 405. Both verbs land on the same
+	// handler.
+	r.Post("/api/admin/disconnect", middleware.RequireAdminAuth(admin.DisconnectInboundConnection))
 	r.Get("/api/admin/ingestbitrate", middleware.RequireAdminAuth(handlers.GetIngestBitrate))
 	r.Get("/api/admin/ingeststats", middleware.RequireAdminAuth(handlers.GetIngestStatsAPI))
 	r.Get("/api/admin/avsync", middleware.RequireAdminAuth(handlers.GetAVSync))
