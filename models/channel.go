@@ -21,6 +21,12 @@ type Channel struct {
 	LatencyLevel   int                   `json:"latencyLevel"`
 	SegmentFormat  string                `json:"segmentFormat,omitempty"`
 	OutputVariants []StreamOutputVariant `json:"outputVariants,omitempty"`
+
+	// Passphrase is the room's own ingest passphrase. When set it replaces
+	// the global TCP/SRT passphrase for streams that open this room with
+	// one of its keys; empty inherits the global one. Never serialised:
+	// the admin API reports only whether one is set.
+	Passphrase string `json:"-"`
 }
 
 // ChannelKey is one stream key a room accepts, with an optional comment —

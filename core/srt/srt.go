@@ -76,7 +76,14 @@ func Start(setStreamAsConnected func(*io.PipeReader, string), setBroadcaster fun
 // callers welcome, the streamid is the lock). It is read per connection,
 // so a change applies to the next handshake without a restart.
 func acceptConnection(req gosrt.ConnRequest) gosrt.ConnType {
-	if passphrase := configrepository.Get().GetSRTPassphrase(); passphrase != "" {
+	// The streamid names the room before any passphrase is judged, so a
+	// room's own passphrase can stand in for the global one.
+	key := streamKeyFromStreamID(req.StreamId())
+	if key == "" {
+		log.Errorln("SRT connection with unknown or missing stream key rejected from", req.RemoteAddr().String())
+		return gosrt.REJECT
+	}
+	if passphrase := passphraseForKey(key, configrepository.Get().GetSRTPassphrase()); passphrase != "" {
 		if !req.IsEncrypted() {
 			log.Errorln("unencrypted SRT connection rejected from", req.RemoteAddr().String(), "— this ingest requires a passphrase")
 			return gosrt.REJECT
@@ -89,12 +96,6 @@ func acceptConnection(req gosrt.ConnRequest) gosrt.ConnType {
 		// The caller encrypts but no passphrase is configured here — the
 		// stream would arrive as undecryptable noise, so refuse honestly.
 		log.Errorln("encrypted SRT connection rejected from", req.RemoteAddr().String(), "— no passphrase is configured on this ingest")
-		return gosrt.REJECT
-	}
-
-	key := streamKeyFromStreamID(req.StreamId())
-	if key == "" {
-		log.Errorln("SRT connection with unknown or missing stream key rejected from", req.RemoteAddr().String())
 		return gosrt.REJECT
 	}
 	if _isStreamBusy(key) {

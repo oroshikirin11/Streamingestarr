@@ -70,3 +70,4 @@ export const deleteRoom = (id) => post('/api/admin/rooms/delete', { id });
 export const renameRoom = (id, name) => post('/api/admin/rooms/rename', { id, name });
 export const setRoomKeys = (id, keys) => post('/api/admin/rooms/keys', { id, keys });
 export const setRoomConfig = (id, config) => post('/api/admin/rooms/config', { id, ...config });
+export const setRoomPassphrase = (id, passphrase) => post('/api/admin/rooms/passphrase', { id, passphrase });

@@ -5,6 +5,7 @@ go 1.25.0
 require (
 	github.com/CAFxX/httpcompression v0.0.9
 	github.com/TwiN/go-away v1.8.1
+	github.com/datarhei/gosrt v0.11.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafov/m3u8 v0.12.1
@@ -43,7 +44,6 @@ require (
 	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/datarhei/gosrt v0.11.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/ebitengine/purego v0.8.4 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect

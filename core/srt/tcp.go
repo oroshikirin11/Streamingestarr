@@ -98,14 +98,16 @@ func handleTCPPublisher(conn *net.TCPConn) {
 	// key alone no longer opens the door — the extra lock for a listener
 	// that faces the internet, where the streamid... IS the whole lock.
 	rawKey, suppliedPass, _ := strings.Cut(strings.TrimSpace(rest), " ")
-	if want := configrepository.Get().GetTCPIngestPassphrase(); want != "" && strings.TrimSpace(suppliedPass) != want {
-		log.Errorln("TCP ingest connection from", remoteAddr, "rejected — missing or wrong passphrase")
-		_ = conn.Close()
-		return
-	}
 	key := streamKeyFromStreamID(strings.TrimSpace(rawKey))
 	if key == "" {
 		log.Errorln("TCP ingest connection with unknown stream key rejected from", remoteAddr)
+		_ = conn.Close()
+		return
+	}
+	// The key names the room, and the room may carry its own passphrase
+	// in place of the global one.
+	if want := passphraseForKey(key, configrepository.Get().GetTCPIngestPassphrase()); want != "" && strings.TrimSpace(suppliedPass) != want {
+		log.Errorln("TCP ingest connection from", remoteAddr, "rejected — missing or wrong passphrase")
 		_ = conn.Close()
 		return
 	}

@@ -64,7 +64,7 @@ as Docker.
 ## Features
 
 - **Ingest over RTMP, SRT or raw TCP** — H.264, HEVC and AV1, with HDR
-  passthrough (PQ/HLG signalled to players). Optional SRT/TCP passphrases.
+  passthrough (PQ/HLG signalled to players). Optional SRT/TCP passphrases, global or per room.
 - **Passthrough-first**: source bytes ship untouched by default; a transcode
   ladder is there when you want it.
 - **The theater**: ambilight glow sampled from the video, live chat with

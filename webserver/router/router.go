@@ -90,6 +90,7 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/rooms/rename", middleware.RequireAdminAuth(admin.RenameRoom))
 	r.Post("/api/admin/rooms/keys", middleware.RequireAdminAuth(admin.SetRoomKeys))
 	r.Post("/api/admin/rooms/config", middleware.RequireAdminAuth(admin.SetRoomConfig))
+	r.Post("/api/admin/rooms/passphrase", middleware.RequireAdminAuth(admin.SetRoomPassphrase))
 	// Playback forensics: viewers report player incidents per room; the
 	// admin reads them next to the segment ledger.
 	r.Post("/api/metrics/player", handlers.ReportPlayerIncidents)

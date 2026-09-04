@@ -33,6 +33,9 @@ type roomResponse struct {
 	LatencyLevel   int                          `json:"latencyLevel"`
 	SegmentFormat  string                       `json:"segmentFormat"`
 	OutputVariants []models.StreamOutputVariant `json:"outputVariants"`
+	// Whether the room has its own ingest passphrase; the value itself
+	// never leaves the server.
+	PassphraseSet bool `json:"passphraseSet"`
 }
 
 func roomToResponse(ch models.Channel) roomResponse {
@@ -46,6 +49,7 @@ func roomToResponse(ch models.Channel) roomResponse {
 		LatencyLevel:   ch.LatencyLevel,
 		SegmentFormat:  ch.SegmentFormat,
 		OutputVariants: ch.OutputVariants,
+		PassphraseSet:  ch.Passphrase != "",
 	}
 	if out.OutputVariants == nil {
 		out.OutputVariants = []models.StreamOutputVariant{}
@@ -238,4 +242,42 @@ func SetRoomConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webutils.WriteSimpleResponse(w, true, "room configuration saved")
+}
+
+// SetRoomPassphrase gives a room its own ingest passphrase, or clears it
+// with "". Streams that open the room with one of its keys must then
+// present it — on TCP as the preamble's second word, on SRT as the
+// encryption passphrase — instead of the global one.
+func SetRoomPassphrase(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID         string `json:"id"`
+		Passphrase string `json:"passphrase"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
+		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\", \"passphrase\": \"...\"}")
+		return
+	}
+	if channelrepository.GetChannel(req.ID) == nil {
+		webutils.WriteSimpleResponse(w, false, "no such room")
+		return
+	}
+	pass := strings.TrimSpace(req.Passphrase)
+	if pass != "" {
+		// SRT's own rule, applied to both transports so one passphrase can
+		// serve either; the TCP preamble is one line of words, so no
+		// whitespace inside it.
+		if len(pass) < 10 || len(pass) > 79 || strings.ContainsAny(pass, " \t\r\n") {
+			webutils.WriteSimpleResponse(w, false, "a passphrase is 10 to 79 characters with no spaces")
+			return
+		}
+	}
+	if err := channelrepository.SetChannelPassphrase(req.ID, pass); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	if pass == "" {
+		webutils.WriteSimpleResponse(w, true, "room passphrase cleared — the global one applies")
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "room passphrase set")
 }

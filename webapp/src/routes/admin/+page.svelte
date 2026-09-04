@@ -130,7 +130,9 @@
 			latencyLevel: r.latencyLevel ?? -1,
 			segmentFormat: r.segmentFormat ?? '',
 			customOutput: (r.outputVariants ?? []).length > 0,
-			outputVariants: r.outputVariants ?? []
+			outputVariants: r.outputVariants ?? [],
+			passphraseSet: Boolean(r.passphraseSet),
+			passphrase: ''
 		}));
 	}
 
@@ -515,6 +517,21 @@
 							<button class="ghost" onclick={() => (r.outputVariants = [...r.outputVariants, { name: 'passthrough', videoPassthrough: true, audioPassthrough: true, cpuUsageLevel: 2 }])}>Add a variant</button>
 						</footer>
 					{/if}
+					<div class="field-row">
+						<div class="field">
+							<label for={'roompass-' + r.id}>Ingest passphrase</label>
+							<input id={'roompass-' + r.id} type="password" bind:value={r.passphrase} autocomplete="new-password"
+								placeholder={r.passphraseSet ? 'set — type a new one to replace it' : 'none — the global TCP/SRT passphrase applies'} />
+						</div>
+						<div class="field compact">
+							<label>&nbsp;</label>
+							<div style="display:flex; gap:6px">
+								<button class="ghost" disabled={!r.passphrase.trim()} onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, r.passphrase.trim()); if (res?.success !== false) { r.passphrase = ''; r.passphraseSet = true; } return res; }, 'Passphrase set')}>Set</button>
+								{#if r.passphraseSet}<button class="ghost danger-text" onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, ''); if (res?.success !== false) r.passphraseSet = false; return res; }, 'Passphrase cleared')}>Clear</button>{/if}
+							</div>
+						</div>
+					</div>
+					<p class="hint">Senders using this room's keys must present it — on TCP as the preamble's second word, on SRT as the encryption passphrase. It replaces the global one for this room. 10 to 79 characters, no spaces. Applies to the next connection.</p>
 					{#if r.isDefault}
 						<p class="hint">This is the main room — the front page. Its stream keys are the list in <b>Stream</b>.</p>
 					{:else}
