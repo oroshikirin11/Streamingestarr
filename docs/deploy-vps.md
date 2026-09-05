@@ -187,6 +187,16 @@ container.
 ## Updating
 
 ```sh
+./update.sh
+```
+
+The script pulls, rebuilds, restarts and prunes the build cache. It keeps
+`./data` and refuses to run when the compose file lacks the `./data:/app/data`
+volume (a rebuild without it starts with an empty database), when tracked
+files were edited locally, or while a stream is live (`--yes` overrides).
+`--dry-run` shows the plan. By hand, the same thing is:
+
+```sh
 git pull && docker compose up -d --build && docker builder prune -f --filter until=24h
 ```
 

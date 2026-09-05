@@ -49,3 +49,6 @@ web/public/sw.js
 web/public/workbox-*.js
 bin/
 streamingestarr
+
+# update.sh keeps a few small backups here
+backups/
