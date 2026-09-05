@@ -40,6 +40,15 @@ func Status(w http.ResponseWriter, r *http.Request) {
 		VersionNumber:          status.VersionNumber,
 		StreamTitle:            channelrepository.GetEffectiveStreamTitle(channelID),
 	}
+	enabled, controlConnected := channel.PauseVoteInfo()
+	response.PauseVote = adminPauseVoteStatus{Enabled: enabled, ControlConnected: controlConnected}
+	if np := channel.GetNowPlaying(); np != nil {
+		response.PauseVote.Paused = np.Paused
+		response.PauseVote.PausedBy = np.PausedBy
+		response.PauseVote.PausedAt = np.PausedAt
+		response.PauseVote.Pending = np.Pending
+		response.PauseVote.Advertised = np.Controls != nil && np.Controls.PauseVote
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	middleware.DisableCache(w)
@@ -60,4 +69,17 @@ type adminStatusResponse struct {
 	OverallPeakViewerCount int                          `json:"overallPeakViewerCount"`
 	SessionPeakViewerCount int                          `json:"sessionPeakViewerCount"`
 	Online                 bool                         `json:"online"`
+	PauseVote              adminPauseVoteStatus         `json:"pauseVote"`
+}
+
+// adminPauseVoteStatus is the viewer pause-vote picture for the admin:
+// the room switch, the sender connection, and who paused when.
+type adminPauseVoteStatus struct {
+	Enabled          bool   `json:"enabled"`
+	ControlConnected bool   `json:"controlConnected"`
+	Advertised       bool   `json:"advertised"`
+	Paused           bool   `json:"paused"`
+	PausedBy         string `json:"pausedBy"`
+	PausedAt         int64  `json:"pausedAt"`
+	Pending          string `json:"pending"`
 }

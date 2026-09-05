@@ -75,7 +75,12 @@ across the switch — restate it after the reconnect regardless.
   the stream ends. Aliases accepted: `hdr10`/`smpte2084`→`pq`,
   `arib-std-b67`→`hlg`.
 - `paused: true` freezes viewers' extrapolated progress (send on pause,
-  clear on resume).
+  clear on resume). With it: `pausedBy` (`host` or `viewers`), `pausedAt`
+  (unix seconds), and `pending` (`pause`/`resume` accepted but not yet on
+  the wire) — the tray says "Paused by viewers · 2:41" or "Pausing…".
+- `controls: {pauseVote: bool}` advertises the viewer pause vote (§5).
+  Absent: the sender does not offer it, no pill. `false`: offered but
+  locked by the host right now — "Pause votes off".
 - `artworkId` (also on `upNext` and schedule items) references an image
   pushed via §3a; viewers fetch it at `/artwork/<id>` (session-gated,
   cached immutable — version the id when art changes, e.g. a hash).
@@ -137,6 +142,27 @@ Prefer the `nowplaying` push, which carries richer data and a `channel`.
 The inherited Owncast API still works and remains the fallback shown when
 no structured metadata has arrived. A Streamingestarr-mode sender should
 prefer §2 and may skip this entirely.
+
+## 5. Viewer pause vote — `GET /api/integrations/control`
+
+A websocket the sender opens per room while it broadcasts, with the same
+token as the pushes: `?accessToken=<token>&channel=<room>`. Viewers vote
+in the room; at half the seated viewers (rounded up, one vote when alone)
+the receiver sends one command and waits for the answer.
+
+- receiver → sender `{"type":"pause"|"resume","votes":2,"viewers":4,"by":["Alex","Sam"],"id":"<uuid>"}`
+- sender → receiver `{"type":"ack","id":"<uuid>","ok":true|false,"reason":"…","paused":bool}` —
+  a refusal's `reason` is shown in the room verbatim ("The stream cannot
+  pause right now — a scheduled start is less than two minutes away").
+- sender → receiver `{"type":"state","paused":bool,"pausedBy":"host"|"viewers"|"","pending":"pause"|"resume"|"","pauseVote":bool}`
+  on connect and on every change; the last word wins, push or frame.
+- both `{"type":"ping"}` / `{"type":"pong"}` every 20 s; 60 s of silence
+  drops the socket. The sender reconnects with backoff while live.
+
+Receiver-side rules: one vote per user, votes expire after 90 s, a vote
+for the wrong phase (resume while playing) is ignored, 30 s cooldown
+after every state change, 15 s wait for the ack, votes are off while the
+host holds the pause. The admin can switch the vote off per room.
 
 ## What "Streamingestarr mode" needs on the sender (Jellystreamerr)
 

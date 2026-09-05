@@ -72,3 +72,4 @@ export const renameRoom = (id, name) => post('/api/admin/rooms/rename', { id, na
 export const setRoomKeys = (id, keys) => post('/api/admin/rooms/keys', { id, keys });
 export const setRoomConfig = (id, config) => post('/api/admin/rooms/config', { id, ...config });
 export const setRoomPassphrase = (id, passphrase) => post('/api/admin/rooms/passphrase', { id, passphrase });
+export const setRoomPauseVote = (id, enabled) => post('/api/admin/rooms/pausevote', { id, enabled });

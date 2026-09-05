@@ -3,6 +3,7 @@
 	// shows the real film, true progress, up next and tonight's showing;
 	// without, it falls back to the stream title and time-live.
 	import { dedupeSubtitle } from '../text.js';
+	import { pauseVote, me, sendPauseVote } from '../chat.js';
 	// clockSkewMs: server clock minus this device's, measured by the store.
 	// Every stamp below is the server's, so the arithmetic runs on server
 	// time — a viewer whose clock lagged the server saw a negative drift
@@ -59,6 +60,52 @@
 	});
 	const ringText = $derived(np?.paused ? '⏸' : position != null ? fmt(position) : (elapsedLive ?? ''));
 
+	// Viewer pause votes. The pill exists only once the sender has
+	// advertised the control; what it says comes from the room's
+	// PAUSE_VOTE_STATE frames (chat.js), with status as the fallback.
+	const pv = $derived($pauseVote);
+	const advertised = $derived(np?.controls != null || pv?.available === true);
+	const iVoted = $derived(Boolean(pv?.voters?.includes($me?.id)));
+	const hostPaused = $derived((pv?.paused ?? np?.paused) && (pv?.pausedBy ?? np?.pausedBy) === 'host');
+	const pending = $derived(pv?.pending || np?.pending || '');
+	const cooldownLeft = $derived.by(() => {
+		const until = (pv?.cooldownUntil ?? 0) * 1000;
+		if (!until) return 0;
+		return Math.max(0, Math.ceil((until - serverNow) / 1000));
+	});
+	const unavailableWhy = $derived.by(() => {
+		if (!pv) return 'waiting for the room';
+		if (pv.available) return '';
+		if (pv.reason) return pv.reason;
+		if (!status?.pauseVote?.enabled) return 'pause votes are switched off for this room';
+		if (!status?.pauseVote?.controlConnected) return 'the sender is not connected';
+		return 'the sender does not allow pause votes';
+	});
+	const pill = $derived.by(() => {
+		if (!advertised) return null;
+		if (hostPaused) return { kind: 'host', label: 'Paused by the host', title: 'The host paused the stream — votes are off until it resumes.' };
+		if (pending === 'pause') return { kind: 'pending', label: 'Pausing…', note: 'reaches the room in a moment' };
+		if (pending === 'resume') return { kind: 'pending', label: 'Resuming…', note: 'reaches the room in a moment' };
+		if (!pv || !pv.available) return { kind: 'off', label: 'Pause votes off', title: unavailableWhy };
+		const verb = pv.action === 'resume' ? 'Resume' : 'Pause';
+		const t = `${pv.needed} vote${pv.needed === 1 ? '' : 's'} needed — half the room`;
+		const note = cooldownLeft > 0 ? `votes count again in ${cooldownLeft} s` : pv.reason ? pv.reason : '';
+		return { kind: 'vote', label: `${verb} · ${pv.votes} of ${pv.viewers}`, title: iVoted ? 'Press again to withdraw your vote' : t, note };
+	});
+	function pressPill() {
+		if (!pv || pill?.kind !== 'vote') return;
+		sendPauseVote(iVoted ? 'withdraw' : pv.action);
+	}
+	// "Paused by viewers · 2:41", counting from pausedAt (server seconds).
+	const pausedLine = $derived.by(() => {
+		const paused = pv?.paused ?? np?.paused;
+		if (!paused) return null;
+		const by = pv?.pausedBy ?? np?.pausedBy ?? '';
+		const at = (pv?.pausedAt || np?.pausedAt || 0) * 1000;
+		const who = by === 'viewers' ? 'Paused by viewers' : by === 'host' ? 'Paused by the host' : 'Paused';
+		return at ? `${who} · ${fmt(Math.max(0, (serverNow - at) / 1000))}` : who;
+	});
+
 	const nextShowing = $derived.by(() => {
 		const item = status?.schedule?.[0];
 		if (!item) return null;
@@ -85,8 +132,27 @@
 				{title}
 				{#if status?.videoRange}<span class="hdr-badge" title="This broadcast is high dynamic range ({status.videoRange})">HDR</span>{/if}
 			</div>
-			{#if subtitle}<div class="s">{subtitle}</div>{/if}
+			{#if pausedLine}
+				<div class="s paused-line">{pausedLine}</div>
+			{:else if subtitle}
+				<div class="s">{subtitle}</div>
+			{/if}
 		</div>
+		{#if pill}
+			<div class="vote" title={pill.title ?? ''}>
+				<button
+					class="pill {pill.kind}"
+					class:pressed={pill.kind === 'vote' && iVoted}
+					aria-pressed={pill.kind === 'vote' ? iVoted : undefined}
+					disabled={pill.kind !== 'vote'}
+					onclick={pressPill}
+				>
+					{#if pill.kind === 'pending'}<span class="spin"></span>{/if}
+					{pill.label}
+				</button>
+				{#if pill.note}<div class="vote-note">{pill.note}</div>{/if}
+			</div>
+		{/if}
 		<div class="ring">
 			<svg width="46" height="46">
 				<circle cx="23" cy="23" r="19" fill="none" stroke="#ffffff14" stroke-width="3" />
@@ -228,6 +294,78 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
+	.paused-line {
+		color: var(--accent);
+		font-variant-numeric: tabular-nums;
+	}
+	.vote {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 3px;
+		flex: none;
+		/* the note wraps under the pill instead of squeezing the title */
+		max-width: 170px;
+	}
+	.pill {
+		appearance: none;
+		font: inherit;
+		font-size: 12px;
+		font-weight: 650;
+		line-height: 1;
+		padding: 8px 13px;
+		border-radius: 999px;
+		border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+		background: color-mix(in srgb, var(--accent) 12%, transparent);
+		color: var(--fg, inherit);
+		cursor: pointer;
+		white-space: nowrap;
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		transition: background 0.15s, border-color 0.15s;
+	}
+	.pill:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--accent) 22%, transparent);
+	}
+	.pill.pressed {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: #fff;
+	}
+	.pill:disabled {
+		cursor: default;
+	}
+	.pill.off {
+		border-color: var(--border-soft);
+		background: transparent;
+		color: var(--muted);
+		font-weight: 500;
+	}
+	.pill.host {
+		border-color: var(--border);
+		background: color-mix(in srgb, var(--surface) 60%, transparent);
+		color: var(--muted);
+	}
+	.pill.pending {
+		border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+		color: var(--muted);
+	}
+	.spin {
+		width: 10px;
+		height: 10px;
+		border-radius: 50%;
+		border: 2px solid color-mix(in srgb, var(--accent) 35%, transparent);
+		border-top-color: var(--accent);
+		animation: spin 0.9s linear infinite;
+	}
+	.vote-note {
+		font-size: 10px;
+		line-height: 1.25;
+		color: var(--muted);
+		text-align: right;
+		text-wrap: balance;
+	}
 	.ring {
 		position: relative;
 		width: 46px;
@@ -255,6 +393,13 @@
 		.tray-sep,
 		.tray-cell:not(.now) {
 			display: none;
+		}
+		.vote-note {
+			display: none;
+		}
+		.pill {
+			padding: 7px 10px;
+			font-size: 11px;
 		}
 	}
 </style>

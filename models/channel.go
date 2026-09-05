@@ -28,6 +28,11 @@ type Channel struct {
 	// passphrase — TLS is its lock.) Never serialised: the admin API
 	// reports only whether one is set.
 	Passphrase string `json:"-"`
+
+	// PauseVoteEnabled is the room's own switch for viewer pause votes
+	// (default on). Votes also need the sender to advertise the control
+	// and to hold a control connection.
+	PauseVoteEnabled bool `json:"pauseVoteEnabled"`
 }
 
 // ChannelKey is one stream key a room accepts, with an optional comment —

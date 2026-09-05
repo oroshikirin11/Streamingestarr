@@ -3,7 +3,9 @@
 	import Hls from 'hls.js';
 	import { sound, setSoundVolume, setSoundMuted, setForcedMute } from '../sound.js';
 
-	let { channelId = 'main', clockSkewMs = 0, paused = false } = $props();
+	let { channelId = 'main', clockSkewMs = 0, paused = false, pausedBy = '' } = $props();
+	// The veil names who paused: the room's vote or the host.
+	const pausedText = $derived(pausedBy === 'viewers' ? 'paused by viewer vote' : pausedBy === 'host' ? 'paused by the host' : 'paused');
 
 	let videoEl;
 	let frameEl;
@@ -436,7 +438,7 @@
 		<video bind:this={videoEl} playsinline muted={muted}></video>
 		{#if paused}
 			<div class="paused-veil">
-				<span class="paused-chip">⏸&nbsp; paused by the streamer</span>
+				<span class="paused-chip">⏸&nbsp; {pausedText}</span>
 			</div>
 		{/if}
 	<div class="sound">

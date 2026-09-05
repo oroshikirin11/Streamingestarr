@@ -51,6 +51,10 @@ type ChannelRuntime struct {
 	handler    transcoder.HLSHandler
 	fileWriter transcoder.FileWriterReceiverService
 
+	// pauseVote is the room's viewer pause-vote state and its sender
+	// control connection (pausevote.go, control.go).
+	pauseVote pauseVoteRoom
+
 	viewersLock sync.RWMutex
 }
 

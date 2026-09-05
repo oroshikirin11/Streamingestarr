@@ -65,6 +65,8 @@ func Setup(db *sql.DB) {
 		"segment_format":  `ALTER TABLE channels ADD COLUMN segment_format TEXT NOT NULL DEFAULT ''`,
 		"output_variants": `ALTER TABLE channels ADD COLUMN output_variants TEXT NOT NULL DEFAULT ''`,
 		"passphrase":      `ALTER TABLE channels ADD COLUMN passphrase TEXT NOT NULL DEFAULT ''`,
+		// Viewer pause votes, on unless an admin switches a room off.
+		"pause_vote_enabled": `ALTER TABLE channels ADD COLUMN pause_vote_enabled INTEGER NOT NULL DEFAULT 1`,
 	} {
 		if !columnExists(db, "channels", col) {
 			if _, err := db.Exec(ddl); err != nil {
@@ -120,8 +122,8 @@ func columnExists(db *sql.DB, table, column string) bool {
 func GetChannel(id string) *models.Channel {
 	var c models.Channel
 	var variantsJSON string
-	row := _db.QueryRow("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants, passphrase FROM channels WHERE id = ?", id)
-	if err := row.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON, &c.Passphrase); err != nil {
+	row := _db.QueryRow("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants, passphrase, pause_vote_enabled FROM channels WHERE id = ?", id)
+	if err := row.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON, &c.Passphrase, &c.PauseVoteEnabled); err != nil {
 		return nil
 	}
 	if variantsJSON != "" {
@@ -133,7 +135,7 @@ func GetChannel(id string) *models.Channel {
 
 // ListChannels returns all channels with their keys, oldest first.
 func ListChannels() []models.Channel {
-	rows, err := _db.Query("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants, passphrase FROM channels ORDER BY created_at")
+	rows, err := _db.Query("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants, passphrase, pause_vote_enabled FROM channels ORDER BY created_at")
 	if err != nil {
 		return nil
 	}
@@ -142,7 +144,7 @@ func ListChannels() []models.Channel {
 	for rows.Next() {
 		var c models.Channel
 		var variantsJSON string
-		if err := rows.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON, &c.Passphrase); err == nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON, &c.Passphrase, &c.PauseVoteEnabled); err == nil {
 			if variantsJSON != "" {
 				_ = json.Unmarshal([]byte(variantsJSON), &c.OutputVariants)
 			}
@@ -313,6 +315,12 @@ func SetChannelConfig(id string, c models.Channel) error {
 // so the global one applies again.
 func SetChannelPassphrase(id, passphrase string) error {
 	_, err := _db.Exec(`UPDATE channels SET passphrase = ? WHERE id = ?`, passphrase, id)
+	return err
+}
+
+// SetChannelPauseVote flips the room's "viewers may vote to pause" switch.
+func SetChannelPauseVote(id string, enabled bool) error {
+	_, err := _db.Exec(`UPDATE channels SET pause_vote_enabled = ? WHERE id = ?`, enabled, id)
 	return err
 }
 

@@ -38,6 +38,10 @@ const (
 	ErrorNeedsRegistration EventType = "ERROR_NEEDS_REGISTRATION" // nolint:gosec
 	// ErrorMaxConnectionsExceeded is an error returned when the server determined it should not handle more connections.
 	ErrorMaxConnectionsExceeded EventType = "ERROR_MAX_CONNECTIONS_EXCEEDED"
+	// PauseVote is a viewer casting or withdrawing a pause/resume vote.
+	PauseVote EventType = "PAUSE_VOTE"
+	// PauseVoteState is the room's vote tally, sent on every change and on connect.
+	PauseVoteState EventType = "PAUSE_VOTE_STATE"
 	// ErrorUserDisabled is an error returned when the connecting user has been previously banned/disabled.
 	ErrorUserDisabled EventType = "ERROR_USER_DISABLED"
 )

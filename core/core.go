@@ -57,6 +57,9 @@ func Start() error {
 	if err := chat.Start(getChannelStatus); err != nil {
 		log.Errorln(err)
 	}
+	// Viewer pause votes: chat carries the messages, the rooms keep the
+	// tally.
+	chat.SetPauseVoteHooks(pauseVoteHook, presenceHook)
 
 	// start the rtmp server
 	go rtmp.Start(setStreamAsConnected, setBroadcaster, isStreamKeyBusy)

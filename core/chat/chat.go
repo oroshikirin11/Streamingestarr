@@ -48,6 +48,80 @@ func Start(getChannelStatusFunc func(channelID string) models.Status) error {
 	return nil
 }
 
+// Pause-vote hooks. The vote state lives in core (alongside the room
+// runtime); chat only carries the messages and reports who is seated.
+// core sets these at start — chat cannot import core.
+var (
+	// pauseVoteHandler receives a viewer's PAUSE_VOTE: action is
+	// "pause", "resume" or "withdraw".
+	pauseVoteHandler func(channelID string, user *models.User, action string)
+	// presenceChangedHandler fires when a room's distinct-user count may
+	// have changed — a join or the last connection of a user closing.
+	// clientID is the joining connection (0 on leave) so the room can
+	// hand it the current tally even when nothing changed.
+	presenceChangedHandler func(channelID string, clientID uint)
+)
+
+// SetPauseVoteHooks wires the room-side vote logic in.
+func SetPauseVoteHooks(onVote func(channelID string, user *models.User, action string), onPresence func(channelID string, clientID uint)) {
+	pauseVoteHandler = onVote
+	presenceChangedHandler = onPresence
+}
+
+// DistinctUserCount is how many different users hold at least one
+// connection in a room — the people who can press the vote button.
+func DistinctUserCount(channelID string) int {
+	if _server == nil {
+		return 0
+	}
+	_server.mu.RLock()
+	defer _server.mu.RUnlock()
+	seen := map[string]struct{}{}
+	for _, client := range _server.clients {
+		if client == nil || client.ChannelID != channelID || client.User == nil {
+			continue
+		}
+		seen[client.User.ID] = struct{}{}
+	}
+	return len(seen)
+}
+
+// UserSeated reports whether a user still holds a connection in a room.
+func UserSeated(channelID, userID string) bool {
+	if _server == nil {
+		return false
+	}
+	_server.mu.RLock()
+	defer _server.mu.RUnlock()
+	for _, client := range _server.clients {
+		if client != nil && client.ChannelID == channelID && client.User != nil && client.User.ID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// SendPayloadToClient delivers one payload to one connection.
+func SendPayloadToClient(clientID uint, payload events.EventPayload) {
+	if _server == nil {
+		return
+	}
+	_server.mu.RLock()
+	client, ok := _server.clients[clientID]
+	_server.mu.RUnlock()
+	if ok && client != nil {
+		client.sendPayload(payload)
+	}
+}
+
+// SendPayloadToChannel delivers a raw payload to everyone in a room.
+func SendPayloadToChannel(channelID string, payload events.EventPayload) {
+	if _server == nil {
+		return
+	}
+	_ = _server.BroadcastToChannel(channelID, payload)
+}
+
 // GetClientsForUser will return chat connections that are owned by a specific user.
 func GetClientsForUser(userID string) ([]*Client, error) {
 	_server.mu.Lock()

@@ -69,7 +69,18 @@ func getStatusResponse(channelID string) webStatusResponse {
 			response.VideoRange = vr
 		}
 	}
+	enabled, controlConnected := channel.PauseVoteInfo()
+	response.PauseVote = &pauseVoteStatus{Enabled: enabled, ControlConnected: controlConnected}
 	return response
+}
+
+// pauseVoteStatus is the room's side of viewer pause votes; the sender's
+// side (controls, pausedBy, pausedAt, pending) rides on nowPlaying.
+type pauseVoteStatus struct {
+	// Enabled is the room's admin switch.
+	Enabled bool `json:"enabled"`
+	// ControlConnected is whether a sender control connection is up.
+	ControlConnected bool `json:"controlConnected"`
 }
 
 type webStatusResponse struct {
@@ -86,4 +97,5 @@ type webStatusResponse struct {
 	ViewerCount   int                   `json:"viewerCount,omitempty"`
 	Online        bool                  `json:"online"`
 	VideoRange    string                `json:"videoRange,omitempty"` // "PQ" | "HLG", absent for SDR
+	PauseVote     *pauseVoteStatus      `json:"pauseVote,omitempty"`
 }

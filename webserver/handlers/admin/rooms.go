@@ -36,20 +36,23 @@ type roomResponse struct {
 	// Whether the room has its own SRT passphrase; the value itself
 	// never leaves the server.
 	PassphraseSet bool `json:"passphraseSet"`
+	// PauseVoteEnabled is the room's "viewers may vote to pause" switch.
+	PauseVoteEnabled bool `json:"pauseVoteEnabled"`
 }
 
 func roomToResponse(ch models.Channel) roomResponse {
 	out := roomResponse{
-		ID:             ch.ID,
-		Name:           ch.Name,
-		Keys:           ch.Keys,
-		IsDefault:      ch.ID == channelrepository.DefaultChannelID,
-		Title:          ch.Title,
-		WelcomeMessage: ch.WelcomeMessage,
-		LatencyLevel:   ch.LatencyLevel,
-		SegmentFormat:  ch.SegmentFormat,
-		OutputVariants: ch.OutputVariants,
-		PassphraseSet:  ch.Passphrase != "",
+		ID:               ch.ID,
+		Name:             ch.Name,
+		Keys:             ch.Keys,
+		IsDefault:        ch.ID == channelrepository.DefaultChannelID,
+		Title:            ch.Title,
+		WelcomeMessage:   ch.WelcomeMessage,
+		LatencyLevel:     ch.LatencyLevel,
+		SegmentFormat:    ch.SegmentFormat,
+		OutputVariants:   ch.OutputVariants,
+		PassphraseSet:    ch.Passphrase != "",
+		PauseVoteEnabled: ch.PauseVoteEnabled,
 	}
 	if out.OutputVariants == nil {
 		out.OutputVariants = []models.StreamOutputVariant{}
@@ -279,4 +282,34 @@ func SetRoomPassphrase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webutils.WriteSimpleResponse(w, true, "room SRT passphrase set")
+}
+
+// SetRoomPauseVote flips a room's "viewers may vote to pause" switch:
+// {"id": "...", "enabled": true|false}. Takes effect at once — the room
+// re-evaluates its tally and tells the viewers.
+func SetRoomPauseVote(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID      string `json:"id"`
+		Enabled *bool  `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" || req.Enabled == nil {
+		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\", \"enabled\": true|false}")
+		return
+	}
+	if channelrepository.GetChannel(req.ID) == nil {
+		webutils.WriteSimpleResponse(w, false, "no such room")
+		return
+	}
+	if err := channelrepository.SetChannelPauseVote(req.ID, *req.Enabled); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	if c := core.GetChannelRuntime(req.ID); c != nil {
+		c.RecomputePauseVote()
+	}
+	if *req.Enabled {
+		webutils.WriteSimpleResponse(w, true, "viewers may vote to pause")
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "pause votes are off for this room")
 }

@@ -40,8 +40,9 @@ your sender. That's the whole setup.
 | `9711` | raw-TCP ingest |
 
 All state lives in `./data` (SQLite + HLS scratch). ffmpeg ships inside the
-image. Update with `./update.sh` — it pulls, rebuilds and restarts, keeps
-`./data`, and refuses to run if that volume is missing from the compose file.
+image. Update with `./update.sh` (`chmod +x update.sh` once if it is not
+executable) — it pulls, rebuilds and restarts, keeps `./data`, and refuses to
+run if that volume is missing from the compose file.
 
 ## Setup — Standalone
 

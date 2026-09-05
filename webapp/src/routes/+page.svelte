@@ -117,7 +117,7 @@
 	{:else if live}
 		<div class="lounge" class:chat-hidden={chatHidden}>
 			<div class="screen-zone">
-				<GlowFrame bind:this={frame} channelId={roomId} clockSkewMs={$clockSkewMs} paused={$status?.nowPlaying?.paused === true} />
+				<GlowFrame bind:this={frame} channelId={roomId} clockSkewMs={$clockSkewMs} paused={$status?.nowPlaying?.paused === true} pausedBy={$status?.nowPlaying?.pausedBy ?? ''} />
 				<NowTray status={$status} clockSkewMs={$clockSkewMs} />
 			</div>
 			{#if !chatHidden}

@@ -10,6 +10,9 @@ const MAX_MESSAGES = 300;
 export const messages = writable([]);
 export const me = writable(null);
 export const connected = writable(false);
+// The room's pause-vote tally (PAUSE_VOTE_STATE): sent on connect and on
+// every change. null until the first frame arrives.
+export const pauseVote = writable(null);
 
 let socket = null;
 let reconnectDelay = 1000;
@@ -108,6 +111,8 @@ export async function connectChat() {
 
 	socket.onclose = async () => {
 		connected.set(false);
+		// Without the socket there is no vote button to press.
+		pauseVote.update((pv) => (pv ? { ...pv, available: false, reason: 'not connected to the room' } : pv));
 		if (closedByUs) return;
 		setTimeout(connectChat, reconnectDelay);
 		reconnectDelay = Math.min(reconnectDelay * 2, 15000);
@@ -136,6 +141,9 @@ function handleEvent(ev) {
 		case 'PING':
 			socket?.send(JSON.stringify({ type: 'PONG' }));
 			break;
+		case 'PAUSE_VOTE_STATE':
+			pauseVote.set(ev);
+			break;
 		case 'VISIBILITY-UPDATE':
 			if (ev.ids && ev.visible === false) {
 				messages.update((list) => list.filter((m) => !ev.ids.includes(m.id)));
@@ -147,6 +155,12 @@ function handleEvent(ev) {
 export function sendChatMessage(body) {
 	if (!socket || socket.readyState !== WebSocket.OPEN) return;
 	socket.send(JSON.stringify({ type: 'CHAT', body }));
+}
+
+// action: 'pause' | 'resume' | 'withdraw'
+export function sendPauseVote(action) {
+	if (!socket || socket.readyState !== WebSocket.OPEN) return;
+	socket.send(JSON.stringify({ type: 'PAUSE_VOTE', action }));
 }
 
 export function requestNameChange(newName) {

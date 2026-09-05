@@ -137,7 +137,8 @@
 			customOutput: (r.outputVariants ?? []).length > 0,
 			outputVariants: r.outputVariants ?? [],
 			passphraseSet: Boolean(r.passphraseSet),
-			passphrase: ''
+			passphrase: '',
+			pauseVoteEnabled: r.pauseVoteEnabled !== false
 		}));
 	}
 
@@ -297,6 +298,15 @@
 		if (r?.success !== false) await loadConfig();
 	}
 
+	// "Paused by viewer vote since 21:14" for the status card.
+	const pausedSince = $derived.by(() => {
+		const pv = status?.pauseVote;
+		if (!pv?.paused) return null;
+		const who = pv.pausedBy === 'viewers' ? 'Paused by viewer vote' : pv.pausedBy === 'host' ? 'Paused by the host' : 'Paused';
+		if (!pv.pausedAt) return who;
+		return `${who} since ${new Date(pv.pausedAt * 1000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`;
+	});
+
 	const uptime = $derived.by(() => {
 		const t = status?.broadcaster?.time;
 		if (!t) return null;
@@ -347,7 +357,7 @@
 				<div class="statusline">
 					<span class="dot" class:live={status?.online}></span>
 					{#if status?.online}
-						<b>Live</b><span class="sep">·</span>{status.viewerCount ?? 0} watching{#if uptime}<span class="sep">·</span>ingest up {uptime}{/if}
+						<b>Live</b><span class="sep">·</span>{status.viewerCount ?? 0} watching{#if uptime}<span class="sep">·</span>ingest up {uptime}{/if}{#if pausedSince}<span class="sep">·</span><b>{pausedSince}</b>{/if}
 					{:else if status?.broadcaster}
 						<b>Ingest connected</b><span class="sep">—</span>buffering to viewers
 					{:else}
@@ -363,6 +373,9 @@
 					<dl>
 						<div><dt>Source</dt><dd>{status.broadcaster.remoteAddr}</dd></div>
 						<div><dt>Connected</dt><dd>{uptime ?? '—'}{uptime ? ' ago' : ''}</dd></div>
+						{#if pausedSince || status?.pauseVote?.advertised}
+							<div><dt>Playback</dt><dd>{pausedSince ?? (status?.pauseVote?.pending ? (status.pauseVote.pending === 'pause' ? 'Pausing…' : 'Resuming…') : 'Playing')}<span class="sep">·</span>{status?.pauseVote?.controlConnected ? 'sender control connected' : 'sender control not connected'}{#if !status?.pauseVote?.enabled}<span class="sep">·</span>pause votes off for this room{/if}</dd></div>
+						{/if}
 						<div><dt>Encoder</dt><dd>{d.encoder || '—'}</dd></div>
 						<div><dt>Video</dt><dd>{[d.videoCodec, d.width ? `${d.width}×${d.height}` : null, d.framerate ? `${d.framerate} fps` : null, kbps(d.videoBitrate)].filter(Boolean).join(' · ') || '—'}</dd></div>
 						<div><dt>Audio</dt><dd>{d.videoOnly ? 'none — video only' : [d.audioCodec, kbps(d.audioBitrate)].filter(Boolean).join(' · ') || '—'}</dd></div>
@@ -543,6 +556,10 @@
 						</div>
 					</div>
 					<p class="hint">Streams that open this room over SRT must use it as the encryption passphrase; it replaces the global SRT passphrase for this room. 10 to 79 characters, no spaces. Applies to the next connection.</p>
+					<label class="switch">
+						<input type="checkbox" bind:checked={r.pauseVoteEnabled} onchange={() => run(async () => { const res = await api.setRoomPauseVote(r.id, r.pauseVoteEnabled); if (res?.success === false) r.pauseVoteEnabled = !r.pauseVoteEnabled; return res; }, r.pauseVoteEnabled ? 'Viewers may vote to pause' : 'Pause votes off')} />
+						<span class="track"></span> Viewers may vote to pause — half the room pauses or resumes the broadcast, when the sender allows it
+					</label>
 					{#if r.isDefault}
 						<p class="hint">This is the main room — the front page. Its stream keys are the list in <b>Stream</b>.</p>
 					{:else}

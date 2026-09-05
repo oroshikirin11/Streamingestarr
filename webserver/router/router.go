@@ -91,6 +91,7 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/rooms/keys", middleware.RequireAdminAuth(admin.SetRoomKeys))
 	r.Post("/api/admin/rooms/config", middleware.RequireAdminAuth(admin.SetRoomConfig))
 	r.Post("/api/admin/rooms/passphrase", middleware.RequireAdminAuth(admin.SetRoomPassphrase))
+	r.Post("/api/admin/rooms/pausevote", middleware.RequireAdminAuth(admin.SetRoomPauseVote))
 	// Playback forensics: viewers report player incidents per room; the
 	// admin reads them next to the segment ledger.
 	r.Post("/api/metrics/player", handlers.ReportPlayerIncidents)
@@ -100,6 +101,10 @@ func Start(enableVerboseLogging bool) error {
 	// Sender helper: which room does a stream key feed (fan-out metadata).
 	r.Post("/api/integrations/metadata/resolve-channel",
 		middleware.RequireExternalAPIAccessToken(models.ScopeCanSendSystemMessages, handlers.ResolveChannel))
+
+	// The sender's control channel for viewer pause votes — a websocket,
+	// so the token rides the query string like /ws.
+	r.Get("/api/integrations/control", handlers.ControlConnection)
 
 	// mount the api
 	r.Mount("/api/", handlers.New().Handler())

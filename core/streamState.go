@@ -81,6 +81,8 @@ func (c *ChannelRuntime) SetStreamAsDisconnected() {
 	c.broadcaster = nil
 	c.rememberNowPlaying()
 	c.deferNowPlayingDrop()
+	// Votes belong to the broadcast that just ended.
+	c.resetPauseVote()
 
 	offlineFilename := "offline-v2.ts"
 

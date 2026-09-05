@@ -15,8 +15,8 @@ import (
 	"streamingestarr/config"
 	"streamingestarr/core/chat"
 	"streamingestarr/core/storageproviders"
-	"streamingestarr/persistence/channelrepository"
 	"streamingestarr/models"
+	"streamingestarr/persistence/channelrepository"
 )
 
 // Metadata is held in memory and mirrored to disk
@@ -81,6 +81,17 @@ func (c *ChannelRuntime) SetNowPlaying(np models.NowPlaying) {
 
 	_metadataLock.Lock()
 	previous := c.nowPlaying
+	// The pause clock survives pushes that do not restate it; a pause the
+	// push introduces starts now.
+	if np.Paused && np.PausedAt == 0 {
+		if previous != nil && previous.Paused && previous.PausedAt != 0 {
+			np.PausedAt = previous.PausedAt
+		} else {
+			np.PausedAt = np.ReceivedAt.Unix()
+		}
+	} else if !np.Paused {
+		np.PausedAt = 0
+	}
 	c.nowPlaying = &np
 	// Only what this room actually aired can become its memory. A push
 	// for a room with no stream connected is metadata about somewhere
@@ -96,6 +107,9 @@ func (c *ChannelRuntime) SetNowPlaying(np models.NowPlaying) {
 	_metadataLock.Unlock()
 
 	persistMetadata()
+
+	// The push is the sender's word on paused/pending/controls too.
+	c.applyPauseTransition()
 
 	changed := previous == nil || previous.Title != np.Title || previous.Subtitle != np.Subtitle
 	if np.Announce && changed && np.Title != "" && onAir {
@@ -171,6 +185,7 @@ func (c *ChannelRuntime) dropNowPlaying() {
 	// a following SDR stream isn't mis-signaled as HDR before its first push.
 	config.SetInboundVideoRange(c.ID, config.VideoRangeSDR)
 	persistMetadata()
+	c.resetPauseVote()
 }
 
 // GetLastPlayed returns what THIS room watched most recently, or nil —

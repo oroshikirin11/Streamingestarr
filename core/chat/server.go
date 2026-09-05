@@ -139,6 +139,12 @@ func (s *Server) Addclient(conn *websocket.Conn, user *models.User, accessToken 
 
 	client.sendConnectedClientInfo()
 
+	// The room's vote tally: the denominator moved, and the newcomer
+	// needs the current state either way.
+	if presenceChangedHandler != nil {
+		presenceChangedHandler(channelID, client.Id)
+	}
+
 	if getChannelStatus(channelID).Online {
 		if shouldSendJoinedMessages {
 			s.sendUserJoinedMessage(client)
@@ -175,6 +181,18 @@ func (s *Server) handleClientDisconnected(c *Client) {
 	}
 
 	additionalClientCheck, _ := GetClientsForUser(c.User.ID)
+	stillSeated := false
+	for _, other := range additionalClientCheck {
+		if other.ChannelID == c.ChannelID {
+			stillSeated = true
+			break
+		}
+	}
+	// The room lost a voter (or a vote) when this was the user's last
+	// connection there; the tally recomputes on every leave.
+	if !stillSeated && presenceChangedHandler != nil {
+		presenceChangedHandler(c.ChannelID, 0)
+	}
 	if len(additionalClientCheck) > 0 {
 		// This user is still connected to chat with another client.
 		return
@@ -435,6 +453,15 @@ func (s *Server) eventReceived(event chatClientEvent) {
 	c := event.client
 	u := c.User
 
+	// A pause vote is a viewer action, not chat: it needs no chat
+	// privileges, only a seat in the room.
+	if pv, ok := parsePauseVote(event.data); ok {
+		if pauseVoteHandler != nil && u != nil {
+			pauseVoteHandler(c.ChannelID, u, pv)
+		}
+		return
+	}
+
 	// If established chat user only mode is enabled and the user is not old
 	// enough then reject this event and send them an informative message.
 	if u != nil && configRepository.GetChatEstbalishedUsersOnlyMode() && time.Since(event.client.User.CreatedAt) < config.GetDefaults().ChatEstablishedUserModeTimeDuration && !u.IsModerator() {
@@ -521,4 +548,20 @@ func (s *Server) sendActionToClient(c *Client, message string) {
 	clientMessage.SetDefaults()
 	clientMessage.RenderBody()
 	s.Send(clientMessage.GetBroadcastPayload(), c)
+}
+
+// parsePauseVote recognises {"type":"PAUSE_VOTE","action":"pause"|"resume"|"withdraw"}.
+func parsePauseVote(data []byte) (string, bool) {
+	var msg struct {
+		Type   string `json:"type"`
+		Action string `json:"action"`
+	}
+	if err := json.Unmarshal(data, &msg); err != nil || msg.Type != events.PauseVote {
+		return "", false
+	}
+	switch msg.Action {
+	case "pause", "resume", "withdraw":
+		return msg.Action, true
+	}
+	return "", false
 }
