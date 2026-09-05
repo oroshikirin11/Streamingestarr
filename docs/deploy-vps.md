@@ -93,12 +93,17 @@ carries the line, commented:
       - /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory:/certs:ro
 ```
 
-`docker compose up -d` to pick the mount up, then in admin → Stream →
-TCP ingest set the mode and the two paths *as seen inside the container*:
-`/certs/<domain>/<domain>.crt` and `/certs/<domain>/<domain>.key`. Save
-loads the pair on the spot and refuses to store anything that does not
-load (the error names the file and the reason — "permission denied" means
-the ACLs above are missing). The status line under the fields shows the
+`docker compose up -d` to pick the mount up — `restart` keeps the old
+mounts, only `up -d` recreates the container with a changed volumes list.
+Then in admin → Stream → TCP ingest set the mode and the two paths *as
+seen inside the container*: `/certs/<domain>/<domain>.crt` and
+`/certs/<domain>/<domain>.key`. Press **Browse…** next to either field to
+pick them instead of typing: the list is what the container sees, it says
+when `/certs` is not mounted, and marks files uid 101 cannot read. (If you
+mounted the domain folder itself, the paths are `/certs/<domain>.crt` and
+`.key` — Browse shows which.) Save loads the pair on the spot and refuses
+to store anything that does not load (the error names the file and the
+reason — "permission denied" means the ACLs above are missing). The status line under the fields shows the
 certificate's subject and expiry; it is re-read whenever the files change,
 so Caddy's renewals apply without a restart. Mode and paths apply to the
 next connection.

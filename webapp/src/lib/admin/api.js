@@ -47,6 +47,9 @@ export const setTCPIngestEnabled = (value) => post('/api/admin/config/tcp/enable
 export const setTCPIngestPort = (value) => post('/api/admin/config/tcp/port', { value });
 export const setTCPIngestTLS = (mode, certFile, keyFile) =>
 	post('/api/admin/config/tcp/tls', { mode, certFile, keyFile });
+// One directory inside the container, for picking the certificate pair.
+export const browseTCPIngestTLS = (path) =>
+	req('/api/admin/config/tcp/tls/browse?path=' + encodeURIComponent(path || ''));
 export const getLogs = () => req('/api/admin/logs');
 export const getWarnings = () => req('/api/admin/logs/warnings');
 export const getIPBans = () => req('/api/admin/chat/users/ipbans');

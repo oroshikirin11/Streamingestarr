@@ -80,6 +80,7 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/config/tcp/enabled", middleware.RequireAdminAuth(handlers.SetTCPIngestEnabled))
 	r.Post("/api/admin/config/tcp/port", middleware.RequireAdminAuth(handlers.SetTCPIngestPort))
 	r.Post("/api/admin/config/tcp/tls", middleware.RequireAdminAuth(handlers.SetTCPIngestTLS))
+	r.Get("/api/admin/config/tcp/tls/browse", middleware.RequireAdminAuth(handlers.BrowseTCPIngestTLS))
 
 	// Rooms: the viewer lobby list, and the admin CRUD (cap 5, key-routed —
 	// no per-room ports).

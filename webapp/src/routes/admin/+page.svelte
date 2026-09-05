@@ -293,6 +293,38 @@
 	const tcpURL = $derived(`tcp://${host}:${tcpIngestPort}`);
 	const tcpTlsExpired = $derived(!!tcpTls.certNotAfter && new Date(tcpTls.certNotAfter) < new Date());
 	const tcpTlsDate = $derived(tcpTls.certNotAfter ? new Date(tcpTls.certNotAfter).toLocaleDateString() : '');
+	// The certificate browser: what the container sees under a path, so
+	// the admin picks the files instead of guessing what a mount produced.
+	let browse = $state(null); // { target: 'cert' | 'key', path, parent, entries, error, loading }
+	const dirOf = (p) => { const i = p.lastIndexOf('/'); return i > 0 ? p.slice(0, i) : ''; };
+	async function openBrowse(target) {
+		if (browse?.target === target) { browse = null; return; }
+		browse = { target, path: '', parent: '', entries: [], error: '', loading: true };
+		await browseTo(dirOf((target === 'cert' ? tcpTlsCert : tcpTlsKey).trim()));
+	}
+	async function browseTo(path) {
+		if (!browse) return;
+		browse.loading = true;
+		try {
+			const r = await api.browseTCPIngestTLS(path);
+			browse = { ...browse, path: r.path, parent: r.parent, entries: r.entries ?? [], error: r.error ?? '', loading: false };
+		} catch {
+			browse = { ...browse, error: 'The receiver did not answer.', loading: false };
+		}
+	}
+	function pickFile(e) {
+		if (!browse) return;
+		if (browse.target === 'cert') {
+			tcpTlsCert = e.path;
+			// A sibling key with the same stem fills an empty key field.
+			const stem = e.name.replace(/\.(crt|pem|cer)$/i, '');
+			const key = browse.entries.find((x) => !x.dir && x.name !== e.name && /\.(key|pem)$/i.test(x.name) && x.name.replace(/\.(key|pem)$/i, '') === stem);
+			if (key && !tcpTlsKey.trim()) tcpTlsKey = key.path;
+		} else {
+			tcpTlsKey = e.path;
+		}
+		browse = null;
+	}
 	async function saveTcpTls() {
 		const r = await run(() => api.setTCPIngestTLS(tcpTlsMode, tcpTlsCert.trim(), tcpTlsKey.trim()));
 		if (r?.success !== false) await loadConfig();
@@ -653,17 +685,56 @@
 					</div>
 					<div class="field">
 						<label for="tcptlscert">Certificate (PEM path in the container)</label>
-						<input id="tcptlscert" class="mono" bind:value={tcpTlsCert} placeholder="/certs/<domain>/<domain>.crt" autocomplete="off" spellcheck="false" />
+						<div class="with-browse">
+							<input id="tcptlscert" class="mono" bind:value={tcpTlsCert} placeholder="/certs/<domain>/<domain>.crt" autocomplete="off" spellcheck="false" />
+							<button class="ghost small" class:active={browse?.target === 'cert'} onclick={() => openBrowse('cert')} title="Pick the file as the container sees it">Browse…</button>
+						</div>
 					</div>
 					<div class="field">
 						<label for="tcptlskey">Key (PEM path in the container)</label>
-						<input id="tcptlskey" class="mono" bind:value={tcpTlsKey} placeholder="/certs/<domain>/<domain>.key" autocomplete="off" spellcheck="false" />
+						<div class="with-browse">
+							<input id="tcptlskey" class="mono" bind:value={tcpTlsKey} placeholder="/certs/<domain>/<domain>.key" autocomplete="off" spellcheck="false" />
+							<button class="ghost small" class:active={browse?.target === 'key'} onclick={() => openBrowse('key')} title="Pick the file as the container sees it">Browse…</button>
+						</div>
 					</div>
 					<div class="field compact">
 						<label>&nbsp;</label>
 						<button class="ghost" onclick={saveTcpTls}>Save TLS</button>
 					</div>
 				</div>
+				{#if browse}
+					<div class="browse" aria-live="polite">
+						<div class="browse-head">
+							<span class="mono-text">{browse.path || '…'}</span>
+							<span class="browse-for">picking the {browse.target === 'cert' ? 'certificate' : 'key'} — as the container sees it</span>
+							<button class="ghost small" onclick={() => (browse = null)}>Close</button>
+						</div>
+						{#if browse.error}
+							<p class="hint danger-text">{browse.error}</p>
+						{/if}
+						<ul class="browse-list">
+							{#if browse.path && browse.path !== '/'}
+								<li><button class="browse-row dir" onclick={() => browseTo(browse.parent)}>..</button></li>
+							{/if}
+							{#each browse.entries as e (e.path)}
+								<li>
+									{#if e.dir}
+										<button class="browse-row dir" class:unreadable={!e.readable} onclick={() => browseTo(e.path)}>
+											{e.name}/{#if !e.readable}<span class="note">no read access</span>{/if}
+										</button>
+									{:else}
+										<button class="browse-row" class:pem={e.pem} class:unreadable={!e.readable} onclick={() => pickFile(e)} title={e.readable ? 'Use this file' : 'The container cannot read this file — see the setfacl commands in docs/deploy-vps.md'}>
+											{e.name}<span class="note">{!e.readable ? 'no read access' : e.pem ? 'PEM' : ''}</span>
+										</button>
+									{/if}
+								</li>
+							{/each}
+							{#if !browse.loading && !browse.error && browse.entries.length === 0}
+								<li class="hint">Empty directory.</li>
+							{/if}
+						</ul>
+					</div>
+				{/if}
 				{#if tcpTls.certOk}
 					<p class="hint" class:danger-text={tcpTlsExpired}>Certificate: {tcpTls.certSubject}, {tcpTlsExpired ? 'EXPIRED on' : 'valid until'} {tcpTlsDate}{tcpTls.mode === 'off' ? ' (TLS is off)' : ''}</p>
 				{:else if tcpTls.certError}
@@ -1016,6 +1087,24 @@
 	button:disabled { opacity: 0.4; cursor: default; }
 	button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); font-weight: 500; }
 	button.ghost:hover { color: var(--accent); border-color: var(--accent); }
+	button.small { padding: 6px 10px; font-size: 12px; }
+	button.ghost.active { color: var(--accent); border-color: var(--accent); }
+	.with-browse { display: flex; gap: 8px; align-items: center; }
+	.with-browse input { flex: 1; min-width: 0; }
+	.browse { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; background: var(--surface-2); }
+	.browse-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+	.browse-head .browse-for { color: var(--muted); font-size: 12px; flex: 1; }
+	.browse-list { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow: auto; }
+	.browse-row {
+		display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+		background: transparent; border: 0; border-radius: 6px; padding: 5px 6px;
+		font-family: ui-monospace, monospace; font-size: 12.5px; font-weight: 500; color: inherit;
+	}
+	.browse-row:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+	.browse-row.dir { color: var(--accent); }
+	.browse-row.pem { font-weight: 600; }
+	.browse-row .note { margin-left: auto; color: var(--muted); font-size: 11px; font-family: inherit; }
+	.browse-row.unreadable .note { color: var(--danger); }
 	button.tiny { padding: 5px 11px; font-size: 12px; }
 	button.danger { background: var(--danger); color: #16090a; }
 	.danger-text:hover { color: var(--danger) !important; border-color: var(--danger) !important; }
