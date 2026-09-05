@@ -236,7 +236,9 @@ func AddChannel(id, name, streamKey string) error {
 	if streamKey == "" {
 		return errors.New("a room needs a stream key")
 	}
-	res, err := _db.Exec(`INSERT OR IGNORE INTO channels(id, name) VALUES(?, ?)`, id, name)
+	// A relay token from the first day: a room switched to relay later must
+	// have links at once, not after the next restart's backfill.
+	res, err := _db.Exec(`INSERT OR IGNORE INTO channels(id, name, relay_token) VALUES(?, ?, ?)`, id, name, NewRelayToken())
 	if err != nil {
 		return err
 	}

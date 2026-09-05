@@ -96,8 +96,17 @@ func UnlockRoom(r *http.Request, channelID, password string) error {
 // server: the request's host and scheme, the RTSP port from config.
 // Only the enabled kinds are present, in canonical order.
 func RelayLinks(r *http.Request, ch *models.Channel) map[string]string {
-	if ch == nil || !ch.Relays() || ch.RelayToken == "" {
+	if ch == nil || !ch.Relays() {
 		return map[string]string{}
+	}
+	if ch.RelayToken == "" {
+		// A room from before tokens existed, created between the backfill
+		// and now: mint one here rather than show an empty link.
+		token, err := channelrepository.RotateRelayToken(ch.ID)
+		if err != nil {
+			return map[string]string{}
+		}
+		ch.RelayToken = token
 	}
 	host := r.Host
 	if fwd := r.Header.Get("X-Forwarded-Host"); fwd != "" {

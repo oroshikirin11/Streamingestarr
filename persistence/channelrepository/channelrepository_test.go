@@ -63,3 +63,18 @@ func TestPauseVoteSwitchPersists(t *testing.T) {
 		t.Fatal("switch on did not persist")
 	}
 }
+
+func TestNewRoomCarriesARelayToken(t *testing.T) {
+
+	if err := AddChannel("relay-room", "Relay Room", "key-1"); err != nil {
+		t.Fatal(err)
+	}
+	ch := GetChannel("relay-room")
+	if ch == nil || len(ch.RelayToken) < 32 {
+		t.Fatalf("a new room must carry a relay token, got %q", ch.RelayToken)
+	}
+	rotated, err := RotateRelayToken("relay-room")
+	if err != nil || rotated == ch.RelayToken || GetChannel("relay-room").RelayToken != rotated {
+		t.Fatal("rotation must store a different token")
+	}
+}
