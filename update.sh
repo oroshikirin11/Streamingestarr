@@ -114,7 +114,13 @@ if [ "$COMPOSE_EDITED" = 1 ] && [ "$DRY" = 0 ]; then
   git checkout --quiet stash@{0} -- docker-compose.yml
   git stash drop --quiet
   git reset --quiet -- docker-compose.yml
-  NEW_LINES="$(printf '%s\n' "$UPSTREAM_COMPOSE" | grep -E '^\s*-\s*"[0-9]+:[0-9]+' | grep -vxF -f <(grep -E '^\s*-\s*"[0-9]+:[0-9]+' docker-compose.yml) || true)"
+  # Compared by the CONTAINER side of each mapping: a host port you remapped
+  # is still the same service, not a missing one.
+  MINE="$(grep -oE '"[0-9]+:[0-9]+(/[a-z]+)?"' docker-compose.yml | sed -E 's/"[0-9]+:([0-9]+(\/[a-z]+)?)"/\1/' || true)"
+  NEW_LINES="$(printf '%s\n' "$UPSTREAM_COMPOSE" | grep -E '^\s*-\s*"[0-9]+:[0-9]+' | while IFS= read -r line; do
+    cport="$(printf '%s' "$line" | grep -oE '"[0-9]+:[0-9]+(/[a-z]+)?"' | sed -E 's/"[0-9]+:([0-9]+(\/[a-z]+)?)"/\1/')"
+    printf '%s\n' "$MINE" | grep -qxF "$cport" || printf '%s\n' "$line"
+  done)"
   if [ -n "$NEW_LINES" ]; then
     bold "Upstream docker-compose.yml has port lines yours does not:"
     printf '%s\n' "$NEW_LINES" | sed 's/^/  /'
