@@ -119,11 +119,11 @@ Differences from the Jellystreamerr original:
 - **One door, two fields (refined 2026-08-30): Name + Password.** The name
   is yours; the password decides the role. `admin` + the admin password →
   admin session (which also watches and chats — admin implies viewer);
-  any other name + the shared **room password** → viewer session, and the
+  any other name + the shared **site password** → viewer session, and the
   name you entered becomes your proposed chat name (§6). The admin may
-  change the room password — doing so evicts the whole room. No per-viewer
+  change the site password — doing so evicts every viewer. No per-viewer
   accounts and no viewer self-service. First-run setup asks exactly two
-  things: the room password and the admin password.
+  things: the site password and the admin password.
 - **Sessions persist across restarts** (SQLite — Owncast already ships it);
   restarting the service must not log twenty viewers out mid-movie
 - **The gate covers the video itself**: every HLS playlist/segment request

@@ -174,7 +174,7 @@ header {
 
 ## 3. First run
 
-Visit the domain → the setup gate asks for the room password and your
+Visit the domain → the setup gate asks for the site password and your
 admin password. Then in the admin: randomize the stream key (Stream →
 Randomize → Save) and create an access token for Jellystreamerr's
 Streamingestarr mode.

@@ -12,9 +12,7 @@
 	// editable copies
 	let serverName = $state('');
 	let keys = $state([]);
-	let variants = $state([]);
 	let latency = $state(2);
-	let segmentFormat = $state('auto');
 	let srtEnabled = $state(true);
 	let srtPort = $state(9710);
 	let srtPassphrase = $state('');
@@ -51,6 +49,9 @@
 	let rooms = $state([]);
 	let newRoomName = $state('');
 	let roomSel = $state('main');
+	// The room whose page is open in the Rooms section; null is the list.
+	let openRoomId = $state(null);
+	const roomOpen = $derived(openRoomId ? roomsEdit.find((r) => r.id === openRoomId) ?? null : null);
 
 	function toast(text, ok = true) {
 		const id = crypto.randomUUID();
@@ -73,9 +74,7 @@
 		cfg = await api.getServerConfig();
 		serverName = cfg.instanceDetails?.name ?? '';
 		keys = (cfg.streamKeys ?? []).map((k) => ({ key: k.key ?? '', comment: k.comment ?? '' }));
-		variants = structuredClone($state.snapshot(cfg.videoSettings?.videoQualityVariants ?? []));
 		latency = cfg.videoSettings?.latencyLevel ?? 2;
-		segmentFormat = cfg.videoSegmentFormat ?? 'auto';
 		srtEnabled = cfg.srtServerEnabled ?? true;
 		srtPort = cfg.srtServerPort ?? 9710;
 		srtPassphraseSet = cfg.srtPassphraseSet ?? false;
@@ -133,9 +132,9 @@
 			title: r.title ?? '',
 			welcomeMessage: r.welcomeMessage ?? '',
 			latencyLevel: r.latencyLevel ?? -1,
-			segmentFormat: r.segmentFormat ?? '',
-			customOutput: (r.outputVariants ?? []).length > 0,
-			outputVariants: r.outputVariants ?? [],
+			// A ladder or forced container stored by an earlier version:
+			// shown as a notice with a reset, never edited.
+			legacyOutput: (r.outputVariants ?? []).length > 0 || Boolean(r.segmentFormat),
 			passphraseSet: Boolean(r.passphraseSet),
 			passphrase: '',
 			pauseVoteEnabled: r.pauseVoteEnabled !== false
@@ -146,18 +145,28 @@
 		return run(async () => {
 			const rn = await api.renameRoom(r.id, r.name.trim());
 			if (rn?.success === false) return rn;
+			// Container and ladder are never sent: the save resets a room to
+			// the server's passthrough and Auto container.
 			const cf = await api.setRoomConfig(r.id, {
 				title: r.title,
 				welcomeMessage: r.welcomeMessage,
-				latencyLevel: Number(r.latencyLevel),
-				segmentFormat: r.segmentFormat,
-				outputVariants: r.customOutput ? r.outputVariants : []
+				latencyLevel: Number(r.latencyLevel)
 			});
 			if (cf?.success === false) return cf;
+			r.legacyOutput = false;
 			if (!r.isDefault) return api.setRoomKeys(r.id, r.keys.filter((k) => k.key));
 			return cf;
 		}, 'Room saved');
 	}
+
+	// The server-wide ladder and container from an earlier version — the
+	// Video tab is gone, but a stored transcode must never hide.
+	const legacyLadder = $derived.by(() => {
+		const v = cfg?.videoSettings?.videoQualityVariants ?? [];
+		return v.length > 1 || v.some((x) => !x.videoPassthrough || !x.audioPassthrough) ? v.length : 0;
+	});
+	const segmentForced = $derived((cfg?.videoSegmentFormat ?? 'auto') !== 'auto' ? cfg.videoSegmentFormat : '');
+	const PASSTHROUGH = [{ name: 'passthrough', videoPassthrough: true, audioPassthrough: true, cpuUsageLevel: 2 }];
 	const roomStatus = (id) => rooms.find((r) => r.id === id);
 
 	// The rubberband verdict, from the segment ledger. Each measured step
@@ -235,7 +244,18 @@
 		loadConfig().catch(() => {});
 		refreshStatus();
 		const t = setInterval(refreshStatus, 5000);
-		return () => clearInterval(t);
+		// #section or #rooms/<id>: a room page survives a reload and the
+		// back button walks between list and page.
+		const fromHash = () => {
+			const [s, id] = location.hash.slice(1).split('/');
+			if (s && SECTIONS.some(([k]) => k === s)) {
+				if (section !== s) pick(s, false);
+				openRoomId = s === 'rooms' && id ? id : null;
+			}
+		};
+		fromHash();
+		window.addEventListener('hashchange', fromHash);
+		return () => { clearInterval(t); window.removeEventListener('hashchange', fromHash); };
 	});
 
 	function randomKey() {
@@ -268,13 +288,23 @@
 		} catch {}
 	}
 
-	function pick(s) {
+	function pick(s, setHash = true) {
 		section = s;
+		if (s !== 'rooms') openRoomId = null;
+		if (setHash && location.hash !== '#' + s) history.replaceState(null, '', '#' + s);
 		if (s === 'chat') loadModeration();
 		if (s === 'logs') loadLogs();
 		if (s === 'stream') loadTokens();
 		if (s === 'rooms') loadRoomsEdit();
 		if (s === 'status') loadRooms();
+	}
+	function openRoomPage(id) {
+		openRoomId = id;
+		history.pushState(null, '', '#rooms/' + id);
+	}
+	function closeRoomPage() {
+		openRoomId = null;
+		history.pushState(null, '', '#rooms');
 	}
 
 	$effect(() => {
@@ -350,7 +380,6 @@
 		['status', 'Status'],
 		['rooms', 'Rooms'],
 		['stream', 'Stream'],
-		['video', 'Video'],
 		['chat', 'Chat'],
 		['logs', 'Logs'],
 		['settings', 'Settings']
@@ -506,43 +535,64 @@
 			{/if}
 
 		{:else if section === 'rooms'}
-			<hgroup><h1>Rooms</h1><p>Independent theaters on the same ingest ports — the stream key decides which room a broadcast lands in. Empty settings inherit the server defaults from Video and Settings.</p></hgroup>
+			{#if !roomOpen}
+				<hgroup><h1>Rooms</h1><p>Independent theaters on the same ingest ports — the stream key decides which room a broadcast lands in. Open a room to set it up.</p></hgroup>
 
-			{#each roomsEdit as r (r.id)}
+				<div class="roomlist">
+					{#each roomsEdit as r (r.id)}
+						<button class="roomrow" onclick={() => openRoomPage(r.id)}>
+							<span class="dot" class:live={roomStatus(r.id)?.online}></span>
+							<span class="rname">{r.name}</span>
+							<span class="rpath mono-text">/t/{r.id}</span>
+							<span class="rstate">{#if roomStatus(r.id)?.online}live · {roomStatus(r.id)?.viewerCount} watching{:else}resting{/if}</span>
+							<span class="chev" aria-hidden="true">›</span>
+						</button>
+					{/each}
+				</div>
+
 				<div class="card">
-					<header>
-						<h2><span class="dot" class:live={roomStatus(r.id)?.online}></span> {r.name}</h2>
+					<header><h2>New room</h2><p>Each room gets its own theater page at /t/&lt;id&gt;, its own chat, its own keys, and its own configuration.</p></header>
+					<div class="field-row">
+						<div class="field"><label for="roomname">Room name</label><input id="roomname" bind:value={newRoomName} placeholder="Second Screen" /></div>
+					</div>
+					<footer>
+						<button disabled={!newRoomName.trim()} onclick={() => run(async () => { const res = await api.createRoom(newRoomName.trim()); newRoomName = ''; await loadRoomsEdit(); return res; }, 'Room created — copy its key')}>Create room</button>
+					</footer>
+					<p class="hint">Point a sender at the SAME ingest address as always and use one of the room's keys — RTMP, SRT and TCP all route by it. Viewers pick a room at /t/&lt;id&gt;; the front page is the main room.</p>
+				</div>
+			{:else}
+				{#each roomsEdit.filter((x) => x.id === openRoomId) as r (r.id)}
+					<a class="backlink" href="#rooms" onclick={(e) => { e.preventDefault(); closeRoomPage(); }}>← Rooms</a>
+					<hgroup>
+						<h1><span class="dot big" class:live={roomStatus(r.id)?.online}></span> {r.name}</h1>
 						<p>/t/{r.id}
 							{#if roomStatus(r.id)?.online}&nbsp;· live · {roomStatus(r.id)?.viewerCount} watching{:else}&nbsp;· resting{/if}
+							{#if r.isDefault}&nbsp;· the main room, the front page{/if}
 						</p>
-					</header>
-					<div class="field-row">
-						<div class="field">
-							<label for={'roomname-' + r.id}>Name</label>
-							<input id={'roomname-' + r.id} bind:value={r.name} />
+					</hgroup>
+
+					<div class="card">
+						<header><h2>Room</h2></header>
+						<div class="field-row">
+							<div class="field">
+								<label for={'roomname-' + r.id}>Name</label>
+								<input id={'roomname-' + r.id} bind:value={r.name} />
+							</div>
+							<div class="field">
+								<label for={'roomtitle-' + r.id}>Stream title — empty inherits the default</label>
+								<input id={'roomtitle-' + r.id} bind:value={r.title} placeholder="what this theater shows" />
+							</div>
 						</div>
-						<div class="field">
-							<label for={'roomtitle-' + r.id}>Stream title — empty inherits the default</label>
-							<input id={'roomtitle-' + r.id} bind:value={r.title} placeholder="what this theater shows" />
-						</div>
-					</div>
-					<div class="field-row">
 						<div class="field">
 							<label for={'roomwelcome-' + r.id}>Chat welcome — empty inherits the default</label>
 							<input id={'roomwelcome-' + r.id} bind:value={r.welcomeMessage} placeholder="welcome to this room" />
 						</div>
+						<footer><button onclick={() => saveRoom(r)}>Save</button></footer>
 					</div>
-					<div class="field-row">
-						<div class="field">
-							<label for={'roomseg-' + r.id}>Segment container</label>
-							<select id={'roomseg-' + r.id} bind:value={r.segmentFormat}>
-								<option value="">Server default</option>
-								<option value="auto">Auto — fMP4 when the codec needs it</option>
-								<option value="ts">mpegts — always</option>
-								<option value="fmp4">fMP4 — always</option>
-							</select>
-						</div>
-						<div class="field">
+
+					<div class="card">
+						<header><h2>Playback</h2><p>The stream is relayed as it arrives. Latency is the cushion viewers keep; it applies to the room's next broadcast.</p></header>
+						<div class="field compact">
 							<label for={'roomlat-' + r.id}>Latency</label>
 							<select id={'roomlat-' + r.id} bind:value={r.latencyLevel}>
 								<option value={-1}>Server default</option>
@@ -551,81 +601,62 @@
 								<option value={4}>Highest buffer</option>
 							</select>
 						</div>
-					</div>
-					<label class="switch">
-						<input type="checkbox" bind:checked={r.customOutput} onchange={() => { if (r.customOutput && r.outputVariants.length === 0) r.outputVariants = [{ name: 'passthrough', videoPassthrough: true, audioPassthrough: true, cpuUsageLevel: 2 }]; }} />
-						<span class="track"></span> Custom output for this room — off inherits the Video section's variants
-					</label>
-					{#if r.customOutput}
-						{#each r.outputVariants as v, i}
-							<div class="variant">
-								<div class="field"><label for={'rvn' + r.id + i}>Name</label><input id={'rvn' + r.id + i} bind:value={v.name} /></div>
-								<label class="switch"><input type="checkbox" bind:checked={v.videoPassthrough} /><span class="track"></span> Video passthrough</label>
-								<label class="switch"><input type="checkbox" bind:checked={v.audioPassthrough} /><span class="track"></span> Audio passthrough</label>
-								{#if !v.videoPassthrough}
-									<div class="field compact"><label for={'rvb' + r.id + i}>kbps</label><input id={'rvb' + r.id + i} type="number" bind:value={v.videoBitrate} /></div>
-									<div class="field compact"><label for={'rvf' + r.id + i}>fps</label><input id={'rvf' + r.id + i} type="number" bind:value={v.framerate} /></div>
-								{/if}
-								<button class="ghost tiny danger-text remove" onclick={() => (r.outputVariants = r.outputVariants.filter((_, j) => j !== i))}>Remove</button>
-							</div>
-						{/each}
-						<footer>
-							<button class="ghost" onclick={() => (r.outputVariants = [...r.outputVariants, { name: 'passthrough', videoPassthrough: true, audioPassthrough: true, cpuUsageLevel: 2 }])}>Add a variant</button>
-						</footer>
-					{/if}
-					<div class="field-row">
-						<div class="field">
-							<label for={'roompass-' + r.id}>SRT passphrase</label>
-							<input id={'roompass-' + r.id} type="password" bind:value={r.passphrase} autocomplete="new-password"
-								placeholder={r.passphraseSet ? 'set — type a new one to replace it' : 'none — the global SRT passphrase applies'} />
-						</div>
-						<div class="field compact">
-							<label>&nbsp;</label>
-							<div style="display:flex; gap:6px">
-								<button class="ghost" disabled={!r.passphrase.trim()} onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, r.passphrase.trim()); if (res?.success !== false) { r.passphrase = ''; r.passphraseSet = true; } return res; }, 'Passphrase set')}>Set</button>
-								{#if r.passphraseSet}<button class="ghost danger-text" onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, ''); if (res?.success !== false) r.passphraseSet = false; return res; }, 'Passphrase cleared')}>Clear</button>{/if}
-							</div>
-						</div>
-					</div>
-					<p class="hint">Streams that open this room over SRT must use it as the encryption passphrase; it replaces the global SRT passphrase for this room. 10 to 79 characters, no spaces. Applies to the next connection.</p>
-					<label class="switch">
-						<input type="checkbox" bind:checked={r.pauseVoteEnabled} onchange={() => run(async () => { const res = await api.setRoomPauseVote(r.id, r.pauseVoteEnabled); if (res?.success === false) r.pauseVoteEnabled = !r.pauseVoteEnabled; return res; }, r.pauseVoteEnabled ? 'Viewers may vote to pause' : 'Pause votes off')} />
-						<span class="track"></span> Viewers may vote to pause — half the room pauses or resumes the broadcast, when the sender allows it
-					</label>
-					{#if r.isDefault}
-						<p class="hint">This is the main room — the front page. Its stream keys are the list in <b>Stream</b>.</p>
-					{:else}
-						{#each r.keys as k, i}
-							<div class="keyrow">
-								<input class="mono" bind:value={k.key} placeholder="key" />
-								<input class="comment" bind:value={k.comment} placeholder="comment" />
-								<button class="ghost tiny" onclick={() => copy(k.key)}>Copy</button>
-								<button class="ghost tiny" onclick={() => (k.key = randomKey())}>Randomize</button>
-								<button class="ghost tiny danger-text" onclick={() => (r.keys = r.keys.filter((_, j) => j !== i))}>Remove</button>
-							</div>
-						{/each}
-					{/if}
-					<footer>
-						{#if !r.isDefault}
-							<button class="ghost" onclick={() => (r.keys = [...r.keys, { key: randomKey(), comment: '' }])}>Add a key</button>
-							<button class="ghost danger-text" onclick={() => { if (confirm(`Delete the room “${r.name}”? A live broadcast in it ends immediately.`)) run(async () => { const res = await api.deleteRoom(r.id); await loadRoomsEdit(); return res; }, 'Room deleted'); }}>Delete room</button>
+						{#if r.legacyOutput}
+							<p class="hint danger-text">This room still carries a transcode ladder or a forced segment container from an earlier version. Saving resets it to passthrough and the Auto container.</p>
 						{/if}
-						<button onclick={() => saveRoom(r)}>Save</button>
-					</footer>
-					<p class="hint">Latency, container and output changes apply to the room's next broadcast.</p>
-				</div>
-			{/each}
+						<label class="switch">
+							<input type="checkbox" bind:checked={r.pauseVoteEnabled} onchange={() => run(async () => { const res = await api.setRoomPauseVote(r.id, r.pauseVoteEnabled); if (res?.success === false) r.pauseVoteEnabled = !r.pauseVoteEnabled; return res; }, r.pauseVoteEnabled ? 'Viewers may vote to pause' : 'Pause votes off')} />
+							<span class="track"></span> Viewers may vote to pause — half the room pauses or resumes the broadcast, when the sender allows it
+						</label>
+						<footer><button onclick={() => saveRoom(r)}>Save</button></footer>
+					</div>
 
-			<div class="card">
-				<header><h2>New room</h2><p>Each room gets its own theater page at /t/&lt;id&gt;, its own chat, its own keys, and its own configuration.</p></header>
-				<div class="field-row">
-					<div class="field"><label for="roomname">Room name</label><input id="roomname" bind:value={newRoomName} placeholder="Second Screen" /></div>
-				</div>
-				<footer>
-					<button disabled={!newRoomName.trim()} onclick={() => run(async () => { const res = await api.createRoom(newRoomName.trim()); newRoomName = ''; await loadRoomsEdit(); return res; }, 'Room created — copy its key')}>Create room</button>
-				</footer>
-				<p class="hint">Point a sender at the SAME ingest address as always and use one of the room's keys — RTMP, SRT and TCP all route by it. Viewers pick a room at /t/&lt;id&gt;; the front page is the main room.</p>
-			</div>
+					<div class="card">
+						<header><h2>Ingest</h2><p>{#if r.isDefault}The main room's stream keys are the list in <b>Stream</b>.{:else}A sender opens this room with one of these keys on the shared ingest address — RTMP, SRT and TCP all route by it.{/if}</p></header>
+						{#if !r.isDefault}
+							{#each r.keys as k, i}
+								<div class="keyrow">
+									<input class="mono" bind:value={k.key} placeholder="key" />
+									<input class="comment" bind:value={k.comment} placeholder="comment" />
+									<button class="ghost tiny" onclick={() => copy(k.key)}>Copy</button>
+									<button class="ghost tiny" onclick={() => (k.key = randomKey())}>Randomize</button>
+									<button class="ghost tiny danger-text" onclick={() => (r.keys = r.keys.filter((_, j) => j !== i))}>Remove</button>
+								</div>
+							{/each}
+						{/if}
+						<div class="field-row">
+							<div class="field">
+								<label for={'roompass-' + r.id}>SRT passphrase</label>
+								<input id={'roompass-' + r.id} type="password" bind:value={r.passphrase} autocomplete="new-password"
+									placeholder={r.passphraseSet ? 'set — type a new one to replace it' : 'none — the global SRT passphrase applies'} />
+							</div>
+							<div class="field compact">
+								<label>&nbsp;</label>
+								<div style="display:flex; gap:6px">
+									<button class="ghost" disabled={!r.passphrase.trim()} onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, r.passphrase.trim()); if (res?.success !== false) { r.passphrase = ''; r.passphraseSet = true; } return res; }, 'Passphrase set')}>Set</button>
+									{#if r.passphraseSet}<button class="ghost danger-text" onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, ''); if (res?.success !== false) r.passphraseSet = false; return res; }, 'Passphrase cleared')}>Clear</button>{/if}
+								</div>
+							</div>
+						</div>
+						<p class="hint">Streams that open this room over SRT must use it as the encryption passphrase; it replaces the global SRT passphrase for this room. 10 to 79 characters, no spaces. Applies to the next connection.</p>
+						{#if !r.isDefault}
+							<footer>
+								<button class="ghost" onclick={() => (r.keys = [...r.keys, { key: randomKey(), comment: '' }])}>Add a key</button>
+								<button onclick={() => saveRoom(r)}>Save</button>
+							</footer>
+						{/if}
+					</div>
+
+					{#if !r.isDefault}
+						<div class="card">
+							<header><h2>Delete</h2><p>Removes the room, its keys and its chat. A live broadcast in it ends immediately.</p></header>
+							<footer>
+								<button class="ghost danger-text" onclick={() => { if (confirm(`Delete the room “${r.name}”? A live broadcast in it ends immediately.`)) run(async () => { const res = await api.deleteRoom(r.id); closeRoomPage(); await loadRoomsEdit(); return res; }, 'Room deleted'); }}>Delete room</button>
+							</footer>
+						</div>
+					{/if}
+				{/each}
+			{/if}
 
 		{:else if section === 'stream'}
 			<hgroup><h1>Stream</h1><p>Where your source connects, and the keys that open the door.</p></hgroup>
@@ -795,51 +826,6 @@
 				</footer>
 			</div>
 
-		{:else if section === 'video'}
-			<hgroup><h1>Video</h1><p>What happens between the ingest and the viewers — the defaults every room inherits unless its card sets its own.</p></hgroup>
-
-			<div class="card">
-				<header><h2>Output</h2><p>Passthrough relays the incoming stream untouched — the normal case when the sender controls its own encode.</p></header>
-				{#each variants as v, i}
-					<div class="variant">
-						<div class="field"><label for={'vn' + i}>Name</label><input id={'vn' + i} bind:value={v.name} /></div>
-						<label class="switch"><input type="checkbox" bind:checked={v.videoPassthrough} /><span class="track"></span> Video passthrough</label>
-						<label class="switch"><input type="checkbox" bind:checked={v.audioPassthrough} /><span class="track"></span> Audio passthrough</label>
-						{#if !v.videoPassthrough}
-							<div class="field compact"><label for={'vb' + i}>kbps</label><input id={'vb' + i} type="number" bind:value={v.videoBitrate} /></div>
-							<div class="field compact"><label for={'vf' + i}>fps</label><input id={'vf' + i} type="number" bind:value={v.framerate} /></div>
-						{/if}
-						<button class="ghost tiny danger-text remove" onclick={() => (variants = variants.filter((_, j) => j !== i))}>Remove</button>
-					</div>
-				{/each}
-				<footer>
-					<button class="ghost" onclick={() => (variants = [...variants, { name: 'passthrough', videoPassthrough: true, audioPassthrough: true, cpuUsageLevel: 2 }])}>Add a variant</button>
-					<button onclick={() => run(() => api.setOutputVariants(variants))}>Save</button>
-				</footer>
-			</div>
-
-			<div class="card">
-				<header><h2>Delivery</h2></header>
-				<div class="field-row">
-					<div class="field">
-						<label for="segfmt">Segment container</label>
-						<select id="segfmt" bind:value={segmentFormat} onchange={() => run(() => api.setSegmentFormat(segmentFormat))}>
-							<option value="auto">Auto — fMP4 when the codec needs it</option>
-							<option value="ts">mpegts — always</option>
-							<option value="fmp4">fMP4 — always</option>
-						</select>
-					</div>
-					<div class="field">
-						<label for="latency">Latency</label>
-						<select id="latency" bind:value={latency} onchange={() => run(() => api.setConfigValue('video/streamlatencylevel', Number(latency)))}>
-							<option value={0}>Lowest</option><option value={1}>Low</option>
-							<option value={2}>Default</option><option value={3}>High</option>
-							<option value={4}>Highest buffer</option>
-						</select>
-					</div>
-				</div>
-			</div>
-
 		{:else if section === 'chat'}
 			<hgroup><h1>Chat</h1><p>The room's rules, and the tools to keep it kind.</p></hgroup>
 
@@ -949,17 +935,37 @@
 				<footer>
 					<button onclick={() => run(() => api.setConfigValue('name', serverName))}>Save</button>
 				</footer>
-				<p class="hint">Each room's stream title lives on its card in <b>Rooms</b>.</p>
+				<p class="hint">Each room's stream title lives on its page in <b>Rooms</b>.</p>
 			</div>
 
 			<div class="card">
-				<header><h2>Room password</h2><p>Shared by everyone who watches. Changing it ends every session except yours — the whole room re-enters with the new key.</p></header>
+				<header><h2>Playback</h2><p>The stream is relayed as it arrives — no re-encode. Latency is the cushion viewers keep; a room can override it on its page.</p></header>
+				<div class="field compact">
+					<label for="latency">Latency</label>
+					<select id="latency" bind:value={latency} onchange={() => run(() => api.setConfigValue('video/streamlatencylevel', Number(latency)))}>
+						<option value={0}>Lowest</option><option value={1}>Low</option>
+						<option value={2}>Default</option><option value={3}>High</option>
+						<option value={4}>Highest buffer</option>
+					</select>
+				</div>
+				{#if legacyLadder}
+					<p class="hint danger-text">A transcode ladder from an earlier version is still stored ({legacyLadder} variants) — every broadcast is re-encoded on this server.
+						<button class="ghost tiny" onclick={() => run(async () => { const r = await api.setOutputVariants(PASSTHROUGH); await loadConfig(); return r; }, 'Passthrough restored')}>Reset to passthrough</button></p>
+				{/if}
+				{#if segmentForced}
+					<p class="hint">The HLS segment container is forced to {segmentForced}. Auto picks fMP4 only when the codec needs it.
+						<button class="ghost tiny" onclick={() => run(async () => { const r = await api.setSegmentFormat('auto'); await loadConfig(); return r; }, 'Container set to Auto')}>Reset to Auto</button></p>
+				{/if}
+			</div>
+
+			<div class="card">
+				<header><h2>Site password</h2><p>The door: shared by everyone who watches, any room. Changing it ends every session except yours — everyone re-enters with the new key.</p></header>
 				<div class="field">
-					<label for="roompw">New room password</label>
+					<label for="roompw">New site password</label>
 					<input id="roompw" type="password" bind:value={newRoomPw} autocomplete="new-password" />
 				</div>
 				<footer>
-					<button disabled={!newRoomPw} onclick={() => run(async () => { const r = await api.setRoomPassword(newRoomPw); newRoomPw = ''; return r; }, 'Room password changed — everyone else was signed out')}>Change</button>
+					<button disabled={!newRoomPw} onclick={() => run(async () => { const r = await api.setRoomPassword(newRoomPw); newRoomPw = ''; return r; }, 'Site password changed — everyone else was signed out')}>Change</button>
 				</footer>
 			</div>
 
@@ -1141,16 +1147,21 @@
 	.keyrow input.comment { flex: 1 1 90px; min-width: 90px; }
 	.keyrow button { flex: 0 0 auto; }
 
-	/* ---------- variants ---------- */
-	.variant {
-		display: flex; align-items: flex-end; gap: 18px; flex-wrap: wrap;
-		border: 1px solid var(--border); border-radius: 10px;
-		padding: 12px 14px; margin: 10px 0;
-		background: color-mix(in srgb, var(--surface-2) 45%, transparent);
+	/* ---------- rooms ---------- */
+	.roomlist { display: flex; flex-direction: column; gap: 8px; max-width: 640px; margin-bottom: 22px; }
+	.roomrow {
+		display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+		background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+		padding: 14px 16px; color: var(--text); font: inherit; cursor: pointer;
 	}
-	.variant .field { margin: 0; max-width: 170px; }
-	.variant .switch { padding-bottom: 8px; }
-	.variant .remove { margin-left: auto; margin-bottom: 6px; }
+	.roomrow:hover { border-color: var(--accent); }
+	.roomrow .rname { font-weight: 650; font-size: 14px; }
+	.roomrow .rpath { color: var(--muted); }
+	.roomrow .rstate { margin-left: auto; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+	.roomrow .chev { color: var(--muted); font-size: 18px; line-height: 1; }
+	.backlink { display: inline-block; color: var(--muted); font-size: 12.5px; text-decoration: none; margin-bottom: 12px; }
+	.backlink:hover { color: var(--accent); }
+	hgroup h1 .dot.big { display: inline-block; width: 11px; height: 11px; vertical-align: 1px; margin-right: 4px; }
 
 	/* ---------- moderation ---------- */
 	.empty { color: var(--muted); font-size: 13px; }

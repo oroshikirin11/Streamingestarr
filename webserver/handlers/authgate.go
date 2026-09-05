@@ -97,7 +97,7 @@ document.querySelector('form').addEventListener('submit', async (e) => {
 </html>`
 
 const loginFormHTML = `
-  <p class="sub">This theater is private. Pick your name, bring the room password.</p>
+  <p class="sub">This theater is private. Pick your name, bring the site password.</p>
   <form action="/api/auth/login" method="post" data-savename>
     <label for="username">Your name</label>
     <input id="username" name="username" maxlength="30" autocomplete="username" required autofocus>
@@ -108,9 +108,9 @@ const loginFormHTML = `
   </form>`
 
 const setupFormHTML = `
-  <p class="sub">First run — set the keys to the theater. The room password is shared by everyone who watches; the admin password is yours. At the door, everyone picks their own name.</p>
+  <p class="sub">First run — set the keys to the theater. The site password is shared by everyone who watches; the admin password is yours. At the door, everyone picks their own name.</p>
   <form action="/api/auth/setup" method="post">
-    <label for="viewerPassword">Room password</label>
+    <label for="viewerPassword">Site password</label>
     <input id="viewerPassword" name="viewerPassword" type="password" autocomplete="new-password" required autofocus>
     <label for="adminPassword">Admin password</label>
     <input id="adminPassword" name="adminPassword" type="password" autocomplete="new-password" required minlength="8">
@@ -237,7 +237,7 @@ func PostAuthSetup(w http.ResponseWriter, r *http.Request) {
 
 	viewerHash, err := auth.HashPassword(req.ViewerPassword)
 	if err != nil {
-		authJSON(w, http.StatusBadRequest, false, "Room password cannot be empty.")
+		authJSON(w, http.StatusBadRequest, false, "Site password cannot be empty.")
 		return
 	}
 	if len(req.AdminPassword) < auth.MinPasswordLength {
@@ -267,7 +267,7 @@ func PostAuthSetup(w http.ResponseWriter, r *http.Request) {
 	authJSON(w, http.StatusOK, true, "")
 }
 
-// SetViewerLogin lets the admin change the shared room password.
+// SetViewerLogin lets the admin change the shared site password.
 // Changing it evicts every session except the caller's — that is the
 // design's "change the password to clear the room" lever.
 func SetViewerLogin(w http.ResponseWriter, r *http.Request) {
@@ -279,7 +279,7 @@ func SetViewerLogin(w http.ResponseWriter, r *http.Request) {
 
 	hash, err := auth.HashPassword(req.ViewerPassword)
 	if err != nil {
-		authJSON(w, http.StatusBadRequest, false, "Room password cannot be empty.")
+		authJSON(w, http.StatusBadRequest, false, "Site password cannot be empty.")
 		return
 	}
 

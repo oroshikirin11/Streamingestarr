@@ -61,7 +61,7 @@ as Docker.
 ## Screens
 
 <p align="center"><img src="docs/media/admin.png" alt="Admin — live broadcaster details, bitrate graph, receive health" width="760"></p>
-<p align="center"><img src="docs/media/login.png" alt="The door — pick your name, bring the room password" width="640"></p>
+<p align="center"><img src="docs/media/login.png" alt="The door — pick your name, bring the site password" width="640"></p>
 
 ## Features
 
