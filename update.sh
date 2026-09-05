@@ -44,9 +44,30 @@ if ! grep -Eq '^\s*-\s*\./data:/app/data' docker-compose.yml; then
 fi
 note "keeping ./data (mounted at /app/data)"
 
-if ! git diff --quiet || ! git diff --cached --quiet; then
-  git status --short --untracked-files=no | sed 's/^/  /'
-  die "Tracked files were changed locally (listed above). Keep them with 'git stash', or drop them with 'git checkout -- .', then run this again."
+# docker-compose.yml is yours to edit — media paths, ports, the cert
+# mount — so a changed one never blocks an update: it is set aside for
+# the pull and put back after. Any OTHER tracked file changed locally is
+# still a stop, since the pull would have to merge it.
+OTHER_CHANGES="$(git status --short --untracked-files=no | grep -v ' docker-compose.yml$' || true)"
+if [ -n "$OTHER_CHANGES" ]; then
+  printf '%s\n' "$OTHER_CHANGES" | sed 's/^/  /'
+  die "Tracked files besides docker-compose.yml were changed locally (listed above). Keep them with 'git stash', or drop them with 'git checkout -- .', then run this again."
+fi
+COMPOSE_EDITED=0
+if ! git diff --quiet -- docker-compose.yml || ! git diff --cached --quiet -- docker-compose.yml; then
+  COMPOSE_EDITED=1
+  note "keeping your edited docker-compose.yml"
+fi
+
+# The container runs as uid 101; a data folder it cannot write (copied
+# or created as root) makes it exit at startup and the site answers 502.
+if [ -d data ] && ! su -s /bin/sh -c 'test -w data' '#101' 2>/dev/null; then
+  if [ "$(id -u)" = 0 ]; then
+    run chown -R 101:101 data
+    note "handed ./data to the container's user (uid 101)"
+  else
+    die "./data is not writable by the container's user (uid 101) — run: sudo chown -R 101:101 data"
+  fi
 fi
 
 # A live stream ends when the container restarts; say so before doing it.
@@ -86,7 +107,24 @@ if [ -d data ]; then
 fi
 
 # ── pull, rebuild, restart ───────────────────────────────────────────────
+if [ "$COMPOSE_EDITED" = 1 ]; then
+  run git stash push --quiet -m "streamingestarr-update: docker-compose.yml" -- docker-compose.yml
+fi
 run git pull --ff-only --quiet origin "$BRANCH"
+if [ "$COMPOSE_EDITED" = 1 ] && [ "$DRY" = 0 ]; then
+  # Your file comes back as it was. If upstream changed the same file, its
+  # new lines are listed so you can add what matters (a new port, say).
+  UPSTREAM_COMPOSE="$(git show HEAD:docker-compose.yml)"
+  git checkout --quiet stash@{0} -- docker-compose.yml
+  git stash drop --quiet
+  git reset --quiet -- docker-compose.yml
+  NEW_LINES="$(printf '%s\n' "$UPSTREAM_COMPOSE" | grep -E '^\s*-\s*"[0-9]+:[0-9]+' | grep -vxF -f <(grep -E '^\s*-\s*"[0-9]+:[0-9]+' docker-compose.yml) || true)"
+  if [ -n "$NEW_LINES" ]; then
+    bold "Upstream docker-compose.yml has port lines yours does not:"
+    printf '%s\n' "$NEW_LINES" | sed 's/^/  /'
+    note "add the ones you need, then: docker compose up -d"
+  fi
+fi
 bold "Rebuilding the image and restarting (the database stays in ./data)"
 run docker compose up -d --build
 # Every --build leaves build cache behind that docker never collects on
