@@ -53,6 +53,26 @@ ufw allow 9711/tcp   # TCP in
 # uses SRT/TCP — leave them closed unless you use them.
 ```
 
+### The relay — links for VRChat and other external players
+
+A room in **relay** (or **both**) mode hands out links an external video
+player pulls: `rtspt://<host>:8554/<room>/<token>` (RTSP over TCP, what
+AVPro on PC plays best), `https://<domain>/relay/<room>/<token>.ts`
+(MPEG-TS over HTTP, Quest) and `https://<domain>/relay/<room>/<token>.m3u8`
+(HLS, everything else). The HTTP links ride the web port through Caddy
+like everything else. RTSP is its own port, plaintext, the token being the
+lock:
+
+```sh
+ufw allow 8554/tcp   # the relay's RTSP port (admin → Stream → Relay)
+```
+
+Publish it in `docker-compose.yml` (`"8554:8554"`) — the shipped file
+carries the line. The token is per room; **New links** on the room's
+page rotates it and drops every connected player. VRChat only plays
+domains on its trusted list by default: everyone in the instance needs
+"Allow Untrusted URLs" on for your domain.
+
 ### TLS on the TCP ingest with Caddy's certificate
 
 The TCP ingest speaks plaintext by default (stream key and media in the

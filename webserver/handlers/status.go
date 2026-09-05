@@ -29,7 +29,7 @@ func channelIDFromRequest(r *http.Request) string {
 // to one room; absent (or unknown) it describes the default room, exactly
 // as before rooms existed.
 func GetStatus(w http.ResponseWriter, r *http.Request) {
-	response := getStatusResponse(channelIDFromRequest(r))
+	response := getStatusResponse(channelIDFromRequest(r), r)
 
 	w.Header().Set("Content-Type", "application/json")
 	middleware.DisableCache(w)
@@ -39,11 +39,12 @@ func GetStatus(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getStatusResponse(channelID string) webStatusResponse {
+func getStatusResponse(channelID string, r *http.Request) webStatusResponse {
 	channel := core.GetChannelRuntime(channelID)
 	if channel == nil {
 		return webStatusResponse{}
 	}
+	room := channelrepository.GetChannel(channelID)
 	status := channel.GetStatus()
 	response := webStatusResponse{
 		NowPlaying:         channel.GetNowPlaying(),
@@ -71,7 +72,43 @@ func getStatusResponse(channelID string) webStatusResponse {
 	}
 	enabled, controlConnected := channel.PauseVoteInfo()
 	response.PauseVote = &pauseVoteStatus{Enabled: enabled, ControlConnected: controlConnected}
+
+	// The room's mode and doors, as they stand for THIS session: a lock
+	// reads open once the session has entered the room's password.
+	if room != nil {
+		response.Mode = room.EffectiveMode()
+		response.Access = &roomAccessStatus{
+			PasswordSet:   room.RoomPasswordHash != "",
+			TheaterLocked: room.HasTheater() && core.TheaterLocked(r, room),
+			RelayLocked:   room.Relays() && core.RelayLocked(r, room),
+		}
+		if room.Relays() {
+			rs := &relayStatus{Protocols: room.EffectiveRelayProtocols(), Players: channel.RelayPlayerCount()}
+			if !response.Access.RelayLocked {
+				rs.Links = core.RelayLinks(r, room)
+			}
+			response.Relay = rs
+		}
+	}
 	return response
+}
+
+// roomAccessStatus is what the room asks of this session.
+type roomAccessStatus struct {
+	// PasswordSet: the room has its own password at all.
+	PasswordSet bool `json:"passwordSet"`
+	// TheaterLocked: the player page needs it and this session has not entered it.
+	TheaterLocked bool `json:"theaterLocked"`
+	// RelayLocked: the relay links need it and this session has not entered it.
+	RelayLocked bool `json:"relayLocked"`
+}
+
+// relayStatus is the room's relay as the viewer sees it. Links are absent
+// while the relay is locked for this session.
+type relayStatus struct {
+	Protocols []string          `json:"protocols"`
+	Links     map[string]string `json:"links,omitempty"`
+	Players   int               `json:"players"`
 }
 
 // pauseVoteStatus is the room's side of viewer pause votes; the sender's
@@ -98,4 +135,9 @@ type webStatusResponse struct {
 	Online        bool                  `json:"online"`
 	VideoRange    string                `json:"videoRange,omitempty"` // "PQ" | "HLG", absent for SDR
 	PauseVote     *pauseVoteStatus      `json:"pauseVote,omitempty"`
+	// Mode is theater, relay or both; Access and Relay describe the doors
+	// and the links for this session.
+	Mode   string            `json:"mode,omitempty"`
+	Access *roomAccessStatus `json:"access,omitempty"`
+	Relay  *relayStatus      `json:"relay,omitempty"`
 }

@@ -60,6 +60,9 @@ func Start() error {
 	// Viewer pause votes: chat carries the messages, the rooms keep the
 	// tally.
 	chat.SetPauseVoteHooks(pauseVoteHook, presenceHook)
+	chat.SetRoomAccessCheck(chatRoomAccess)
+	// The relay's RTSP outlet, one server for every room.
+	startRelayRTSP()
 
 	// start the rtmp server
 	go rtmp.Start(setStreamAsConnected, setBroadcaster, isStreamKeyBusy)

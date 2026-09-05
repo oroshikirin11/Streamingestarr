@@ -173,6 +173,38 @@ func (r *SqlConfigRepository) SetTCPIngestPort(port int) error {
 	return r.datastore.SetNumber(tcpIngestPortKey, float64(port))
 }
 
+// GetRelayRTSPPort returns the port the relay's RTSP server listens on
+// (default 8554) — the port in every rtspt:// relay link.
+func (r *SqlConfigRepository) GetRelayRTSPPort() int {
+	port, err := r.datastore.GetNumber(relayRTSPPortKey)
+	if err != nil || port == 0 {
+		return 8554
+	}
+	return int(port)
+}
+
+// SetRelayRTSPPort sets the relay's RTSP port (effective on restart).
+func (r *SqlConfigRepository) SetRelayRTSPPort(port int) error {
+	return r.datastore.SetNumber(relayRTSPPortKey, float64(port))
+}
+
+// GetRelayTranscodeFallback says whether a relay room re-encodes a
+// source that is not H.264 on this server (default on). Stored as a
+// string so "never set" reads as on.
+func (r *SqlConfigRepository) GetRelayTranscodeFallback() bool {
+	v, _ := r.datastore.GetString(relayTranscodeFallbackKey)
+	return v != "off"
+}
+
+// SetRelayTranscodeFallback flips the relay's transcode fallback.
+func (r *SqlConfigRepository) SetRelayTranscodeFallback(on bool) error {
+	v := "on"
+	if !on {
+		v = "off"
+	}
+	return r.datastore.SetString(relayTranscodeFallbackKey, v)
+}
+
 // GetTCPIngestTLSMode returns the TCP ingest's TLS mode: "off" (plaintext
 // only, the default), "allow" (both, told apart by the first byte) or
 // "require" (TLS only). Read per connection; unknown values read as off.

@@ -13,6 +13,9 @@ export const connected = writable(false);
 // The room's pause-vote tally (PAUSE_VOTE_STATE): sent on connect and on
 // every change. null until the first frame arrives.
 export const pauseVote = writable(null);
+// The room's mode as the server last announced it over the socket —
+// null until a ROOM_MODE event arrives. The page refreshes status on it.
+export const roomModeEvent = writable(null);
 
 let socket = null;
 let reconnectDelay = 1000;
@@ -143,6 +146,9 @@ function handleEvent(ev) {
 			break;
 		case 'PAUSE_VOTE_STATE':
 			pauseVote.set(ev);
+			break;
+		case 'ROOM_MODE':
+			roomModeEvent.set({ mode: ev.mode, at: Date.now() });
 			break;
 		case 'VISIBILITY-UPDATE':
 			if (ev.ids && ev.visible === false) {

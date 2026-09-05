@@ -143,6 +143,24 @@ The inherited Owncast API still works and remains the fallback shown when
 no structured metadata has arrived. A Streamingestarr-mode sender should
 prefer §2 and may skip this entirely.
 
+## 4a. Room modes — what `resolve-channel` says about a room
+
+`POST /api/integrations/metadata/resolve-channel` answers with the room
+and its mode:
+
+```json
+{"channel": "main", "name": "Main Theater", "mode": "theater|relay|both",
+ "relay": {"enabled": true, "protocols": ["rtsp", "ts"], "wants": {"video": "h264", "range": "sdr"}}}
+```
+
+A room with `relay.enabled` hands its broadcast to external players
+(VRChat's video players, VLC) over RTSP, MPEG-TS over HTTP and HLS.
+Those players take H.264 SDR only, so a sender feeding such a room sends
+H.264 SDR for that broadcast, whatever its picture setting says — the
+receiver re-encodes a foreign source only as a fallback. `GET
+/api/integrations/capabilities` lists every room with `mode` and `relay`
+under `rooms`, and the RTSP port under `relay.rtspPort`.
+
 ## 5. Viewer pause vote — `GET /api/integrations/control`
 
 A websocket the sender opens per room while it broadcasts, with the same

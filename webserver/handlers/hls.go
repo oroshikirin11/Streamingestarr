@@ -43,6 +43,12 @@ func HandleHLSRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+	// A relay-only room has no theater; a locked one opens to sessions
+	// that entered its password.
+	if !core.TheaterAllowed(r, channelID) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
 	fullPath := filepath.Join(channel.HLSOutputPath, relativePath)
 
 	// Handle playlists

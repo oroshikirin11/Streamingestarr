@@ -12,6 +12,7 @@ services:
       - "1935:1935"        # RTMP ingest
       - "9710:9710/udp"    # SRT ingest
       - "9711:9711"        # TCP ingest (SGR-TS/1 preamble)
+      - "8554:8554"        # relay RTSP outlet (rooms in relay mode)
 
     volumes:
       - ./data:/app/data

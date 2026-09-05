@@ -33,6 +33,79 @@ type Channel struct {
 	// (default on). Votes also need the sender to advertise the control
 	// and to hold a control connection.
 	PauseVoteEnabled bool `json:"pauseVoteEnabled"`
+
+	// Mode is what the room is: a theater (the player page), a relay
+	// (links for external players such as VRChat, no theater), or both.
+	// Stored "" reads as theater.
+	Mode string `json:"mode"`
+	// RelayProtocols are the link kinds the relay offers, in the order
+	// the card shows them: rtsp, ts, hls. Empty means rtsp only.
+	RelayProtocols []string `json:"relayProtocols"`
+	// RelayToken is the secret in every relay link. Rotating it ends
+	// every link at once. Never serialised through the model — the admin
+	// and viewer surfaces decide who sees the links.
+	RelayToken string `json:"-"`
+	// RoomPasswordHash is the room's own password, hashed; "" means none.
+	// LockTheater and LockRelay say what it guards. Both are off when no
+	// password is set.
+	RoomPasswordHash string `json:"-"`
+	LockTheater      bool   `json:"lockTheater"`
+	LockRelay        bool   `json:"lockRelay"`
+}
+
+// Room modes.
+const (
+	RoomModeTheater = "theater"
+	RoomModeRelay   = "relay"
+	RoomModeBoth    = "both"
+)
+
+// Relay protocols, in display order.
+const (
+	RelayProtocolRTSP = "rtsp"
+	RelayProtocolTS   = "ts"
+	RelayProtocolHLS  = "hls"
+)
+
+// RelayProtocolOrder is the canonical order of relay link kinds.
+var RelayProtocolOrder = []string{RelayProtocolRTSP, RelayProtocolTS, RelayProtocolHLS}
+
+// EffectiveMode reads the stored mode with "" as theater.
+func (c Channel) EffectiveMode() string {
+	switch c.Mode {
+	case RoomModeRelay, RoomModeBoth:
+		return c.Mode
+	}
+	return RoomModeTheater
+}
+
+// Relays reports whether the room offers relay links at all.
+func (c Channel) Relays() bool {
+	m := c.EffectiveMode()
+	return m == RoomModeRelay || m == RoomModeBoth
+}
+
+// HasTheater reports whether the room's player page is open to viewers.
+func (c Channel) HasTheater() bool {
+	return c.EffectiveMode() != RoomModeRelay
+}
+
+// EffectiveRelayProtocols is the stored list normalised: known kinds
+// only, canonical order, rtsp when nothing valid is stored.
+func (c Channel) EffectiveRelayProtocols() []string {
+	out := []string{}
+	for _, want := range RelayProtocolOrder {
+		for _, have := range c.RelayProtocols {
+			if have == want {
+				out = append(out, want)
+				break
+			}
+		}
+	}
+	if len(out) == 0 {
+		out = append(out, RelayProtocolRTSP)
+	}
+	return out
 }
 
 // ChannelKey is one stream key a room accepts, with an optional comment —

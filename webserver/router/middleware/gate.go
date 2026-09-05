@@ -20,6 +20,7 @@ var gateExemptPrefixes = []string{
 	"/api/admin/",        // per-handler admin auth
 	"/api/integrations/", // per-handler bearer-token auth (Jellystreamerr)
 	"/api/moderation/",   // per-handler moderator-token auth
+	"/relay/",            // relay outlets: the link's token is the key
 	"/admin/",            // admin web app, RequireAdminAuth wrapped
 	"/robots.txt",
 	"/favicon.svg",

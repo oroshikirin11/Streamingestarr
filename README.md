@@ -19,6 +19,18 @@ One server, many theaters: every room takes its own inbound stream on the
 same ports — the stream key decides where a broadcast lands. Own page, own
 chat, own configuration; viewers pick a screen in the lobby.
 
+## Relay — VRChat and other external players
+
+A room can be a **theater**, a **relay**, or **both**. A relay hands the
+broadcast to a video player that pulls a URL — VRChat's AVPro players,
+VLC — as RTSP over TCP (`rtspt://`, PC), MPEG-TS over HTTP (Quest) or
+HLS. The links live on the room's page behind the site password, and
+behind the room's own password when its Access card says so; one click
+copies the one for your platform. The source is passed through untouched
+when it is H.264; a HEVC source is re-encoded on the server only as a
+fallback, since Streamerr sends H.264 SDR to a relay room on its own. The
+RTSP port (8554) is the one extra port to open.
+
 ## Setup — Docker
 
 ```sh

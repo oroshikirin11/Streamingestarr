@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"streamingestarr/auth"
 	"strings"
 
 	"streamingestarr/core"
@@ -38,9 +39,20 @@ type roomResponse struct {
 	PassphraseSet bool `json:"passphraseSet"`
 	// PauseVoteEnabled is the room's "viewers may vote to pause" switch.
 	PauseVoteEnabled bool `json:"pauseVoteEnabled"`
+
+	// Mode, the relay's link kinds and links (as reached through this
+	// request's host), and the room's own password and what it guards.
+	Mode            string            `json:"mode"`
+	RelayProtocols  []string          `json:"relayProtocols"`
+	RelayLinks      map[string]string `json:"relayLinks"`
+	RelayPlayers    int               `json:"relayPlayers"`
+	RelayEncoding   string            `json:"relayEncoding"`
+	RoomPasswordSet bool              `json:"roomPasswordSet"`
+	LockTheater     bool              `json:"lockTheater"`
+	LockRelay       bool              `json:"lockRelay"`
 }
 
-func roomToResponse(ch models.Channel) roomResponse {
+func roomToResponse(ch models.Channel, r *http.Request) roomResponse {
 	out := roomResponse{
 		ID:               ch.ID,
 		Name:             ch.Name,
@@ -53,6 +65,12 @@ func roomToResponse(ch models.Channel) roomResponse {
 		OutputVariants:   ch.OutputVariants,
 		PassphraseSet:    ch.Passphrase != "",
 		PauseVoteEnabled: ch.PauseVoteEnabled,
+		Mode:             ch.EffectiveMode(),
+		RelayProtocols:   ch.EffectiveRelayProtocols(),
+		RelayLinks:       core.RelayLinks(r, &ch),
+		RoomPasswordSet:  ch.RoomPasswordHash != "",
+		LockTheater:      ch.LockTheater,
+		LockRelay:        ch.LockRelay,
 	}
 	if out.OutputVariants == nil {
 		out.OutputVariants = []models.StreamOutputVariant{}
@@ -64,6 +82,8 @@ func roomToResponse(ch models.Channel) roomResponse {
 		status := c.GetStatus()
 		out.Online = status.Online
 		out.ViewerCount = status.ViewerCount
+		out.RelayPlayers = c.RelayPlayerCount()
+		out.RelayEncoding = c.RelayEncoding()
 	}
 	return out
 }
@@ -72,7 +92,7 @@ func roomToResponse(ch models.Channel) roomResponse {
 func GetRooms(w http.ResponseWriter, r *http.Request) {
 	rooms := []roomResponse{}
 	for _, c := range channelrepository.ListChannels() {
-		rooms = append(rooms, roomToResponse(c))
+		rooms = append(rooms, roomToResponse(c, r))
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"rooms": rooms})
@@ -129,7 +149,7 @@ func CreateRoom(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(roomToResponse(*channel))
+	_ = json.NewEncoder(w).Encode(roomToResponse(*channel, r))
 }
 
 // DeleteRoom removes a room by {"id": "..."} — a live broadcast in it is
@@ -312,4 +332,127 @@ func SetRoomPauseVote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	webutils.WriteSimpleResponse(w, true, "pause votes are off for this room")
+}
+
+// SetRoomMode sets what a room is and which relay links it offers:
+// {"id": "...", "mode": "theater|relay|both", "relayProtocols": ["rtsp", "ts", "hls"]}.
+func SetRoomMode(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID             string   `json:"id"`
+		Mode           string   `json:"mode"`
+		RelayProtocols []string `json:"relayProtocols"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
+		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\", \"mode\": \"theater|relay|both\", \"relayProtocols\": [...]}")
+		return
+	}
+	if channelrepository.GetChannel(req.ID) == nil {
+		webutils.WriteSimpleResponse(w, false, "no such room")
+		return
+	}
+	if err := core.SetRoomMode(req.ID, strings.ToLower(strings.TrimSpace(req.Mode)), req.RelayProtocols); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	switch req.Mode {
+	case models.RoomModeRelay:
+		webutils.WriteSimpleResponse(w, true, "Relay mode — the theater is closed, the links are live")
+	case models.RoomModeBoth:
+		webutils.WriteSimpleResponse(w, true, "Theater and relay")
+	default:
+		webutils.WriteSimpleResponse(w, true, "Theater mode")
+	}
+}
+
+// SetRoomPassword sets or clears ("") a room's own password. A change
+// forgets every session that had entered the old one.
+func SetRoomPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID       string `json:"id"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
+		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\", \"password\": \"...\"}")
+		return
+	}
+	if channelrepository.GetChannel(req.ID) == nil {
+		webutils.WriteSimpleResponse(w, false, "no such room")
+		return
+	}
+	req.Password = strings.TrimSpace(req.Password)
+	if len(req.Password) > 128 {
+		webutils.WriteSimpleResponse(w, false, "the room password can be up to 128 characters")
+		return
+	}
+	hash := ""
+	if req.Password != "" {
+		h, err := auth.HashPassword(req.Password)
+		if err != nil {
+			webutils.WriteSimpleResponse(w, false, "unable to hash the password")
+			return
+		}
+		hash = h
+	}
+	if err := channelrepository.SetChannelPassword(req.ID, hash); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	auth.ClearRoomUnlocks(req.ID)
+	if hash == "" {
+		webutils.WriteSimpleResponse(w, true, "Room password removed — nothing is locked")
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "Room password set — choose what it guards")
+}
+
+// SetRoomLocks says what the room password guards:
+// {"id": "...", "lockTheater": bool, "lockRelay": bool}.
+func SetRoomLocks(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID          string `json:"id"`
+		LockTheater bool   `json:"lockTheater"`
+		LockRelay   bool   `json:"lockRelay"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
+		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\", \"lockTheater\": bool, \"lockRelay\": bool}")
+		return
+	}
+	ch := channelrepository.GetChannel(req.ID)
+	if ch == nil {
+		webutils.WriteSimpleResponse(w, false, "no such room")
+		return
+	}
+	if ch.RoomPasswordHash == "" && (req.LockTheater || req.LockRelay) {
+		webutils.WriteSimpleResponse(w, false, "set a room password first")
+		return
+	}
+	if err := channelrepository.SetChannelLocks(req.ID, req.LockTheater, req.LockRelay); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	webutils.WriteSimpleResponse(w, true, "Locks saved")
+}
+
+// NewRelayToken rotates a room's relay token: every old link stops
+// working and connected relay players are dropped. {"id": "..."}.
+func NewRelayToken(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
+		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\"}")
+		return
+	}
+	if channelrepository.GetChannel(req.ID) == nil {
+		webutils.WriteSimpleResponse(w, false, "no such room")
+		return
+	}
+	if _, err := channelrepository.RotateRelayToken(req.ID); err != nil {
+		webutils.WriteSimpleResponse(w, false, err.Error())
+		return
+	}
+	if c := core.GetChannelRuntime(req.ID); c != nil {
+		c.DropRelayPlayers()
+	}
+	webutils.WriteSimpleResponse(w, true, "New links — the old ones stopped working")
 }

@@ -5,10 +5,15 @@
 package channelrepository
 
 import (
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"regexp"
+	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -67,6 +72,13 @@ func Setup(db *sql.DB) {
 		"passphrase":      `ALTER TABLE channels ADD COLUMN passphrase TEXT NOT NULL DEFAULT ''`,
 		// Viewer pause votes, on unless an admin switches a room off.
 		"pause_vote_enabled": `ALTER TABLE channels ADD COLUMN pause_vote_enabled INTEGER NOT NULL DEFAULT 1`,
+		// Room mode, relay links and the room's own password (Sep 2026).
+		"mode":            `ALTER TABLE channels ADD COLUMN mode TEXT NOT NULL DEFAULT ''`,
+		"relay_protocols": `ALTER TABLE channels ADD COLUMN relay_protocols TEXT NOT NULL DEFAULT ''`,
+		"relay_token":     `ALTER TABLE channels ADD COLUMN relay_token TEXT NOT NULL DEFAULT ''`,
+		"room_password":   `ALTER TABLE channels ADD COLUMN room_password TEXT NOT NULL DEFAULT ''`,
+		"lock_theater":    `ALTER TABLE channels ADD COLUMN lock_theater INTEGER NOT NULL DEFAULT 0`,
+		"lock_relay":      `ALTER TABLE channels ADD COLUMN lock_relay INTEGER NOT NULL DEFAULT 0`,
 	} {
 		if !columnExists(db, "channels", col) {
 			if _, err := db.Exec(ddl); err != nil {
@@ -82,6 +94,10 @@ func Setup(db *sql.DB) {
 	// One-time migration: the pre-rooms GLOBAL stream title and welcome
 	// message move into the main room, which is now the only place they
 	// live — the Settings/Chat sections stopped editing the global copies.
+	// Every room carries a relay token from the start, so switching a room
+	// to relay never has to mint one on the fly.
+	backfillRelayTokens(db)
+
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS channel_meta (
 		"key" TEXT NOT NULL PRIMARY KEY,
 		"value" TEXT NOT NULL DEFAULT ''
@@ -122,12 +138,20 @@ func columnExists(db *sql.DB, table, column string) bool {
 func GetChannel(id string) *models.Channel {
 	var c models.Channel
 	var variantsJSON string
-	row := _db.QueryRow("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants, passphrase, pause_vote_enabled FROM channels WHERE id = ?", id)
-	if err := row.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON, &c.Passphrase, &c.PauseVoteEnabled); err != nil {
+	var protocols string
+	row := _db.QueryRow("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants, passphrase, pause_vote_enabled, mode, relay_protocols, relay_token, room_password, lock_theater, lock_relay FROM channels WHERE id = ?", id)
+	if err := row.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON, &c.Passphrase, &c.PauseVoteEnabled, &c.Mode, &protocols, &c.RelayToken, &c.RoomPasswordHash, &c.LockTheater, &c.LockRelay); err != nil {
 		return nil
 	}
 	if variantsJSON != "" {
 		_ = json.Unmarshal([]byte(variantsJSON), &c.OutputVariants)
+	}
+	if protocols != "" {
+		c.RelayProtocols = strings.Split(protocols, ",")
+	}
+	// Locks without a password guard nothing.
+	if c.RoomPasswordHash == "" {
+		c.LockTheater, c.LockRelay = false, false
 	}
 	c.Keys = ListChannelKeys(id)
 	return &c
@@ -135,25 +159,25 @@ func GetChannel(id string) *models.Channel {
 
 // ListChannels returns all channels with their keys, oldest first.
 func ListChannels() []models.Channel {
-	rows, err := _db.Query("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants, passphrase, pause_vote_enabled FROM channels ORDER BY created_at")
+	// One reader for a room: GetChannel. The list is the ids in order,
+	// so a column added there is never missed here.
+	rows, err := _db.Query("SELECT id FROM channels ORDER BY created_at")
 	if err != nil {
 		return nil
 	}
-	defer rows.Close()
-	var channels []models.Channel
+	ids := []string{}
 	for rows.Next() {
-		var c models.Channel
-		var variantsJSON string
-		if err := rows.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON, &c.Passphrase, &c.PauseVoteEnabled); err == nil {
-			if variantsJSON != "" {
-				_ = json.Unmarshal([]byte(variantsJSON), &c.OutputVariants)
-			}
-			channels = append(channels, c)
+		var id string
+		if err := rows.Scan(&id); err == nil {
+			ids = append(ids, id)
 		}
 	}
 	rows.Close()
-	for i := range channels {
-		channels[i].Keys = ListChannelKeys(channels[i].ID)
+	var channels []models.Channel
+	for _, id := range ids {
+		if c := GetChannel(id); c != nil {
+			channels = append(channels, *c)
+		}
 	}
 	return channels
 }
@@ -388,4 +412,72 @@ func GetEffectiveOutputVariants(channelID string) []models.StreamOutputVariant {
 		return c.OutputVariants
 	}
 	return configrepository.Get().GetStreamOutputVariants()
+}
+
+// --- Room mode, relay links and the room password ---------------------
+
+// NewRelayToken mints the secret that rides in every relay link.
+func NewRelayToken() string {
+	b := make([]byte, 20)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
+}
+
+// backfillRelayTokens gives every token-less room one.
+func backfillRelayTokens(db *sql.DB) {
+	rows, err := db.Query(`SELECT id FROM channels WHERE relay_token = ''`)
+	if err != nil {
+		return
+	}
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if rows.Scan(&id) == nil {
+			ids = append(ids, id)
+		}
+	}
+	_ = rows.Close()
+	for _, id := range ids {
+		if _, err := db.Exec(`UPDATE channels SET relay_token = ? WHERE id = ?`, NewRelayToken(), id); err != nil {
+			log.Errorln("unable to set a relay token for room", id, err)
+		}
+	}
+}
+
+// SetChannelMode stores the room mode and the relay link kinds.
+func SetChannelMode(id, mode string, protocols []string) error {
+	switch mode {
+	case models.RoomModeTheater, models.RoomModeRelay, models.RoomModeBoth:
+	default:
+		return errors.New("mode must be theater, relay or both")
+	}
+	clean := models.Channel{RelayProtocols: protocols}.EffectiveRelayProtocols()
+	_, err := _db.Exec(`UPDATE channels SET mode = ?, relay_protocols = ? WHERE id = ?`, mode, strings.Join(clean, ","), id)
+	return err
+}
+
+// RotateRelayToken replaces a room's relay token and returns the new one.
+func RotateRelayToken(id string) (string, error) {
+	token := NewRelayToken()
+	_, err := _db.Exec(`UPDATE channels SET relay_token = ? WHERE id = ?`, token, id)
+	return token, err
+}
+
+// SetChannelPassword stores the room password hash; "" clears it and
+// drops both locks with it.
+func SetChannelPassword(id, hash string) error {
+	if hash == "" {
+		_, err := _db.Exec(`UPDATE channels SET room_password = '', lock_theater = 0, lock_relay = 0 WHERE id = ?`, id)
+		return err
+	}
+	_, err := _db.Exec(`UPDATE channels SET room_password = ? WHERE id = ?`, hash, id)
+	return err
+}
+
+// SetChannelLocks says what the room password guards.
+func SetChannelLocks(id string, theater, relay bool) error {
+	_, err := _db.Exec(`UPDATE channels SET lock_theater = ?, lock_relay = ? WHERE id = ?`, theater, relay, id)
+	return err
 }

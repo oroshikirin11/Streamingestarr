@@ -23,9 +23,20 @@ function noteServerTime(s) {
 	clockSkewMs.update((prev) => (skewSeeded ? prev * 0.8 + sample * 0.2 : ((skewSeeded = true), sample)));
 }
 
+// refreshStatus polls right now — after an unlock or a mode event the
+// page must not wait out the interval.
+let pollNow = null;
+export function refreshStatus() {
+	pollNow?.();
+}
+
 export const status = readable(null, (set) => {
 	let stopped = false;
 	let failures = 0;
+	pollNow = () => {
+		clearTimeout(timer);
+		poll();
+	};
 	async function poll() {
 		try {
 			const s = await getStatus();
@@ -43,6 +54,7 @@ export const status = readable(null, (set) => {
 	poll();
 	return () => {
 		stopped = true;
+		pollNow = null;
 		clearTimeout(timer);
 	};
 });

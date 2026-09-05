@@ -424,6 +424,43 @@ func SetTCPIngestPort(w http.ResponseWriter, r *http.Request) {
 	authJSON(w, http.StatusOK, true, "")
 }
 
+// SetRelayRTSPPort stores the relay's RTSP port (effective on restart).
+func SetRelayRTSPPort(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Value int `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Value < 1 || req.Value > 65535 {
+		authJSON(w, http.StatusBadRequest, false, "Send {\"value\": <port>}.")
+		return
+	}
+	if err := configrepository.Get().SetRelayRTSPPort(req.Value); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	authJSON(w, http.StatusOK, true, "RTSP port saved — applies after a restart")
+}
+
+// SetRelayTranscodeFallback flips whether a relay room re-encodes a
+// non-H.264 source on this server: {"value": true|false}.
+func SetRelayTranscodeFallback(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Value bool `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		authJSON(w, http.StatusBadRequest, false, "Send {\"value\": true|false}.")
+		return
+	}
+	if err := configrepository.Get().SetRelayTranscodeFallback(req.Value); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	if req.Value {
+		authJSON(w, http.StatusOK, true, "Relay rooms re-encode a non-H.264 source — from the next broadcast")
+		return
+	}
+	authJSON(w, http.StatusOK, true, "Relay passes the source through as it is — from the next broadcast")
+}
+
 // SetTCPIngestTLS stores the TCP ingest's TLS mode and certificate paths.
 // When the mode is not off the pair is loaded right here and a failure
 // (missing or unreadable file, PEM garbage, key mismatch) is answered

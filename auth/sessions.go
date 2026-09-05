@@ -42,6 +42,8 @@ func Setup(db *sql.DB) {
 	if _, err := db.Exec(createTableSQL); err != nil {
 		log.Fatalln("unable to create auth_sessions table:", err)
 	}
+	setupRoomUnlocks(db)
+	pruneOrphanUnlocks()
 
 	go func() {
 		for range time.Tick(time.Hour) {
@@ -93,6 +95,7 @@ func SessionRole(token string) Role {
 // DestroySession removes a session.
 func DestroySession(token string) {
 	_, _ = _db.Exec("DELETE FROM auth_sessions WHERE token_hash = ?", hashToken(token))
+	_, _ = _db.Exec("DELETE FROM room_unlocks WHERE token_hash = ?", hashToken(token))
 }
 
 // DestroyAllSessions logs everyone out — used when the shared viewer
@@ -100,14 +103,16 @@ func DestroySession(token string) {
 func DestroyAllSessions(keepToken string) {
 	if keepToken == "" {
 		_, _ = _db.Exec("DELETE FROM auth_sessions")
-		return
+	} else {
+		_, _ = _db.Exec("DELETE FROM auth_sessions WHERE token_hash != ?", hashToken(keepToken))
 	}
-	_, _ = _db.Exec("DELETE FROM auth_sessions WHERE token_hash != ?", hashToken(keepToken))
+	pruneOrphanUnlocks()
 }
 
 func sweepExpiredSessions() {
 	cutoff := time.Now().Add(-SessionTTL).Unix()
 	_, _ = _db.Exec("DELETE FROM auth_sessions WHERE created_at < ?", cutoff)
+	pruneOrphanUnlocks()
 }
 
 // TokenFromRequest pulls the session token from the cookie, or an

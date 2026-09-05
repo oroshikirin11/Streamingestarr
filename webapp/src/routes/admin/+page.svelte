@@ -49,6 +49,8 @@
 	let rooms = $state([]);
 	let newRoomName = $state('');
 	let roomSel = $state('main');
+	let relayRTSPPort = $state(8554);
+	let relayTranscodeFallback = $state(true);
 	// The room whose page is open in the Rooms section; null is the list.
 	let openRoomId = $state(null);
 	const roomOpen = $derived(openRoomId ? roomsEdit.find((r) => r.id === openRoomId) ?? null : null);
@@ -80,6 +82,8 @@
 		srtPassphraseSet = cfg.srtPassphraseSet ?? false;
 		tcpIngestEnabled = cfg.tcpIngestEnabled ?? false;
 		tcpIngestPort = cfg.tcpIngestPort ?? 9711;
+		relayRTSPPort = cfg.relayRTSPPort ?? 8554;
+		relayTranscodeFallback = cfg.relayTranscodeFallback !== false;
 		tcpTls = cfg.tcpTls ?? { mode: 'off', certFile: '', keyFile: '', certOk: false, certError: '', certSubject: '', certNotAfter: '' };
 		tcpTlsMode = tcpTls.mode ?? 'off';
 		tcpTlsCert = tcpTls.certFile ?? '';
@@ -137,7 +141,16 @@
 			legacyOutput: (r.outputVariants ?? []).length > 0 || Boolean(r.segmentFormat),
 			passphraseSet: Boolean(r.passphraseSet),
 			passphrase: '',
-			pauseVoteEnabled: r.pauseVoteEnabled !== false
+			pauseVoteEnabled: r.pauseVoteEnabled !== false,
+			mode: r.mode ?? 'theater',
+			relayProtocols: r.relayProtocols ?? ['rtsp'],
+			relayLinks: r.relayLinks ?? {},
+			relayPlayers: r.relayPlayers ?? 0,
+			relayEncoding: r.relayEncoding ?? '',
+			roomPasswordSet: Boolean(r.roomPasswordSet),
+			roomPassword: '',
+			lockTheater: Boolean(r.lockTheater),
+			lockRelay: Boolean(r.lockRelay)
 		}));
 	}
 
@@ -158,6 +171,40 @@
 			return cf;
 		}, 'Room saved');
 	}
+
+	// Mode and relay links save on their own — the switch is the action.
+	const MODES = [['theater', 'Theater'], ['relay', 'Relay'], ['both', 'Both']];
+	const PROTOCOLS = [
+		['rtsp', 'RTSP', 'PC — lowest latency, over TCP'],
+		['ts', 'MPEG-TS over HTTP', 'Quest'],
+		['hls', 'HLS', 'browsers and everything else']
+	];
+	async function saveMode(r, mode, protocols) {
+		const before = { mode: r.mode, relayProtocols: r.relayProtocols };
+		r.mode = mode;
+		r.relayProtocols = protocols;
+		const res = await run(() => api.setRoomMode(r.id, mode, protocols));
+		if (res?.success === false) { r.mode = before.mode; r.relayProtocols = before.relayProtocols; return; }
+		await refreshRoomLinks(r);
+	}
+	function toggleProtocol(r, p) {
+		const has = r.relayProtocols.includes(p);
+		const next = has ? r.relayProtocols.filter((x) => x !== p) : [...r.relayProtocols, p];
+		if (!next.length) { toast('Keep at least one link kind', false); return; }
+		saveMode(r, r.mode, next);
+	}
+	async function refreshRoomLinks(r) {
+		try {
+			const d = await api.getRooms();
+			const fresh = (d.rooms ?? []).find((x) => x.id === r.id);
+			if (fresh) { r.relayLinks = fresh.relayLinks ?? {}; r.relayProtocols = fresh.relayProtocols ?? r.relayProtocols; r.relayPlayers = fresh.relayPlayers ?? 0; r.relayEncoding = fresh.relayEncoding ?? ''; }
+		} catch {}
+	}
+	const linkLabel = { rtsp: 'PC · RTSP', ts: 'Quest · MPEG-TS', hls: 'Other · HLS' };
+	const dimToken = (url) => {
+		const m = String(url).match(/^(.*\/)([0-9a-f]{16,})(\.[a-z0-9]+)?$/i);
+		return m ? { head: m[1], token: m[2], tail: m[3] ?? '' } : { head: url, token: '', tail: '' };
+	};
 
 	// The server-wide ladder and container from an earlier version — the
 	// Video tab is gone, but a stored transcode must never hide.
@@ -360,6 +407,17 @@
 		if (r?.success !== false) await loadConfig();
 	}
 
+	// "passthrough (h264) · 3 players" for the status card and the room page.
+	function relayLine(rl) {
+		if (!rl) return '';
+		const enc = rl.encoding === 'transcode' ? `re-encoding ${(rl.sourceVideo || 'the source').toUpperCase()} to H.264`
+			: rl.encoding === 'passthrough-foreign' ? `${(rl.sourceVideo || 'source').toUpperCase()} passed through — PC players that take only H.264 will not play it`
+			: rl.encoding === 'passthrough' ? `passthrough (${(rl.sourceVideo || 'h264').toUpperCase()})`
+			: 'waiting for a stream';
+		const players = rl.players === 1 ? '1 player' : `${rl.players ?? 0} players`;
+		return `${enc} · ${players}${rl.rtspListening === false ? ' · RTSP port not bound' : ''}`;
+	}
+
 	// "Paused by viewer vote since 21:14" for the status card.
 	const pausedSince = $derived.by(() => {
 		const pv = status?.pauseVote;
@@ -434,6 +492,9 @@
 					<dl>
 						<div><dt>Source</dt><dd>{status.broadcaster.remoteAddr}</dd></div>
 						<div><dt>Connected</dt><dd>{uptime ?? '—'}{uptime ? ' ago' : ''}</dd></div>
+						{#if status?.relay?.mode && status.relay.mode !== 'theater'}
+							<div><dt>Relay</dt><dd>{relayLine(status.relay)}</dd></div>
+						{/if}
 						{#if pausedSince || status?.pauseVote?.advertised}
 							<div><dt>Playback</dt><dd>{pausedSince ?? (status?.pauseVote?.pending ? (status.pauseVote.pending === 'pause' ? 'Pausing…' : 'Resuming…') : 'Playing')}<span class="sep">·</span>{status?.pauseVote?.controlConnected ? 'sender control connected' : 'sender control not connected'}{#if !status?.pauseVote?.enabled}<span class="sep">·</span>pause votes off for this room{/if}</dd></div>
 						{/if}
@@ -544,6 +605,7 @@
 							<span class="dot" class:live={roomStatus(r.id)?.online}></span>
 							<span class="rname">{r.name}</span>
 							<span class="rpath mono-text">/t/{r.id}</span>
+							{#if r.mode !== 'theater'}<span class="badge">{r.mode === 'relay' ? 'relay' : 'theater + relay'}</span>{/if}
 							<span class="rstate">{#if roomStatus(r.id)?.online}live · {roomStatus(r.id)?.viewerCount} watching{:else}resting{/if}</span>
 							<span class="chev" aria-hidden="true">›</span>
 						</button>
@@ -591,6 +653,87 @@
 					</div>
 
 					<div class="card">
+						<header><h2>Mode</h2><p>What this room is. A theater is the player page. A relay hands out links for an external player — VRChat's video players, VLC — and seats nobody. Both keeps the theater open with a relay chip in its header.</p></header>
+						<div class="seg" role="radiogroup" aria-label="Room mode">
+							{#each MODES as [id, label]}
+								<button role="radio" aria-checked={r.mode === id} class:on={r.mode === id} onclick={() => r.mode !== id && saveMode(r, id, r.relayProtocols)}>{label}</button>
+							{/each}
+						</div>
+						{#if r.mode !== 'theater'}
+							<div class="protocols">
+								{#each PROTOCOLS as [id, label, where]}
+									<label class="switch">
+										<input type="checkbox" checked={r.relayProtocols.includes(id)} onchange={() => toggleProtocol(r, id)} />
+										<span class="track"></span> {label} <span class="where">— {where}</span>
+									</label>
+								{/each}
+							</div>
+							<div class="links">
+								{#each r.relayProtocols as p (p)}
+									{#if r.relayLinks[p]}
+										{@const parts = dimToken(r.relayLinks[p])}
+										<div class="linkrow">
+											<span class="lk">{linkLabel[p]}</span>
+											<code class="mono-text" title={r.relayLinks[p]}>{parts.head}<span class="tok">{parts.token}</span>{parts.tail}</code>
+											<button class="ghost tiny" onclick={() => copy(r.relayLinks[p])}>Copy</button>
+										</div>
+									{/if}
+								{/each}
+							</div>
+							<footer>
+								<span class="players">{r.relayPlayers === 1 ? '1 player connected' : `${r.relayPlayers} players connected`}{#if r.relayEncoding}&nbsp;· {r.relayEncoding === 'transcode' ? 're-encoding to H.264 here' : r.relayEncoding === 'passthrough-foreign' ? 'source is not H.264, passed through' : 'passthrough'}{/if}</span>
+								<button class="ghost danger-text" onclick={() => { if (confirm('New links? Every old link stops working and connected players are dropped.')) run(async () => { const res = await api.newRelayToken(r.id); await refreshRoomLinks(r); return res; }); }}>New links</button>
+							</footer>
+							<p class="hint">Links are shown to viewers on the room's page — behind the room password when <b>Access</b> says so. The RTSP port is set under <b>Stream</b>.</p>
+						{/if}
+					</div>
+
+					<div class="card">
+						<header><h2>Access</h2><p>The site password is the door for everyone. This room can ask for a second one — for its theater, its relay links, either or neither.</p></header>
+						<div class="field-row">
+							<div class="field">
+								<label for={'roomrpw-' + r.id}>Room password</label>
+								<input id={'roomrpw-' + r.id} type="password" bind:value={r.roomPassword} autocomplete="new-password"
+									placeholder={r.roomPasswordSet ? 'set — type a new one to replace it' : 'none'} />
+							</div>
+							<div class="field compact">
+								<label>&nbsp;</label>
+								<div style="display:flex; gap:6px">
+									<button class="ghost" disabled={!r.roomPassword.trim()} onclick={() => run(async () => { const res = await api.setRoomPassword(r.id, r.roomPassword.trim()); if (res?.success !== false) { r.roomPassword = ''; r.roomPasswordSet = true; } return res; })}>Set</button>
+									{#if r.roomPasswordSet}<button class="ghost danger-text" onclick={() => run(async () => { const res = await api.setRoomPassword(r.id, ''); if (res?.success !== false) { r.roomPasswordSet = false; r.lockTheater = false; r.lockRelay = false; } return res; })}>Remove</button>{/if}
+								</div>
+							</div>
+						</div>
+						<div class="locks" class:off={!r.roomPasswordSet}>
+							<label class="switch">
+								<input type="checkbox" bind:checked={r.lockTheater} disabled={!r.roomPasswordSet} onchange={() => run(async () => { const res = await api.setRoomLocks(r.id, r.lockTheater, r.lockRelay); if (res?.success === false) r.lockTheater = !r.lockTheater; return res; }, r.lockTheater ? 'The theater asks for the room password' : 'The theater is open to everyone at the door')} />
+								<span class="track"></span> Required to enter the theater
+							</label>
+							<label class="switch">
+								<input type="checkbox" bind:checked={r.lockRelay} disabled={!r.roomPasswordSet} onchange={() => run(async () => { const res = await api.setRoomLocks(r.id, r.lockTheater, r.lockRelay); if (res?.success === false) r.lockRelay = !r.lockRelay; return res; }, r.lockRelay ? 'The relay links ask for the room password' : 'The relay links are open to everyone at the door')} />
+								<span class="track"></span> Required to see the relay links
+							</label>
+							{#if !r.roomPasswordSet}<p class="hint">Set a room password first.</p>{/if}
+						</div>
+						<p class="hint">Changing the password asks everyone again. Admins are never asked.</p>
+						<div class="field-row">
+							<div class="field">
+								<label for={'roompass-' + r.id}>SRT passphrase</label>
+								<input id={'roompass-' + r.id} type="password" bind:value={r.passphrase} autocomplete="new-password"
+									placeholder={r.passphraseSet ? 'set — type a new one to replace it' : 'none — the global SRT passphrase applies'} />
+							</div>
+							<div class="field compact">
+								<label>&nbsp;</label>
+								<div style="display:flex; gap:6px">
+									<button class="ghost" disabled={!r.passphrase.trim()} onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, r.passphrase.trim()); if (res?.success !== false) { r.passphrase = ''; r.passphraseSet = true; } return res; }, 'Passphrase set')}>Set</button>
+									{#if r.passphraseSet}<button class="ghost danger-text" onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, ''); if (res?.success !== false) r.passphraseSet = false; return res; }, 'Passphrase cleared')}>Clear</button>{/if}
+								</div>
+							</div>
+						</div>
+						<p class="hint">Senders that open this room over SRT must use the passphrase as the encryption key; it replaces the global SRT passphrase for this room. 10 to 79 characters, no spaces. Applies to the next connection.</p>
+					</div>
+
+					<div class="card">
 						<header><h2>Playback</h2><p>The stream is relayed as it arrives. Latency is the cushion viewers keep; it applies to the room's next broadcast.</p></header>
 						<div class="field compact">
 							<label for={'roomlat-' + r.id}>Latency</label>
@@ -624,21 +767,6 @@
 								</div>
 							{/each}
 						{/if}
-						<div class="field-row">
-							<div class="field">
-								<label for={'roompass-' + r.id}>SRT passphrase</label>
-								<input id={'roompass-' + r.id} type="password" bind:value={r.passphrase} autocomplete="new-password"
-									placeholder={r.passphraseSet ? 'set — type a new one to replace it' : 'none — the global SRT passphrase applies'} />
-							</div>
-							<div class="field compact">
-								<label>&nbsp;</label>
-								<div style="display:flex; gap:6px">
-									<button class="ghost" disabled={!r.passphrase.trim()} onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, r.passphrase.trim()); if (res?.success !== false) { r.passphrase = ''; r.passphraseSet = true; } return res; }, 'Passphrase set')}>Set</button>
-									{#if r.passphraseSet}<button class="ghost danger-text" onclick={() => run(async () => { const res = await api.setRoomPassphrase(r.id, ''); if (res?.success !== false) r.passphraseSet = false; return res; }, 'Passphrase cleared')}>Clear</button>{/if}
-								</div>
-							</div>
-						</div>
-						<p class="hint">Streams that open this room over SRT must use it as the encryption passphrase; it replaces the global SRT passphrase for this room. 10 to 79 characters, no spaces. Applies to the next connection.</p>
 						{#if !r.isDefault}
 							<footer>
 								<button class="ghost" onclick={() => (r.keys = [...r.keys, { key: randomKey(), comment: '' }])}>Add a key</button>
@@ -786,6 +914,17 @@
 						return r;
 					})}>Save</button>
 				</footer>
+			</div>
+
+			<div class="card">
+				<header><h2>Relay</h2><p>The RTSP outlet for rooms in relay mode — rtspt:// links carry this port. TCP only, one port to open. The HTTP links (MPEG-TS, HLS) ride the web port.</p></header>
+				<div class="field-row">
+					<div class="field compact">
+						<label for="rtspport">RTSP port</label>
+						<input id="rtspport" type="number" bind:value={relayRTSPPort} onchange={() => run(() => api.setRelayRTSPPort(Number(relayRTSPPort)))} />
+					</div>
+				</div>
+				<p class="hint">Applies on restart. Open it in the firewall (ufw allow {relayRTSPPort}/tcp) when players come from the internet — the token in the link is the lock, the RTSP itself is plaintext.</p>
 			</div>
 
 			<div class="card">
@@ -948,6 +1087,11 @@
 						<option value={4}>Highest buffer</option>
 					</select>
 				</div>
+				<label class="switch">
+					<input type="checkbox" bind:checked={relayTranscodeFallback} onchange={() => run(() => api.setRelayTranscodeFallback(relayTranscodeFallback))} />
+					<span class="track"></span> Re-encode to H.264 on this server when a relay room's source is not H.264
+				</label>
+				<p class="hint">Relay players (VRChat on PC) take H.264 only. The sender is asked to send H.264 first; this is the fallback when it does not, at the cost of CPU here and a generation of quality. Off, the source passes through as it is.</p>
 				{#if legacyLadder}
 					<p class="hint danger-text">A transcode ladder from an earlier version is still stored ({legacyLadder} variants) — every broadcast is re-encoded on this server.
 						<button class="ghost tiny" onclick={() => run(async () => { const r = await api.setOutputVariants(PASSTHROUGH); await loadConfig(); return r; }, 'Passthrough restored')}>Reset to passthrough</button></p>
@@ -965,7 +1109,7 @@
 					<input id="roompw" type="password" bind:value={newRoomPw} autocomplete="new-password" />
 				</div>
 				<footer>
-					<button disabled={!newRoomPw} onclick={() => run(async () => { const r = await api.setRoomPassword(newRoomPw); newRoomPw = ''; return r; }, 'Site password changed — everyone else was signed out')}>Change</button>
+					<button disabled={!newRoomPw} onclick={() => run(async () => { const r = await api.setSitePassword(newRoomPw); newRoomPw = ''; return r; }, 'Site password changed — everyone else was signed out')}>Change</button>
 				</footer>
 			</div>
 
@@ -1117,7 +1261,7 @@
 
 	/* ---------- status ---------- */
 	.statusline { display: flex; align-items: center; gap: 9px; font-size: 15px; }
-	.statusline .sep { color: var(--muted); }
+	.statusline .sep, dd .sep { color: var(--muted); margin: 0 6px; }
 	.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
 	.dot.live { background: #5fc493; box-shadow: 0 0 10px #5fc493; }
 	.roompick { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
@@ -1159,6 +1303,20 @@
 	.roomrow .rpath { color: var(--muted); }
 	.roomrow .rstate { margin-left: auto; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 	.roomrow .chev { color: var(--muted); font-size: 18px; line-height: 1; }
+	.roomrow .badge, .seg + .protocols { }
+	.badge { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); border-radius: 999px; padding: 2px 8px; }
+	.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; padding: 3px; gap: 2px; background: var(--surface-2); margin: 4px 0 12px; }
+	.seg button { background: transparent; color: var(--muted); border: 0; border-radius: 999px; padding: 6px 16px; font-size: 13px; font-weight: 600; }
+	.seg button.on { background: var(--accent); color: #101216; }
+	.protocols { margin: 4px 0 10px; }
+	.protocols .where { color: var(--muted); font-weight: 400; }
+	.links { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; }
+	.linkrow { display: flex; align-items: center; gap: 10px; }
+	.linkrow .lk { flex: none; width: 118px; font-size: 11.5px; color: var(--muted); }
+	.linkrow code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+	.linkrow code .tok { color: var(--muted); }
+	.players { margin-right: auto; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+	.locks.off { opacity: 0.55; }
 	.backlink { display: inline-block; color: var(--muted); font-size: 12.5px; text-decoration: none; margin-bottom: 12px; }
 	.backlink:hover { color: var(--accent); }
 	hgroup h1 .dot.big { display: inline-block; width: 11px; height: 11px; vertical-align: 1px; margin-right: 4px; }

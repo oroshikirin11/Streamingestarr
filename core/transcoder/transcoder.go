@@ -42,9 +42,17 @@ type Transcoder struct {
 
 	stdin *io.PipeReader
 
-	TranscoderCompleted  func(error)
-	playlistOutputPath   string
-	segmentFormat        string
+	TranscoderCompleted func(error)
+	playlistOutputPath  string
+	segmentFormat       string
+
+	// The relay output: a second, MPEG-TS output over loopback TCP for the
+	// room's relay links. relayVideo is "copy" or "h264" (a re-encode for
+	// players that cannot take the source codec); relayVideoRange is the
+	// source's colour range so a re-encode tone-maps HDR.
+	relayOutput          string
+	relayVideo           string
+	relayVideoRange      string
 	ffmpegPath           string
 	segmentIdentifier    string
 	internalListenerPort string
@@ -292,6 +300,32 @@ func (t *Transcoder) getFlags() *execInfo {
 		localListenerAddress + "/%v/stream.m3u8", // Send HLS playlists back to us over HTTP
 	}...)
 
+	// The relay output rides the same ffmpeg: a remux when the source is
+	// already what the players want, a re-encode otherwise. Options here
+	// apply to this output only — they follow the HLS output's URL.
+	if t.relayOutput != "" {
+		ffmpegFlags = append(ffmpegFlags, "-map", "0:v:0", "-map", "0:a:0?")
+		if t.relayVideo == "h264" {
+			vf := "format=yuv420p"
+			if (t.relayVideoRange == "pq" || t.relayVideoRange == "hlg") && HasFilter("zscale") {
+				vf = "zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p"
+			}
+			ffmpegFlags = append(ffmpegFlags, []string{
+				"-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high", "-level", "4.1",
+				"-vf", vf, "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
+				"-b:v", "6000k", "-maxrate", "6500k", "-bufsize", "12000k",
+			}...)
+		} else {
+			ffmpegFlags = append(ffmpegFlags, "-c:v", "copy")
+		}
+		if audio := config.GetInboundAudioCodec(t.channelID); audio == "" || audio == "aac" {
+			ffmpegFlags = append(ffmpegFlags, "-c:a", "copy")
+		} else {
+			ffmpegFlags = append(ffmpegFlags, "-c:a", "aac", "-b:a", "160k")
+		}
+		ffmpegFlags = append(ffmpegFlags, "-f", "mpegts", "-flush_packets", "1", t.relayOutput)
+	}
+
 	return &execInfo{
 		binPath: t.ffmpegPath,
 		command: ffmpegFlags,
@@ -513,6 +547,14 @@ func (t *Transcoder) AddVariant(variant HLSVariant) {
 // SetInput sets the input stream on the filesystem.
 func (t *Transcoder) SetInput(input string) {
 	t.input = input
+}
+
+// SetRelayOutput adds the relay's MPEG-TS output: url is the loopback
+// listener, video "copy" or "h264", videoRange the source's ("" for SDR).
+func (t *Transcoder) SetRelayOutput(url, video, videoRange string) {
+	t.relayOutput = url
+	t.relayVideo = video
+	t.relayVideoRange = videoRange
 }
 
 // SetStdin sets the Stdin of the ffmpeg command.

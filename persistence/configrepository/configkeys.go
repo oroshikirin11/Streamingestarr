@@ -37,6 +37,8 @@ const (
 	srtPassphraseKey                = "srt_passphrase"
 	tcpIngestEnabledKey             = "tcp_ingest_enabled"
 	tcpIngestPortKey                = "tcp_ingest_port"
+	relayRTSPPortKey                = "relay_rtsp_port"
+	relayTranscodeFallbackKey       = "relay_transcode_fallback"
 	tcpIngestTLSModeKey             = "tcp_ingest_tls_mode"
 	tcpIngestTLSCertFileKey         = "tcp_ingest_tls_cert_file"
 	tcpIngestTLSKeyFileKey          = "tcp_ingest_tls_key_file"

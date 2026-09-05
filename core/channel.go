@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"streamingestarr/auth"
 	"sync"
 	"time"
 
@@ -42,6 +43,9 @@ type ChannelRuntime struct {
 	// promoting that at stream end put another room's film in this
 	// room's "previously in this room" line.
 	lastOnAir *models.LastPlayed
+
+	// relay is the room's relay feed and player counts (relayplayers.go).
+	relay roomRelay
 
 	offlineCleanupTimer *time.Timer
 	// Pending drop of now-playing after a disconnect; see deferNowPlayingDrop.
@@ -172,6 +176,7 @@ func RemoveChannel(id string) error {
 	if err := channelrepository.DeleteChannel(id); err != nil {
 		return err
 	}
+	auth.ClearRoomUnlocks(id)
 	_channelsLock.Lock()
 	delete(_channels, id)
 	_channelsLock.Unlock()

@@ -54,6 +54,9 @@ func Start(enableVerboseLogging bool) error {
 	// unscoped paths resolve to the default channel.
 	r.HandleFunc("/hls/*", handlers.HandleHLSRequest)
 
+	// Relay outlets for external players: the token in the link is the key.
+	r.HandleFunc("/relay/*", handlers.HandleRelayRequest)
+
 	// Channel-scoped viewer pages. One theater today: the root serves it,
 	// and /t/<channel> is the scoped address the multi-channel future uses.
 	r.HandleFunc("/t/*", handlers.ViewerAppHandler)
@@ -81,6 +84,8 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/config/tcp/port", middleware.RequireAdminAuth(handlers.SetTCPIngestPort))
 	r.Post("/api/admin/config/tcp/tls", middleware.RequireAdminAuth(handlers.SetTCPIngestTLS))
 	r.Get("/api/admin/config/tcp/tls/browse", middleware.RequireAdminAuth(handlers.BrowseTCPIngestTLS))
+	r.Post("/api/admin/config/relay/rtspport", middleware.RequireAdminAuth(handlers.SetRelayRTSPPort))
+	r.Post("/api/admin/config/relay/transcodefallback", middleware.RequireAdminAuth(handlers.SetRelayTranscodeFallback))
 
 	// Rooms: the viewer lobby list, and the admin CRUD (cap 5, key-routed —
 	// no per-room ports).
@@ -89,6 +94,12 @@ func Start(enableVerboseLogging bool) error {
 	r.Post("/api/admin/rooms", middleware.RequireAdminAuth(admin.CreateRoom))
 	r.Post("/api/admin/rooms/delete", middleware.RequireAdminAuth(admin.DeleteRoom))
 	r.Post("/api/admin/rooms/rename", middleware.RequireAdminAuth(admin.RenameRoom))
+	r.Post("/api/admin/rooms/mode", middleware.RequireAdminAuth(admin.SetRoomMode))
+	r.Post("/api/admin/rooms/password", middleware.RequireAdminAuth(admin.SetRoomPassword))
+	r.Post("/api/admin/rooms/locks", middleware.RequireAdminAuth(admin.SetRoomLocks))
+	r.Post("/api/admin/rooms/relaytoken", middleware.RequireAdminAuth(admin.NewRelayToken))
+	// A viewer entering a room's own password.
+	r.Post("/api/rooms/unlock", handlers.UnlockRoom)
 	r.Post("/api/admin/rooms/keys", middleware.RequireAdminAuth(admin.SetRoomKeys))
 	r.Post("/api/admin/rooms/config", middleware.RequireAdminAuth(admin.SetRoomConfig))
 	r.Post("/api/admin/rooms/passphrase", middleware.RequireAdminAuth(admin.SetRoomPassphrase))

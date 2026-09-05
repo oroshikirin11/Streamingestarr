@@ -15,9 +15,11 @@ import (
 // theaters exist, which are playing, and what's on. No stream keys here.
 
 type viewerRoom struct {
-	ID          string             `json:"id"`
-	Name        string             `json:"name"`
-	Online      bool               `json:"online"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Online bool   `json:"online"`
+	// Mode: theater, relay or both — the wall badges relays.
+	Mode        string             `json:"mode"`
 	ViewerCount int                `json:"viewerCount,omitempty"`
 	NowPlaying  *models.NowPlaying `json:"nowPlaying,omitempty"`
 }
@@ -27,7 +29,7 @@ func GetRooms(w http.ResponseWriter, r *http.Request) {
 	hideViewerCount := configrepository.Get().GetHideViewerCount()
 	rooms := []viewerRoom{}
 	for _, ch := range channelrepository.ListChannels() {
-		room := viewerRoom{ID: ch.ID, Name: ch.Name}
+		room := viewerRoom{ID: ch.ID, Name: ch.Name, Mode: ch.EffectiveMode()}
 		if c := core.GetChannelRuntime(ch.ID); c != nil {
 			status := c.GetStatus()
 			room.Online = status.Online

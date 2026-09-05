@@ -62,6 +62,15 @@ var (
 	presenceChangedHandler func(channelID string, clientID uint)
 )
 
+// roomAccessCheck says whether a request may take a seat in a room —
+// the room's mode and its own password, decided by core.
+var roomAccessCheck func(r *http.Request, channelID string) bool
+
+// SetRoomAccessCheck wires the room access decision in.
+func SetRoomAccessCheck(check func(r *http.Request, channelID string) bool) {
+	roomAccessCheck = check
+}
+
 // SetPauseVoteHooks wires the room-side vote logic in.
 func SetPauseVoteHooks(onVote func(channelID string, user *models.User, action string), onPresence func(channelID string, clientID uint)) {
 	pauseVoteHandler = onVote

@@ -30,6 +30,21 @@ export const getStatus = () => request(`/api/status?channel=${currentChannel()}`
 export const getConfig = () => request('/api/config');
 export const getRooms = () => request('/api/rooms');
 
+// A room's own password. The answer is {success, message}; a wrong
+// password is a 401 with the sentence to show, never a door redirect.
+export async function unlockRoom(password) {
+	const res = await fetch('/api/rooms/unlock', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ channel: currentChannel(), password })
+	});
+	const body = await res.json().catch(() => ({}));
+	if (res.status === 401 && String(body.message ?? '').includes('not authenticated')) {
+		window.location.href = '/login';
+	}
+	return body;
+}
+
 export const registerChatUser = (displayName) =>
 	request('/api/chat/register', {
 		method: 'POST',

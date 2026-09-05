@@ -248,6 +248,13 @@ func (s *Server) HandleClientConnection(w http.ResponseWriter, r *http.Request) 
 		log.Errorln("error determining if IP address is blocked: ", err)
 	}
 
+	// The room's door: a relay-only room seats nobody, a locked theater
+	// only sessions that entered its password.
+	if roomAccessCheck != nil && !roomAccessCheck(r, r.URL.Query().Get("channel")) {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
 	// Limit concurrent chat connections
 	if uint64(len(s.clients)) >= s.maxSocketConnectionLimit {
 		log.Warnln("rejecting incoming client connection as it exceeds the max client count of", s.maxSocketConnectionLimit)

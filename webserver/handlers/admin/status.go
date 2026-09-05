@@ -3,6 +3,7 @@ package admin
 import (
 	"encoding/json"
 	"net/http"
+	"streamingestarr/config"
 
 	log "github.com/sirupsen/logrus"
 	"streamingestarr/core"
@@ -42,6 +43,15 @@ func Status(w http.ResponseWriter, r *http.Request) {
 	}
 	enabled, controlConnected := channel.PauseVoteInfo()
 	response.PauseVote = adminPauseVoteStatus{Enabled: enabled, ControlConnected: controlConnected}
+	if room := channelrepository.GetChannel(channelID); room != nil {
+		response.Relay = adminRelayStatus{
+			Mode:          room.EffectiveMode(),
+			Encoding:      channel.RelayEncoding(),
+			Players:       channel.RelayPlayerCount(),
+			RTSPListening: core.RelayRTSPListening(),
+			SourceVideo:   config.GetInboundVideoCodec(channelID),
+		}
+	}
 	if np := channel.GetNowPlaying(); np != nil {
 		response.PauseVote.Paused = np.Paused
 		response.PauseVote.PausedBy = np.PausedBy
@@ -70,6 +80,17 @@ type adminStatusResponse struct {
 	SessionPeakViewerCount int                          `json:"sessionPeakViewerCount"`
 	Online                 bool                         `json:"online"`
 	PauseVote              adminPauseVoteStatus         `json:"pauseVote"`
+	Relay                  adminRelayStatus             `json:"relay"`
+}
+
+// adminRelayStatus is the relay picture for the admin: the room's mode,
+// what the running broadcast's relay does with the video, who pulls.
+type adminRelayStatus struct {
+	Mode          string `json:"mode"`
+	Encoding      string `json:"encoding"` // passthrough | transcode | passthrough-foreign | ""
+	Players       int    `json:"players"`
+	RTSPListening bool   `json:"rtspListening"`
+	SourceVideo   string `json:"sourceVideo"`
 }
 
 // adminPauseVoteStatus is the viewer pause-vote picture for the admin:

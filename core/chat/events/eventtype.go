@@ -28,6 +28,8 @@ const (
 	StreamTitleUpdated EventType = "STREAM_TITLE_UPDATED"
 	// SystemMessageSent is the event sent when a system message is sent.
 	SystemMessageSent EventType = "SYSTEM"
+	// RoomModeChanged tells a room its mode flipped: {"mode": "theater"|"relay"|"both"}.
+	RoomModeChanged EventType = "ROOM_MODE"
 	// ChatDisabled is when a user is explicitly disabled and blocked from using chat.
 	ChatDisabled EventType = "CHAT_DISABLED"
 	// ConnectedUserInfo is a private event to a user letting them know their user details.

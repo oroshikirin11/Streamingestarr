@@ -91,8 +91,20 @@ func ResolveChannel(integration models.ExternalAPIUser, w http.ResponseWriter, r
 			return
 		}
 	}
+	// The room's mode rides along: a relay room wants H.264 SDR from the
+	// sender, so it can decide the codec before going live.
+	response := map[string]interface{}{"channel": channelID}
+	if ch := channelrepository.GetChannel(channelID); ch != nil {
+		response["name"] = ch.Name
+		response["mode"] = ch.EffectiveMode()
+		response["relay"] = map[string]interface{}{
+			"enabled":   ch.Relays(),
+			"protocols": ch.EffectiveRelayProtocols(),
+			"wants":     map[string]string{"video": "h264", "range": "sdr"},
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"channel": channelID})
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // GetCapabilities tells a sender what this receiver accepts, so a
@@ -100,8 +112,10 @@ func ResolveChannel(integration models.ExternalAPIUser, w http.ResponseWriter, r
 func GetCapabilities(integration models.ExternalAPIUser, w http.ResponseWriter, r *http.Request) {
 	configRepository := configrepository.Get()
 	channels := []string{}
+	rooms := []map[string]interface{}{}
 	for _, c := range channelrepository.ListChannels() {
 		channels = append(channels, c.ID)
+		rooms = append(rooms, map[string]interface{}{"id": c.ID, "name": c.Name, "mode": c.EffectiveMode(), "relay": c.Relays()})
 	}
 	response := map[string]interface{}{
 		"service":    "streamingestarr",
@@ -115,6 +129,10 @@ func GetCapabilities(integration models.ExternalAPIUser, w http.ResponseWriter, 
 		},
 		"segmentFormat": configRepository.GetVideoSegmentFormat(),
 		"channels":      channels,
+		// Rooms with their mode; a relay room takes H.264 SDR only (the
+		// resolve-channel answer says so per stream key as well).
+		"rooms": rooms,
+		"relay": map[string]interface{}{"rtspPort": configRepository.GetRelayRTSPPort(), "wants": map[string]string{"video": "h264", "range": "sdr"}},
 		"metadata": map[string]bool{
 			"nowPlaying": true,
 			"schedule":   true,

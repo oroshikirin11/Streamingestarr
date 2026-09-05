@@ -26,6 +26,10 @@ type ConfigRepository interface {
 	GetTCPIngestEnabled() bool
 	SetTCPIngestEnabled(enabled bool) error
 	GetTCPIngestPort() int
+	GetRelayRTSPPort() int
+	SetRelayRTSPPort(port int) error
+	GetRelayTranscodeFallback() bool
+	SetRelayTranscodeFallback(on bool) error
 	SetTCPIngestPort(port int) error
 	GetTCPIngestTLSMode() string
 	SetTCPIngestTLSMode(mode string) error

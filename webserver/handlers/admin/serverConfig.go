@@ -76,18 +76,20 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 			VideoQualityVariants: videoQualityVariants,
 			LatencyLevel:         configRepository.GetStreamLatencyLevel().Level,
 		},
-		ExternalActions:    configRepository.GetExternalActions(),
-		SupportedCodecs:    transcoder.GetCodecs(ffmpeg),
-		VideoCodec:         configRepository.GetVideoCodec(),
-		VideoSegmentFormat: configRepository.GetVideoSegmentFormat(),
-		SRTServerEnabled:   configRepository.GetSRTServerEnabled(),
-		SRTServerPort:      configRepository.GetSRTServerPort(),
-		SRTPassphraseSet:   configRepository.GetSRTPassphrase() != "",
-		TCPIngestEnabled:   configRepository.GetTCPIngestEnabled(),
-		TCPIngestPort:      configRepository.GetTCPIngestPort(),
-		TCPTLS:             tcpTLSStatusFor(configRepository),
-		ForbiddenUsernames: usernameBlocklist,
-		SuggestedUsernames: usernameSuggestions,
+		ExternalActions:        configRepository.GetExternalActions(),
+		SupportedCodecs:        transcoder.GetCodecs(ffmpeg),
+		VideoCodec:             configRepository.GetVideoCodec(),
+		VideoSegmentFormat:     configRepository.GetVideoSegmentFormat(),
+		SRTServerEnabled:       configRepository.GetSRTServerEnabled(),
+		SRTServerPort:          configRepository.GetSRTServerPort(),
+		SRTPassphraseSet:       configRepository.GetSRTPassphrase() != "",
+		TCPIngestEnabled:       configRepository.GetTCPIngestEnabled(),
+		TCPIngestPort:          configRepository.GetTCPIngestPort(),
+		RelayRTSPPort:          configRepository.GetRelayRTSPPort(),
+		RelayTranscodeFallback: configRepository.GetRelayTranscodeFallback(),
+		TCPTLS:                 tcpTLSStatusFor(configRepository),
+		ForbiddenUsernames:     usernameBlocklist,
+		SuggestedUsernames:     usernameSuggestions,
 
 		// Compatibility stubs for the legacy admin UI: it destructures
 		// these removed features' config objects and crashes when they are
@@ -119,6 +121,8 @@ type serverConfigAdminResponse struct {
 	SRTPassphraseSet          bool                    `json:"srtPassphraseSet"`
 	TCPIngestEnabled          bool                    `json:"tcpIngestEnabled"`
 	TCPIngestPort             int                     `json:"tcpIngestPort"`
+	RelayRTSPPort             int                     `json:"relayRTSPPort"`
+	RelayTranscodeFallback    bool                    `json:"relayTranscodeFallback"`
 	TCPTLS                    tcpTLSStatus            `json:"tcpTls"`
 	YP                        legacyYPStub            `json:"yp"`
 	S3                        legacyS3Stub            `json:"s3"`

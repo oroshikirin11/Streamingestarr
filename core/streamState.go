@@ -2,6 +2,7 @@ package core
 
 import (
 	"io"
+	"streamingestarr/config"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -52,7 +53,13 @@ func (c *ChannelRuntime) setStreamAsConnected(rtmpOut *io.PipeReader) {
 		c.transcoder = transcoder.NewTranscoder(c.ID)
 		c.transcoder.SetOutputPath(c.HLSOutputPath)
 		c.transcoder.SetInternalHTTPPort(c.fileWriter.Port())
+		// The relay feed rides every broadcast: a remux costs nothing, and
+		// a room switched to relay mid-show has its links live at once.
+		if url, video := c.relayBegin(); url != "" {
+			c.transcoder.SetRelayOutput(url, video, config.GetInboundVideoRange(c.ID))
+		}
 		c.transcoder.TranscoderCompleted = func(error) {
+			c.relayEnd()
 			c.SetStreamAsDisconnected()
 			c.transcoder = nil
 			c.currentBroadcast = nil

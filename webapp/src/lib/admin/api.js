@@ -30,7 +30,7 @@ export const setStreamKeys = (keys) => post('/api/admin/config/streamkeys', { va
 export const setOutputVariants = (variants) =>
 	post('/api/admin/config/video/streamoutputvariants', { value: variants });
 export const setAdminPassword = (value) => post('/api/admin/config/adminpass', { value });
-export const setRoomPassword = (viewerPassword) =>
+export const setSitePassword = (viewerPassword) =>
 	post('/api/admin/config/viewerlogin', { viewerPassword });
 export const setNameReservationDays = (value) =>
 	post('/api/admin/config/chat/namereservationdays', { value });
@@ -76,3 +76,9 @@ export const setRoomKeys = (id, keys) => post('/api/admin/rooms/keys', { id, key
 export const setRoomConfig = (id, config) => post('/api/admin/rooms/config', { id, ...config });
 export const setRoomPassphrase = (id, passphrase) => post('/api/admin/rooms/passphrase', { id, passphrase });
 export const setRoomPauseVote = (id, enabled) => post('/api/admin/rooms/pausevote', { id, enabled });
+export const setRoomMode = (id, mode, relayProtocols) => post('/api/admin/rooms/mode', { id, mode, relayProtocols });
+export const setRoomPassword = (id, password) => post('/api/admin/rooms/password', { id, password });
+export const setRoomLocks = (id, lockTheater, lockRelay) => post('/api/admin/rooms/locks', { id, lockTheater, lockRelay });
+export const newRelayToken = (id) => post('/api/admin/rooms/relaytoken', { id });
+export const setRelayRTSPPort = (value) => post('/api/admin/config/relay/rtspport', { value });
+export const setRelayTranscodeFallback = (value) => post('/api/admin/config/relay/transcodefallback', { value });

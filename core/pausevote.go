@@ -241,8 +241,13 @@ func (c *ChannelRuntime) pauseVoteAvailability() (bool, string) {
 	if np == nil || np.Controls == nil || !np.Controls.PauseVote {
 		return false, "the sender does not allow pause votes"
 	}
-	if ch := channelrepository.GetChannel(c.ID); ch != nil && !ch.PauseVoteEnabled {
-		return false, "pause votes are switched off for this room"
+	if ch := channelrepository.GetChannel(c.ID); ch != nil {
+		if !ch.HasTheater() {
+			return false, "the room is in relay mode"
+		}
+		if !ch.PauseVoteEnabled {
+			return false, "pause votes are switched off for this room"
+		}
 	}
 	if c.pauseVote.control == nil {
 		return false, "the sender is not connected"

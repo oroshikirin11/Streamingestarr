@@ -1,6 +1,7 @@
 <script>
 	import '../app.css';
-	import { status, config, role, reachable, clockSkewMs } from '$lib/stores.js';
+	import { status, config, role, reachable, clockSkewMs, refreshStatus } from '$lib/stores.js';
+	import { roomModeEvent } from '$lib/chat.js';
 	import { dedupeSubtitle } from '$lib/text.js';
 	import { logout, getRooms } from '$lib/api.js';
 	import GlowFrame from '$lib/components/GlowFrame.svelte';
@@ -8,9 +9,28 @@
 	import ChatPanel from '$lib/components/ChatPanel.svelte';
 	import Lobby from '$lib/components/Lobby.svelte';
 	import RoomWall from '$lib/components/RoomWall.svelte';
+	import RelayCard from '$lib/components/RelayCard.svelte';
+	import RoomLock from '$lib/components/RoomLock.svelte';
 
 	let chatHidden = $state(false);
 	let frame = $state();
+
+	// The room's mode and doors come with status. A ROOM_MODE event over
+	// the chat socket means the admin flipped it while people were inside:
+	// refresh at once so the page morphs in place.
+	const mode = $derived($status?.mode ?? 'theater');
+	const relayOnly = $derived(mode === 'relay');
+	const hybrid = $derived(mode === 'both');
+	const theaterLocked = $derived(Boolean($status?.access?.theaterLocked));
+	let relayOpen = $state(false);
+	let lastModeEvent = 0;
+	$effect(() => {
+		const ev = $roomModeEvent;
+		if (ev && ev.at !== lastModeEvent) {
+			lastModeEvent = ev.at;
+			refreshStatus();
+		}
+	});
 
 	// The rooms list drives the overview: with more than one room the front
 	// page becomes the screen wall, and scoped theaters grow a way back to
@@ -79,8 +99,13 @@
 			<div class="mood">{$status.streamTitle}</div>
 		{/if}
 		<div class="spacer"></div>
-		{#if live && !showWall}
+		{#if live && !showWall && !relayOnly && !theaterLocked}
 			<div class="presence">{viewers} watching</div>
+		{/if}
+		{#if hybrid && !showWall && !theaterLocked}
+			<button class="relay-chip" class:on={relayOpen} onclick={() => (relayOpen = !relayOpen)} title={relayOpen ? 'Hide the relay links' : 'Links for an external player'} aria-pressed={relayOpen}>
+				relay on{#if $status?.relay?.players} · {$status.relay.players} {$status.relay.players === 1 ? 'player' : 'players'}{/if}
+			</button>
 		{/if}
 		<div class="iconbar">
 			{#if multiRoom && scoped}
@@ -88,7 +113,7 @@
 					<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
 				</a>
 			{/if}
-			{#if live && !showWall}
+			{#if live && !showWall && !relayOnly && !theaterLocked}
 				<button
 					class="icon-btn"
 					class:active={!chatHidden}
@@ -114,20 +139,30 @@
 		<div class="loading">·</div>
 	{:else if showWall}
 		<RoomWall rooms={roomsList} />
+	{:else if !$status}
+		<div class="loading">·</div>
+	{:else if relayOnly}
+		<RelayCard status={$status} roomName={theaterName} onUnlocked={refreshStatus} />
+	{:else if theaterLocked}
+		<div class="lockstage"><RoomLock roomName={theaterName} what="theater" onUnlocked={refreshStatus} /></div>
 	{:else if live}
 		<div class="lounge" class:chat-hidden={chatHidden}>
 			<div class="screen-zone">
 				<GlowFrame bind:this={frame} channelId={roomId} clockSkewMs={$clockSkewMs} paused={$status?.nowPlaying?.paused === true} pausedBy={$status?.nowPlaying?.pausedBy ?? ''} />
 				<NowTray status={$status} clockSkewMs={$clockSkewMs} />
+				{#if hybrid && relayOpen}
+					<RelayCard status={$status} roomName={theaterName} compact onUnlocked={refreshStatus} />
+				{/if}
 			</div>
 			{#if !chatHidden}
 				<ChatPanel />
 			{/if}
 		</div>
-	{:else if $status}
-		<Lobby status={$status} />
 	{:else}
-		<div class="loading">·</div>
+		{#if hybrid && relayOpen}
+			<RelayCard status={$status} roomName={theaterName} compact onUnlocked={refreshStatus} />
+		{/if}
+		<Lobby status={$status} />
 	{/if}
 </div>
 
@@ -300,5 +335,33 @@
 		.screen-zone :global(.now-tray) {
 			display: none;
 		}
+	}
+	.relay-chip {
+		appearance: none;
+		font: inherit;
+		font-size: 11.5px;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		padding: 5px 11px;
+		border-radius: 999px;
+		border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+		background: color-mix(in srgb, var(--accent) 10%, transparent);
+		color: var(--accent);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.relay-chip.on {
+		background: var(--accent);
+		color: #101216;
+	}
+	.lockstage {
+		flex: 1;
+		min-height: 0;
+		display: grid;
+		place-items: center;
+		padding: 20px;
+		border: 1px solid var(--border-soft);
+		border-radius: var(--radius);
+		background: radial-gradient(ellipse at 50% 40%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%);
 	}
 </style>

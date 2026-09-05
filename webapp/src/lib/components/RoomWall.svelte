@@ -64,6 +64,7 @@
 									<div class="preview fallback"></div>
 								{/if}
 								<span class="live-chip">Live</span>
+								{#if r.mode === 'relay'}<span class="relay-chip">Relay</span>{/if}
 								{#if r.viewerCount}
 									<span class="viewers-chip">{r.viewerCount} watching</span>
 								{/if}
@@ -72,12 +73,13 @@
 								{/if}
 							{:else}
 								<div class="off">{REST_LINES[i % REST_LINES.length]}</div>
+								{#if r.mode === 'relay'}<span class="relay-chip">Relay</span>{/if}
 							{/if}
 						</div>
 					</div>
 					<div class="meta">
 						<span class="name">{r.name}</span>
-						<span class="enter">{r.online ? 'Enter →' : 'Wait inside →'}</span>
+						<span class="enter">{r.mode === 'relay' ? 'Links →' : r.online ? 'Enter →' : 'Wait inside →'}</span>
 					</div>
 				</a>
 			{/each}
@@ -202,6 +204,19 @@
 		letter-spacing: 0.14em;
 		text-transform: uppercase;
 		color: #5fc493;
+	}
+	.relay-chip {
+		position: absolute;
+		top: 10px;
+		right: 10px;
+		font-size: 10px;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		padding: 3px 8px;
+		border-radius: 999px;
+		border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+		color: var(--accent);
+		background: color-mix(in srgb, var(--bg) 70%, transparent);
 	}
 	.live-chip::before {
 		content: '';
