@@ -1,6 +1,6 @@
 // Server state: status polled every 5s, config fetched once.
 import { readable, writable } from 'svelte/store';
-import { getStatus, getConfig } from './api.js';
+import { getStatus, getConfig, currentChannel } from './api.js';
 
 export const config = writable(null);
 getConfig().then(config.set).catch(() => {});
@@ -33,17 +33,23 @@ export function refreshStatus() {
 export const status = readable(null, (set) => {
 	let stopped = false;
 	let failures = 0;
+	// A remount for another room starts here again: the last room's answer
+	// must not be the first thing the new room renders.
+	set(null);
 	pollNow = () => {
 		clearTimeout(timer);
 		poll();
 	};
 	async function poll() {
 		try {
+			const asked = currentChannel();
 			const s = await getStatus();
 			failures = 0;
 			reachable.set(true);
 			noteServerTime(s);
-			if (!stopped) set(s);
+			// A poll that started for one room and lands after a switch to
+			// another says nothing about the room on screen: drop it.
+			if (!stopped && asked === currentChannel() && (!s?.channelId || s.channelId === asked)) set(s);
 		} catch {
 			failures += 1;
 			if (failures >= 2) reachable.set(false);

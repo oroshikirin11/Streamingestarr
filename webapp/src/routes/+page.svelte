@@ -15,13 +15,24 @@
 	let chatHidden = $state(false);
 	let frame = $state();
 
+	// Only a status for THIS room counts. The store is shared across the
+	// per-room remount, so an answer tagged with another room's id — the
+	// last room's, or a poll that landed late — is not this room's.
+	const st = $derived($status && (!$status.channelId || $status.channelId === roomId) ? $status : null);
+	// A fresh mount asks for the room's status at once instead of waiting
+	// out the poll interval the shared store is on.
+	$effect(() => {
+		roomId;
+		refreshStatus();
+	});
+
 	// The room's mode and doors come with status. A ROOM_MODE event over
 	// the chat socket means the admin flipped it while people were inside:
 	// refresh at once so the page morphs in place.
-	const mode = $derived($status?.mode ?? 'theater');
+	const mode = $derived(st?.mode ?? 'theater');
 	const relayOnly = $derived(mode === 'relay');
 	const hybrid = $derived(mode === 'both');
-	const theaterLocked = $derived(Boolean($status?.access?.theaterLocked));
+	const theaterLocked = $derived(Boolean(st?.access?.theaterLocked));
 	let relayOpen = $state(false);
 	let lastModeEvent = 0;
 	$effect(() => {
@@ -64,8 +75,8 @@
 	const multiRoom = $derived((roomsList?.length ?? 0) > 1);
 	const showWall = $derived(!scoped && multiRoom);
 
-	const live = $derived($status?.online === true);
-	const viewers = $derived($status?.viewerCount ?? 0);
+	const live = $derived(st?.online === true);
+	const viewers = $derived(st?.viewerCount ?? 0);
 	const roomName = $derived.by(() => {
 		if (!scoped) return null;
 		const id = location.pathname.match(/^\/t\/([a-z][a-z0-9-]*)/)?.[1];
@@ -75,7 +86,7 @@
 
 	const tabTitle = $derived.by(() => {
 		if (showWall) return theaterName + ' — rooms';
-		const np = $status?.nowPlaying;
+		const np = st?.nowPlaying;
 		if (live && np?.title) {
 			const sub = dedupeSubtitle(np.title, np.subtitle);
 			return sub ? `${np.title} — ${sub}` : np.title;
@@ -95,8 +106,8 @@
 	{/if}
 	<header class="soft">
 		<div class="name"><b>●</b> {theaterName}</div>
-		{#if $status?.streamTitle && live}
-			<div class="mood">{$status.streamTitle}</div>
+		{#if st?.streamTitle && live}
+			<div class="mood">{st.streamTitle}</div>
 		{/if}
 		<div class="spacer"></div>
 		{#if live && !showWall && !relayOnly && !theaterLocked}
@@ -104,7 +115,7 @@
 		{/if}
 		{#if hybrid && !showWall && !theaterLocked}
 			<button class="relay-chip" class:on={relayOpen} onclick={() => (relayOpen = !relayOpen)} title={relayOpen ? 'Hide the relay links' : 'Links for an external player'} aria-pressed={relayOpen}>
-				relay on{#if $status?.relay?.players} · {$status.relay.players} {$status.relay.players === 1 ? 'player' : 'players'}{/if}
+				relay on{#if st?.relay?.players} · {st.relay.players} {st.relay.players === 1 ? 'player' : 'players'}{/if}
 			</button>
 		{/if}
 		<div class="iconbar">
@@ -139,19 +150,19 @@
 		<div class="loading">·</div>
 	{:else if showWall}
 		<RoomWall rooms={roomsList} />
-	{:else if !$status}
+	{:else if !st}
 		<div class="loading">·</div>
 	{:else if relayOnly}
-		<RelayCard status={$status} roomName={theaterName} onUnlocked={refreshStatus} />
+		<RelayCard status={st} roomName={theaterName} onUnlocked={refreshStatus} />
 	{:else if theaterLocked}
 		<div class="lockstage"><RoomLock roomName={theaterName} what="theater" onUnlocked={refreshStatus} /></div>
 	{:else if live}
 		<div class="lounge" class:chat-hidden={chatHidden}>
 			<div class="screen-zone">
-				<GlowFrame bind:this={frame} channelId={roomId} clockSkewMs={$clockSkewMs} paused={$status?.nowPlaying?.paused === true} pausedBy={$status?.nowPlaying?.pausedBy ?? ''} />
-				<NowTray status={$status} clockSkewMs={$clockSkewMs} />
+				<GlowFrame bind:this={frame} channelId={roomId} clockSkewMs={$clockSkewMs} paused={st?.nowPlaying?.paused === true} pausedBy={st?.nowPlaying?.pausedBy ?? ''} />
+				<NowTray status={st} clockSkewMs={$clockSkewMs} />
 				{#if hybrid && relayOpen}
-					<RelayCard status={$status} roomName={theaterName} compact onUnlocked={refreshStatus} />
+					<RelayCard status={st} roomName={theaterName} compact onUnlocked={refreshStatus} />
 				{/if}
 			</div>
 			{#if !chatHidden}
@@ -160,9 +171,9 @@
 		</div>
 	{:else}
 		{#if hybrid && relayOpen}
-			<RelayCard status={$status} roomName={theaterName} compact onUnlocked={refreshStatus} />
+			<RelayCard status={st} roomName={theaterName} compact onUnlocked={refreshStatus} />
 		{/if}
-		<Lobby status={$status} />
+		<Lobby status={st} />
 	{/if}
 </div>
 

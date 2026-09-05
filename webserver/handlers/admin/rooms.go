@@ -98,12 +98,16 @@ func GetRooms(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"rooms": rooms})
 }
 
-var roomSlugStrip = regexp.MustCompile(`[^a-z0-9-]+`)
+var (
+	roomSlugStrip  = regexp.MustCompile(`[^a-z0-9-]+`)
+	roomSlugDashes = regexp.MustCompile(`-{2,}`)
+)
 
 // roomIDFromName derives a URL/directory-safe unique id from a display name.
 func roomIDFromName(name string) string {
 	slug := strings.ToLower(strings.TrimSpace(name))
 	slug = roomSlugStrip.ReplaceAllString(strings.ReplaceAll(slug, " ", "-"), "")
+	slug = roomSlugDashes.ReplaceAllString(slug, "-")
 	slug = strings.Trim(slug, "-")
 	if len(slug) > 24 {
 		slug = slug[:24]
