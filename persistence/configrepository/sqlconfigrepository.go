@@ -173,19 +173,51 @@ func (r *SqlConfigRepository) SetTCPIngestPort(port int) error {
 	return r.datastore.SetNumber(tcpIngestPortKey, float64(port))
 }
 
-// GetTCPIngestPassphrase returns the TCP preamble passphrase, or "" when
-// the stream key alone opens the door. Read per connection.
-func (r *SqlConfigRepository) GetTCPIngestPassphrase() string {
-	passphrase, err := r.datastore.GetString(tcpIngestPassphraseKey)
+// GetTCPIngestTLSMode returns the TCP ingest's TLS mode: "off" (plaintext
+// only, the default), "allow" (both, told apart by the first byte) or
+// "require" (TLS only). Read per connection; unknown values read as off.
+func (r *SqlConfigRepository) GetTCPIngestTLSMode() string {
+	mode, err := r.datastore.GetString(tcpIngestTLSModeKey)
+	if err != nil || (mode != "allow" && mode != "require") {
+		return "off"
+	}
+	return mode
+}
+
+// SetTCPIngestTLSMode stores the TCP ingest's TLS mode (applies to the
+// next connection).
+func (r *SqlConfigRepository) SetTCPIngestTLSMode(mode string) error {
+	return r.datastore.SetString(tcpIngestTLSModeKey, mode)
+}
+
+// GetTCPIngestTLSCertFile returns the PEM certificate path for the TCP
+// ingest's TLS, "" when none is configured.
+func (r *SqlConfigRepository) GetTCPIngestTLSCertFile() string {
+	path, err := r.datastore.GetString(tcpIngestTLSCertFileKey)
 	if err != nil {
 		return ""
 	}
-	return passphrase
+	return path
 }
 
-// SetTCPIngestPassphrase stores the TCP preamble passphrase ("" disables).
-func (r *SqlConfigRepository) SetTCPIngestPassphrase(passphrase string) error {
-	return r.datastore.SetString(tcpIngestPassphraseKey, passphrase)
+// SetTCPIngestTLSCertFile stores the PEM certificate path.
+func (r *SqlConfigRepository) SetTCPIngestTLSCertFile(path string) error {
+	return r.datastore.SetString(tcpIngestTLSCertFileKey, path)
+}
+
+// GetTCPIngestTLSKeyFile returns the PEM private key path for the TCP
+// ingest's TLS, "" when none is configured. The key never leaves disk.
+func (r *SqlConfigRepository) GetTCPIngestTLSKeyFile() string {
+	path, err := r.datastore.GetString(tcpIngestTLSKeyFileKey)
+	if err != nil {
+		return ""
+	}
+	return path
+}
+
+// SetTCPIngestTLSKeyFile stores the PEM private key path.
+func (r *SqlConfigRepository) SetTCPIngestTLSKeyFile(path string) error {
+	return r.datastore.SetString(tcpIngestTLSKeyFileKey, path)
 }
 
 // GetVideoSegmentFormat returns the HLS segment container choice: "ts",

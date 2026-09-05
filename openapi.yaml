@@ -3315,6 +3315,30 @@ paths:
               properties:
                 value:
                   type: integer
+  /admin/config/tcp/tls:
+    post:
+      operationId: SetTCPIngestTLS
+      summary: TLS on the TCP ingest — mode off|allow|require plus PEM certificate and key paths; the pair is loaded before anything is stored (applies to the next connection)
+      tags:
+      - Admin
+      responses:
+        '200':
+          description: Operation result
+        '400':
+          description: Invalid mode, or the certificate pair does not load (message carries the exact reason); nothing stored
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mode:
+                  type: string
+                  enum: [off, allow, require]
+                certFile:
+                  type: string
+                keyFile:
+                  type: string
   /integrations/metadata/nowplaying:
     post:
       operationId: SetNowPlayingMetadata

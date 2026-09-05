@@ -21,8 +21,10 @@
 	let srtPassphraseSet = $state(false);
 	let tcpIngestEnabled = $state(false);
 	let tcpIngestPort = $state(9711);
-	let tcpPassphrase = $state('');
-	let tcpPassphraseSet = $state(false);
+	let tcpTlsMode = $state('off');
+	let tcpTlsCert = $state('');
+	let tcpTlsKey = $state('');
+	let tcpTls = $state({ certOk: false, certError: '', certSubject: '', certNotAfter: '' });
 	let reservationDays = $state(30);
 	let chatEnabled = $state(true);
 	let joinMessages = $state(true);
@@ -79,7 +81,10 @@
 		srtPassphraseSet = cfg.srtPassphraseSet ?? false;
 		tcpIngestEnabled = cfg.tcpIngestEnabled ?? false;
 		tcpIngestPort = cfg.tcpIngestPort ?? 9711;
-		tcpPassphraseSet = cfg.tcpPassphraseSet ?? false;
+		tcpTls = cfg.tcpTls ?? { mode: 'off', certFile: '', keyFile: '', certOk: false, certError: '', certSubject: '', certNotAfter: '' };
+		tcpTlsMode = tcpTls.mode ?? 'off';
+		tcpTlsCert = tcpTls.certFile ?? '';
+		tcpTlsKey = tcpTls.keyFile ?? '';
 		reservationDays = cfg.chatNameReservationDays ?? 30;
 		chatEnabled = !(cfg.chatDisabled ?? false);
 		joinMessages = cfg.chatJoinMessagesEnabled ?? true;
@@ -285,6 +290,12 @@
 	const rtmpURL = $derived(`rtmp://${host}:${cfg?.rtmpServerPort ?? 1935}`);
 	const srtURL = $derived(`srt://${host}:${srtPort}`);
 	const tcpURL = $derived(`tcp://${host}:${tcpIngestPort}`);
+	const tcpTlsExpired = $derived(!!tcpTls.certNotAfter && new Date(tcpTls.certNotAfter) < new Date());
+	const tcpTlsDate = $derived(tcpTls.certNotAfter ? new Date(tcpTls.certNotAfter).toLocaleDateString() : '');
+	async function saveTcpTls() {
+		const r = await run(() => api.setTCPIngestTLS(tcpTlsMode, tcpTlsCert.trim(), tcpTlsKey.trim()));
+		if (r?.success !== false) await loadConfig();
+	}
 
 	const uptime = $derived.by(() => {
 		const t = status?.broadcaster?.time;
@@ -519,9 +530,9 @@
 					{/if}
 					<div class="field-row">
 						<div class="field">
-							<label for={'roompass-' + r.id}>Ingest passphrase</label>
+							<label for={'roompass-' + r.id}>SRT passphrase</label>
 							<input id={'roompass-' + r.id} type="password" bind:value={r.passphrase} autocomplete="new-password"
-								placeholder={r.passphraseSet ? 'set — type a new one to replace it' : 'none — the global TCP/SRT passphrase applies'} />
+								placeholder={r.passphraseSet ? 'set — type a new one to replace it' : 'none — the global SRT passphrase applies'} />
 						</div>
 						<div class="field compact">
 							<label>&nbsp;</label>
@@ -531,7 +542,7 @@
 							</div>
 						</div>
 					</div>
-					<p class="hint">Senders using this room's keys must present it — on TCP as the preamble's second word, on SRT as the encryption passphrase. It replaces the global one for this room. 10 to 79 characters, no spaces. Applies to the next connection.</p>
+					<p class="hint">Streams that open this room over SRT must use it as the encryption passphrase; it replaces the global SRT passphrase for this room. 10 to 79 characters, no spaces. Applies to the next connection.</p>
 					{#if r.isDefault}
 						<p class="hint">This is the main room — the front page. Its stream keys are the list in <b>Stream</b>.</p>
 					{:else}
@@ -612,19 +623,38 @@
 						<label for="tcpport">TCP port</label>
 						<input id="tcpport" type="number" bind:value={tcpIngestPort} onchange={() => run(() => api.setTCPIngestPort(Number(tcpIngestPort)))} />
 					</div>
+				</div>
+				<p class="hint">Raw container over TCP: retransmits forever, so uplink loss becomes delay instead of artifacts — carries HEVC/AV1 like SRT, survives lossy links like RTMP. The sender authenticates with the stream key (Jellystreamerr: protocol TCP + this host + port). Enabled flag and port apply on restart.</p>
+				<div class="field-row">
+					<div class="field compact">
+						<label for="tcptlsmode">TLS</label>
+						<select id="tcptlsmode" bind:value={tcpTlsMode}>
+							<option value="off">Off</option>
+							<option value="allow">Allow TLS</option>
+							<option value="require">Require TLS</option>
+						</select>
+					</div>
 					<div class="field">
-						<label for="tcppass">Passphrase — optional ({tcpPassphraseSet ? 'set' : 'not set'})</label>
-						<div class="pw-row">
-							<input id="tcppass" type="password" bind:value={tcpPassphrase} autocomplete="new-password"
-								placeholder={tcpPassphraseSet ? 'unchanged — type to replace' : '10–79 chars, no spaces; empty = key only'}
-								onchange={() => { if (tcpPassphrase !== '') run(async () => { const r = await api.setTCPIngestPassphrase(tcpPassphrase); if (r?.success !== false) { tcpPassphraseSet = true; tcpPassphrase = ''; } return r; }); }} />
-							{#if tcpPassphraseSet}
-								<button class="ghost tiny danger-text" onclick={() => run(async () => { const r = await api.setTCPIngestPassphrase(''); if (r?.success !== false) { tcpPassphraseSet = false; tcpPassphrase = ''; } return r; }, 'TCP passphrase removed — the stream key alone opens the door again')}>Remove</button>
-							{/if}
-						</div>
+						<label for="tcptlscert">Certificate (PEM path in the container)</label>
+						<input id="tcptlscert" class="mono" bind:value={tcpTlsCert} placeholder="/certs/<domain>/<domain>.crt" autocomplete="off" spellcheck="false" />
+					</div>
+					<div class="field">
+						<label for="tcptlskey">Key (PEM path in the container)</label>
+						<input id="tcptlskey" class="mono" bind:value={tcpTlsKey} placeholder="/certs/<domain>/<domain>.key" autocomplete="off" spellcheck="false" />
+					</div>
+					<div class="field compact">
+						<label>&nbsp;</label>
+						<button class="ghost" onclick={saveTcpTls}>Save TLS</button>
 					</div>
 				</div>
-				<p class="hint">Raw container over TCP: retransmits forever, so uplink loss becomes delay instead of artifacts — carries HEVC/AV1 like SRT, survives lossy links like RTMP. The sender authenticates with the stream key (Jellystreamerr: protocol TCP + this host + port); key and media travel in plaintext, so keep it tailnet-bound. Restart to apply.</p>
+				{#if tcpTls.certOk}
+					<p class="hint" class:danger-text={tcpTlsExpired}>Certificate: {tcpTls.certSubject}, {tcpTlsExpired ? 'EXPIRED on' : 'valid until'} {tcpTlsDate}{tcpTls.mode === 'off' ? ' (TLS is off)' : ''}</p>
+				{:else if tcpTls.certError}
+					<p class="hint danger-text">Certificate: {tcpTls.certError}</p>
+				{:else}
+					<p class="hint">Certificate: none configured.</p>
+				{/if}
+				<p class="hint">Same port, no passphrase: with TLS <b>required</b> the stream key and the media are encrypted on the wire and a plaintext sender is closed at its first byte — safe to face the internet. <b>Allow</b> takes both, for switching the sender over. Off means plaintext only: keep the port tailnet-bound then. The certificate is re-read when its files change, so renewals apply on their own; borrow Caddy's, see <span class="mono">docs/deploy-vps.md</span>. Mode and paths apply to the next connection.</p>
 				<footer>
 					<button onclick={() => run(async () => {
 						const r = await api.setSRTPort(Number(srtPort));
@@ -1001,6 +1031,7 @@
 	   the card. Four buttons used to push Remove past the edge. */
 	.keyrow { display: flex; gap: 8px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
 	.keyrow input.mono { font-family: ui-monospace, monospace; font-size: 12.5px; flex: 1.4 1 140px; min-width: 140px; }
+	.field input.mono, .hint .mono { font-family: ui-monospace, monospace; font-size: 12.5px; }
 	.keyrow input.comment { flex: 1 1 90px; min-width: 90px; }
 	.keyrow button { flex: 0 0 auto; }
 

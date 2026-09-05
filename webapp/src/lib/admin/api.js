@@ -45,7 +45,8 @@ export const setSRTPort = (value) => post('/api/admin/config/srt/port', { value 
 export const setSRTPassphrase = (value) => post('/api/admin/config/srt/passphrase', { value });
 export const setTCPIngestEnabled = (value) => post('/api/admin/config/tcp/enabled', { value });
 export const setTCPIngestPort = (value) => post('/api/admin/config/tcp/port', { value });
-export const setTCPIngestPassphrase = (value) => post('/api/admin/config/tcp/passphrase', { value });
+export const setTCPIngestTLS = (mode, certFile, keyFile) =>
+	post('/api/admin/config/tcp/tls', { mode, certFile, keyFile });
 export const getLogs = () => req('/api/admin/logs');
 export const getWarnings = () => req('/api/admin/logs/warnings');
 export const getIPBans = () => req('/api/admin/chat/users/ipbans');

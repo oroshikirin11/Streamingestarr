@@ -22,10 +22,11 @@ type Channel struct {
 	SegmentFormat  string                `json:"segmentFormat,omitempty"`
 	OutputVariants []StreamOutputVariant `json:"outputVariants,omitempty"`
 
-	// Passphrase is the room's own ingest passphrase. When set it replaces
-	// the global TCP/SRT passphrase for streams that open this room with
-	// one of its keys; empty inherits the global one. Never serialised:
-	// the admin API reports only whether one is set.
+	// Passphrase is the room's own SRT passphrase. When set it replaces
+	// the global SRT passphrase for streams that open this room over SRT
+	// with one of its keys; empty inherits the global one. (TCP has no
+	// passphrase — TLS is its lock.) Never serialised: the admin API
+	// reports only whether one is set.
 	Passphrase string `json:"-"`
 }
 

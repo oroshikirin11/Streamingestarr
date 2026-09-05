@@ -79,7 +79,7 @@ func Start(enableVerboseLogging bool) error {
 	r.Get("/api/admin/avsync", middleware.RequireAdminAuth(handlers.GetAVSync))
 	r.Post("/api/admin/config/tcp/enabled", middleware.RequireAdminAuth(handlers.SetTCPIngestEnabled))
 	r.Post("/api/admin/config/tcp/port", middleware.RequireAdminAuth(handlers.SetTCPIngestPort))
-	r.Post("/api/admin/config/tcp/passphrase", middleware.RequireAdminAuth(handlers.SetTCPIngestPassphrase))
+	r.Post("/api/admin/config/tcp/tls", middleware.RequireAdminAuth(handlers.SetTCPIngestTLS))
 
 	// Rooms: the viewer lobby list, and the admin CRUD (cap 5, key-routed —
 	// no per-room ports).

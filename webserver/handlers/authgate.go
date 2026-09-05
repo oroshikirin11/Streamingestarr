@@ -424,24 +424,58 @@ func SetTCPIngestPort(w http.ResponseWriter, r *http.Request) {
 	authJSON(w, http.StatusOK, true, "")
 }
 
-// SetTCPIngestPassphrase stores the TCP preamble passphrase. Optional:
-// empty means the stream key alone opens the door. No spaces or newlines —
-// it rides a space-delimited preamble line. Applies to new connections.
-func SetTCPIngestPassphrase(w http.ResponseWriter, r *http.Request) {
+// SetTCPIngestTLS stores the TCP ingest's TLS mode and certificate paths.
+// When the mode is not off the pair is loaded right here and a failure
+// (missing or unreadable file, PEM garbage, key mismatch) is answered
+// with its exact reason and stores NOTHING — the running configuration
+// is never left pointing at a certificate that does not load. Applies to
+// the next connection; no restart, and the paths are re-read per
+// handshake so renewals apply on their own.
+func SetTCPIngestTLS(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Value string `json:"value"`
+		Mode     string `json:"mode"`
+		CertFile string `json:"certFile"`
+		KeyFile  string `json:"keyFile"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil ||
-		strings.ContainsAny(req.Value, " \r\n") ||
-		(req.Value != "" && (len(req.Value) < 10 || len(req.Value) > 79)) {
-		authJSON(w, http.StatusBadRequest, false, "TCP passphrases must be 10-79 characters with no spaces; send an empty value to disable.")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		authJSON(w, http.StatusBadRequest, false, "Send {\"mode\": \"off|allow|require\", \"certFile\": \"...\", \"keyFile\": \"...\"}.")
 		return
 	}
-	if err := configrepository.Get().SetTCPIngestPassphrase(req.Value); err != nil {
+	mode := strings.ToLower(strings.TrimSpace(req.Mode))
+	if mode != srt.TLSModeOff && mode != srt.TLSModeAllow && mode != srt.TLSModeRequire {
+		authJSON(w, http.StatusBadRequest, false, "The TLS mode must be one of off, allow, require.")
+		return
+	}
+	certFile := strings.TrimSpace(req.CertFile)
+	keyFile := strings.TrimSpace(req.KeyFile)
+	message := ""
+	if mode != srt.TLSModeOff {
+		info, err := srt.InspectTLSPair(certFile, keyFile)
+		if err != nil {
+			authJSON(w, http.StatusBadRequest, false, "Not saved — "+err.Error())
+			return
+		}
+		message = fmt.Sprintf("Saved — certificate %s, valid until %s", info.Subject, info.NotAfter.Format("2006-01-02"))
+		if info.Expired {
+			message = fmt.Sprintf("Saved — but the certificate %s EXPIRED on %s; senders that verify will refuse it", info.Subject, info.NotAfter.Format("2006-01-02"))
+		}
+	}
+	cfg := configrepository.Get()
+	// Paths first, mode last: a store failure half-way leaves the mode
+	// unchanged rather than "require" with no certificate.
+	if err := cfg.SetTCPIngestTLSCertFile(certFile); err != nil {
 		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
 		return
 	}
-	authJSON(w, http.StatusOK, true, "")
+	if err := cfg.SetTCPIngestTLSKeyFile(keyFile); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	if err := cfg.SetTCPIngestTLSMode(mode); err != nil {
+		authJSON(w, http.StatusInternalServerError, false, "Unable to store setting.")
+		return
+	}
+	authJSON(w, http.StatusOK, true, message)
 }
 
 // SetSRTEnabled toggles the SRT ingest listener (takes effect on restart).

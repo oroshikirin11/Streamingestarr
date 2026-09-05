@@ -41,10 +41,10 @@ Jellystreamerr, keep them closed publicly and ingest over Tailscale.
 
 Every port is published plainly (`8080`, `1935`, `9710/udp`, `9711`) — no
 per-interface binds, no required env vars. The locks live in the app: the
-login gate on the web port, stream keys on every ingest, and the SRT/TCP
-passphrases (set them in admin → Stream when the ingests face the
-internet — SRT's also encrypts the wire). Anything you want closed, close
-in `ufw`:
+login gate on the web port, stream keys on every ingest, the SRT
+passphrase (encrypts the wire) and TLS on the TCP ingest (next section) —
+set them in admin → Stream when the ingests face the internet. Anything
+you want closed, close in `ufw`:
 
 ```sh
 ufw allow 9710/udp   # SRT in
@@ -52,6 +52,72 @@ ufw allow 9711/tcp   # TCP in
 # 8080/1935 need no public rule if Caddy fronts the domain and the sender
 # uses SRT/TCP — leave them closed unless you use them.
 ```
+
+### TLS on the TCP ingest with Caddy's certificate
+
+The TCP ingest speaks plaintext by default (stream key and media in the
+clear — tailnet only). With TLS on, the same port takes TLS connections:
+the first byte tells a ClientHello from a preamble, and with the mode at
+**require** a plaintext sender is closed at that first byte. No second
+certificate is needed — the ingest borrows the one Caddy already renews
+for the domain.
+
+Caddy keeps its certificates under its data dir, renewed automatically:
+
+```
+/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<domain>/<domain>.crt
+/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/<domain>/<domain>.key
+```
+
+The files are `0600` owned by `caddy`, the directories `0700`. The
+container runs as uid 101, so grant it read access with ACLs — including
+*default* ACLs, so the files a renewal writes inherit them — and make
+every parent directory up to `/var/lib/caddy` traversable:
+
+```sh
+CERTS=/var/lib/caddy/.local/share/caddy/certificates
+setfacl -R -m u:101:rX "$CERTS"        # read now
+setfacl -R -d -m u:101:rX "$CERTS"     # ...and after every renewal
+for d in /var/lib/caddy /var/lib/caddy/.local /var/lib/caddy/.local/share /var/lib/caddy/.local/share/caddy; do
+  setfacl -m u:101:x "$d"              # traverse only
+done
+sudo -u '#101' cat "$CERTS"/acme-v02.api.letsencrypt.org-directory/<domain>/<domain>.crt >/dev/null && echo readable
+```
+
+Mount the directory read-only into the container — `docker-compose.yml`
+carries the line, commented:
+
+```yaml
+    volumes:
+      - ./data:/app/data
+      - /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory:/certs:ro
+```
+
+`docker compose up -d` to pick the mount up, then in admin → Stream →
+TCP ingest set the mode and the two paths *as seen inside the container*:
+`/certs/<domain>/<domain>.crt` and `/certs/<domain>/<domain>.key`. Save
+loads the pair on the spot and refuses to store anything that does not
+load (the error names the file and the reason — "permission denied" means
+the ACLs above are missing). The status line under the fields shows the
+certificate's subject and expiry; it is re-read whenever the files change,
+so Caddy's renewals apply without a restart. Mode and paths apply to the
+next connection.
+
+Verify from anywhere:
+
+```sh
+openssl s_client -connect <host>:9711 -servername <domain> </dev/null | head
+```
+
+shows the certificate chain (`subject=CN=<domain>`, `issuer=...Let's
+Encrypt...`). The ingest ignores the SNI name — it serves the configured
+certificate to every caller.
+
+**Migrating a running sender:** set the mode to **allow** (plaintext and
+TLS both accepted), switch the sender to TLS and confirm the admin's
+Encoder line reads `TCP+TLS`, then set **require**. The TCP passphrase is
+gone — TLS replaced it; a sender that still sends one is not rejected, the
+extra token is ignored.
 
 ### Kernel UDP buffers (required for high-bitrate ingest)
 

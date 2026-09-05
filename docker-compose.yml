@@ -15,6 +15,11 @@ services:
 
     volumes:
       - ./data:/app/data
+      # TLS on the TCP ingest with Caddy's certificate (docs/deploy-vps.md):
+      # mount Caddy's certificate store read-only and point the admin page
+      # at /certs/<domain>/<domain>.crt and .key. The container runs as
+      # uid 101 — grant it read access with the ACLs from the doc first.
+      # - /var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory:/certs:ro
 
     # Cap docker's own json log files — without this they grow forever and
     # quietly eat the disk on a long-running host.

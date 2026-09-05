@@ -33,7 +33,7 @@ type roomResponse struct {
 	LatencyLevel   int                          `json:"latencyLevel"`
 	SegmentFormat  string                       `json:"segmentFormat"`
 	OutputVariants []models.StreamOutputVariant `json:"outputVariants"`
-	// Whether the room has its own ingest passphrase; the value itself
+	// Whether the room has its own SRT passphrase; the value itself
 	// never leaves the server.
 	PassphraseSet bool `json:"passphraseSet"`
 }
@@ -244,10 +244,10 @@ func SetRoomConfig(w http.ResponseWriter, r *http.Request) {
 	webutils.WriteSimpleResponse(w, true, "room configuration saved")
 }
 
-// SetRoomPassphrase gives a room its own ingest passphrase, or clears it
-// with "". Streams that open the room with one of its keys must then
-// present it — on TCP as the preamble's second word, on SRT as the
-// encryption passphrase — instead of the global one.
+// SetRoomPassphrase gives a room its own SRT passphrase, or clears it
+// with "". Streams that open the room over SRT with one of its keys must
+// then use it as the encryption passphrase instead of the global SRT one.
+// (The TCP ingest has no passphrase — TLS is its lock.)
 func SetRoomPassphrase(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID         string `json:"id"`
@@ -263,11 +263,10 @@ func SetRoomPassphrase(w http.ResponseWriter, r *http.Request) {
 	}
 	pass := strings.TrimSpace(req.Passphrase)
 	if pass != "" {
-		// SRT's own rule, applied to both transports so one passphrase can
-		// serve either; the TCP preamble is one line of words, so no
-		// whitespace inside it.
+		// SRT's own rule: 10 to 79 characters. No whitespace either, so
+		// it survives every sender's URL/config field intact.
 		if len(pass) < 10 || len(pass) > 79 || strings.ContainsAny(pass, " \t\r\n") {
-			webutils.WriteSimpleResponse(w, false, "a passphrase is 10 to 79 characters with no spaces")
+			webutils.WriteSimpleResponse(w, false, "an SRT passphrase is 10 to 79 characters with no spaces")
 			return
 		}
 	}
@@ -276,8 +275,8 @@ func SetRoomPassphrase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pass == "" {
-		webutils.WriteSimpleResponse(w, true, "room passphrase cleared — the global one applies")
+		webutils.WriteSimpleResponse(w, true, "room SRT passphrase cleared — the global SRT passphrase applies")
 		return
 	}
-	webutils.WriteSimpleResponse(w, true, "room passphrase set")
+	webutils.WriteSimpleResponse(w, true, "room SRT passphrase set")
 }

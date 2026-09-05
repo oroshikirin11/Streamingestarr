@@ -109,7 +109,7 @@ func pump(conn ingestConn, remoteAddr, transport, key string) {
 	// pipe writes happen on a drain goroutine, the reader only enqueues.
 	// ~10s of stream at 25 Mbps fits the budget; a stall longer than that
 	// drops oldest data audibly in the log instead of silently on the wire.
-	q := newPipeQueue(32<<20, transport == "TCP", &s.queueDroppedBytes)
+	q := newPipeQueue(32<<20, isTCPTransport(transport), &s.queueDroppedBytes)
 	go func() {
 		for {
 			chunk, ok := q.pop()

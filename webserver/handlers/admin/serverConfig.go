@@ -3,9 +3,11 @@ package admin
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"streamingestarr/config"
+	"streamingestarr/core/srt"
 	"streamingestarr/core/transcoder"
 	"streamingestarr/models"
 	"streamingestarr/persistence/configrepository"
@@ -83,7 +85,7 @@ func GetServerConfig(w http.ResponseWriter, r *http.Request) {
 		SRTPassphraseSet:   configRepository.GetSRTPassphrase() != "",
 		TCPIngestEnabled:   configRepository.GetTCPIngestEnabled(),
 		TCPIngestPort:      configRepository.GetTCPIngestPort(),
-		TCPPassphraseSet:   configRepository.GetTCPIngestPassphrase() != "",
+		TCPTLS:             tcpTLSStatusFor(configRepository),
 		ForbiddenUsernames: usernameBlocklist,
 		SuggestedUsernames: usernameSuggestions,
 
@@ -117,7 +119,7 @@ type serverConfigAdminResponse struct {
 	SRTPassphraseSet          bool                    `json:"srtPassphraseSet"`
 	TCPIngestEnabled          bool                    `json:"tcpIngestEnabled"`
 	TCPIngestPort             int                     `json:"tcpIngestPort"`
-	TCPPassphraseSet          bool                    `json:"tcpPassphraseSet"`
+	TCPTLS                    tcpTLSStatus            `json:"tcpTls"`
 	YP                        legacyYPStub            `json:"yp"`
 	S3                        legacyS3Stub            `json:"s3"`
 	Federation                legacyFederationStub    `json:"federation"`
@@ -202,4 +204,41 @@ type webConfigResponse struct {
 	Tags                []string              `json:"tags"`
 	SocialHandles       []models.SocialHandle `json:"socialHandles"`
 	NSFW                bool                  `json:"nsfw"`
+}
+
+// tcpTLSStatus is what the admin page learns about the TCP ingest's TLS:
+// the mode, the two paths, and whether the pair loads right now — with
+// the leaf's subject and expiry when it does, the exact error when it
+// does not. No key material ever leaves the server.
+type tcpTLSStatus struct {
+	Mode         string `json:"mode"`
+	CertFile     string `json:"certFile"`
+	KeyFile      string `json:"keyFile"`
+	CertOk       bool   `json:"certOk"`
+	CertError    string `json:"certError"`
+	CertSubject  string `json:"certSubject"`
+	CertNotAfter string `json:"certNotAfter"`
+}
+
+func tcpTLSStatusFor(cfg configrepository.ConfigRepository) tcpTLSStatus {
+	st := tcpTLSStatus{
+		Mode:     cfg.GetTCPIngestTLSMode(),
+		CertFile: cfg.GetTCPIngestTLSCertFile(),
+		KeyFile:  cfg.GetTCPIngestTLSKeyFile(),
+	}
+	if st.CertFile == "" && st.KeyFile == "" {
+		if st.Mode != srt.TLSModeOff {
+			st.CertError = "no certificate and key configured"
+		}
+		return st
+	}
+	info, err := srt.InspectTLSPair(st.CertFile, st.KeyFile)
+	if err != nil {
+		st.CertError = err.Error()
+		return st
+	}
+	st.CertOk = true
+	st.CertSubject = info.Subject
+	st.CertNotAfter = info.NotAfter.UTC().Format(time.RFC3339)
+	return st
 }
