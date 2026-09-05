@@ -61,13 +61,9 @@ fi
 
 # The container runs as uid 101; a data folder it cannot write (copied
 # or created as root) makes it exit at startup and the site answers 502.
-if [ -d data ] && ! su -s /bin/sh -c 'test -w data' '#101' 2>/dev/null; then
-  if [ "$(id -u)" = 0 ]; then
-    run chown -R 101:101 data
-    note "handed ./data to the container's user (uid 101)"
-  else
-    die "./data is not writable by the container's user (uid 101) — run: sudo chown -R 101:101 data"
-  fi
+if [ "$(id -u)" = 0 ] && [ -d data ] && ! su -s /bin/sh -c 'test -w data' '#101' 2>/dev/null; then
+  run chown -R 101:101 data
+  note "handed ./data to the container's user (uid 101)"
 fi
 
 # A live stream ends when the container restarts; say so before doing it.
