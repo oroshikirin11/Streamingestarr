@@ -176,7 +176,7 @@
 		{/if}
 		<Lobby status={st}>
 			{#if !hybrid}
-				<OpenStage />
+				<OpenStage lifted />
 			{/if}
 		</Lobby>
 	{/if}
