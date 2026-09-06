@@ -150,6 +150,10 @@
 				nudgeMaxRetry: 10
 			});
 			hls.loadSource(src());
+			// Rate steering resamples rather than time-stretches: at the half
+			// percent it is bounded to, that is inaudible either way, and the
+			// stretch was the warble every viewer heard.
+			try { videoEl.preservesPitch = false; videoEl.webkitPreservesPitch = false; } catch { /* older engines */ }
 			hls.attachMedia(videoEl);
 			hls.on(Hls.Events.MANIFEST_PARSED, startPlayback);
 			hls.on(Hls.Events.ERROR, (_e, data) => {
@@ -193,18 +197,38 @@
 	// one shared target latency. "My playlist edge minus five segments"
 	// differed between viewers by fetch timing; the wall clock does not.
 	//
-	// Steering is gentle and bounded: ±2%/s of drift within [0.97, 1.05]
-	// (browsers pitch-correct — inaudible), a dead band so rate sits at
-	// exactly 1 when in sync, and the hard snap only for gross drift after
-	// a real stall. When PDT or the skew is unavailable the controller
-	// falls back to hls.js's edge-based latency — the exact behaviour that
-	// shipped before wall-clock sync existed.
+	// Steering is gentle and bounded, and the bound is AUDIBLE, not a
+	// courtesy: browsers hold pitch across a rate change by time-stretching
+	// the audio (WSOLA), and at the 3-5% this ran at, every viewer heard a
+	// warble — "out of tune, sped up and slowed down" — for as long as the
+	// drift took to burn off, which after a join or a sender-side seek was a
+	// minute or more, and again whenever drift left the dead band. The
+	// sender's wire was measured clean (no seams, no drift, no clipping).
+	//
+	// So the room stays in sync by a different means. Inside the dead band
+	// the rate is exactly 1. Small drift is steered at half a percent at
+	// most, with pitch preservation OFF: that is plain resampling, no
+	// stretch artefacts, and a pitch change under the threshold of hearing.
+	// Drift beyond a second is corrected by ONE seek — into buffered media,
+	// so it is a near-instant hop — rather than a minute of smeared music;
+	// when the target is not buffered the rate steering carries it. The
+	// room's tolerance is therefore ~1 s instead of the dead band alone,
+	// and every client converges on the same anchor as before. When PDT or
+	// the skew is unavailable the controller falls back to hls.js's
+	// edge-based latency — the exact behaviour that shipped before
+	// wall-clock sync existed.
 	const SYNC = {
 		deadband: 0.35, // s — inside this, rate is exactly 1
-		snapAt: 8, // s behind target — jump instead of crawling
-		rateMax: 1.05,
-		rateMin: 0.97,
-		gain: 0.02 // rate delta per second of drift
+		snapAt: 1.2, // s of drift — one seek into the buffer instead of crawling
+		rateMax: 1.005,
+		rateMin: 0.995,
+		gain: 0.02 // rate delta per second of drift, before the clamp above
+	};
+	const buffered = (el, t) => {
+		const b = el?.buffered;
+		if (!b) return false;
+		for (let i = 0; i < b.length; i++) if (t >= b.start(i) + 0.25 && t <= b.end(i) - 0.25) return true;
+		return false;
 	};
 	// The shared wall-clock anchor. PDT is stamped when a segment is
 	// WRITTEN, so it runs ~1.5 SEGMENT DURATIONS newer than the media —
@@ -283,7 +307,7 @@
 				// take it, fall through to bounded rate steering.
 				const want = videoEl.currentTime + drift;
 				const s = videoEl.seekable;
-				if (s.length && want > s.start(0) + 1 && want < s.end(s.length - 1) - 0.5) {
+				if (buffered(videoEl, want) && s.length && want > s.start(0) + 1 && want < s.end(s.length - 1) - 0.5) {
 					lastControllerSeek = performance.now();
 					noteIncident('sync-snap', drift * 1000);
 					videoEl.currentTime = want;
