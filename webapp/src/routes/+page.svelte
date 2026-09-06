@@ -174,10 +174,11 @@
 		{#if hybrid && relayOpen}
 			<RelayCard status={st} roomName={theaterName} compact onUnlocked={refreshStatus} />
 		{/if}
-		<Lobby status={st} />
-		{#if !hybrid}
-			<OpenStage />
-		{/if}
+		<Lobby status={st}>
+			{#if !hybrid}
+				<OpenStage />
+			{/if}
+		</Lobby>
 	{/if}
 </div>
 

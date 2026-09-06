@@ -3,7 +3,7 @@
 	// With a pushed schedule the lobby shows the next showing + countdown;
 	// without, the room simply rests with the last-watched note.
 	import { dedupeSubtitle } from '../text.js';
-	let { status } = $props();
+	let { status, children } = $props();
 
 	// The lobby's copy shuffles per visit — every slot independently, so
 	// the room greets a regular differently almost every time.
@@ -113,6 +113,9 @@
 				<div class="foot">{footPrefix} — <b>{lastWatched}</b></div>
 			{/if}
 		</div>
+		{#if children}
+			<div class="stage-slot">{@render children()}</div>
+		{/if}
 	</div>
 </div>
 
@@ -128,6 +131,7 @@
 		position: relative;
 		overflow: hidden;
 		display: grid;
+		grid-template-rows: 1fr auto;
 		place-items: center;
 		background:
 			radial-gradient(ellipse 90% 70% at 50% 115%, #2a1c18 0%, transparent 55%),
@@ -158,6 +162,15 @@
 	.lobby-card {
 		text-align: center;
 		padding: 20px;
+		grid-row: 1;
+	}
+	/* The open stage rides the lobby's own backdrop — same dead-stream
+	   room, the credentials resting at its foot. */
+	.stage-slot {
+		grid-row: 2;
+		justify-self: center;
+		width: min(792px, 100%);
+		padding: 0 16px 16px;
 	}
 	.z {
 		font-size: 12px;
