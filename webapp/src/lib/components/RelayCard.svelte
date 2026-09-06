@@ -6,6 +6,7 @@
 	// open (admin: Rooms → Ingest → Open stage) the card also shows the
 	// ingest address and stream keys, so anyone here may broadcast.
 	import { dedupeSubtitle } from '../text.js';
+	import { currentChannel } from '../api.js';
 	import OpenStage from './OpenStage.svelte';
 	import RoomLock from './RoomLock.svelte';
 
@@ -19,6 +20,21 @@
 		const sub = dedupeSubtitle(np.title, np.subtitle);
 		return sub ? `${np.title} — ${sub}` : np.title;
 	});
+
+	// While the stream runs the card shows a small live preview — the same
+	// still the room wall uses, refreshed on the thumbnail generator's own
+	// ~20s rhythm. Kept behind the room lock like everything else here.
+	let tick = $state(Date.now());
+	let previewBroken = $state(false);
+	$effect(() => {
+		if (!status?.online) return;
+		const t = setInterval(() => {
+			previewBroken = false;
+			tick = Date.now();
+		}, 20000);
+		return () => clearInterval(t);
+	});
+	const previewSrc = $derived(`/thumbnail.jpg?channel=${encodeURIComponent(currentChannel())}&t=${tick}`);
 
 	// Where a link goes decides which one to show; the protocol is the
 	// small print. Remembered per browser.
@@ -81,13 +97,14 @@
 		<h1>{roomName}</h1>
 	{/if}
 
-	{#if status?.online && nowLine && !compact}
-		<div class="now">
-			{#if np?.artworkId}<img class="poster" src={'/artwork/' + np.artworkId} alt="" />{/if}
-			<div>
-				<div class="label">Now playing</div>
-				<div class="title">{nowLine}</div>
-			</div>
+	{#if status?.online && !locked && !compact}
+		<div class="live">
+			{#if !previewBroken}
+				<img class="preview" src={previewSrc} alt="Live preview" onerror={() => (previewBroken = true)} />
+			{/if}
+			{#if nowLine}
+				<div class="nowline"><span class="label">Now playing</span><span class="title">{nowLine}</span></div>
+			{/if}
 		</div>
 	{:else if !compact}
 		<p class="rest">nothing is playing yet — the link works the moment the stream starts</p>
@@ -160,18 +177,25 @@
 		letter-spacing: -0.01em;
 		text-wrap: balance;
 	}
-	.now {
+	.live {
 		display: flex;
+		flex-direction: column;
 		align-items: center;
-		gap: 14px;
-		text-align: left;
+		gap: 10px;
 	}
-	.poster {
-		width: 38px;
-		height: 54px;
-		border-radius: 5px;
+	.preview {
+		width: min(420px, 100%);
+		aspect-ratio: 16 / 9;
 		object-fit: cover;
+		border-radius: 12px;
 		border: 1px solid var(--border);
+		box-shadow: 0 18px 50px -18px #000;
+		background: #0a0a0c;
+	}
+	.nowline {
+		display: flex;
+		align-items: baseline;
+		gap: 10px;
 	}
 	.label {
 		font-size: 9.5px;
