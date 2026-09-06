@@ -5,9 +5,7 @@
 	// its stage closed — the server answers {enabled:false}.
 	import { getRoomBroadcast } from '../api.js';
 
-	// lifted floats the panel a little above where it sits — the lobby
-	// uses it so the credentials hover in the room, not glued to its edge.
-	let { locked = false, lifted = false } = $props();
+	let { locked = false } = $props();
 
 	let stage = $state(null);
 	$effect(() => {
@@ -57,7 +55,7 @@
 </script>
 
 {#if stage}
-	<div class="stage" class:lifted>
+	<div class="stage">
 		<div class="stage-head">
 			<span class="stage-kicker">open stage</span>
 			<span class="stage-sub">anyone here may broadcast — point your encoder at an address below with one of the keys</span>
@@ -98,9 +96,6 @@
 		border-radius: var(--radius);
 		background: color-mix(in srgb, var(--surface) 60%, transparent);
 		text-align: left;
-	}
-	.stage.lifted {
-		margin-bottom: min(16vh, 150px);
 	}
 	.stage-head {
 		display: flex;

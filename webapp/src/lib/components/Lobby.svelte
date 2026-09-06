@@ -130,9 +130,11 @@
 		border-radius: var(--radius);
 		position: relative;
 		overflow: hidden;
-		display: grid;
-		grid-template-rows: 1fr auto;
-		place-items: center;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 34px;
 		background:
 			radial-gradient(ellipse 90% 70% at 50% 115%, #2a1c18 0%, transparent 55%),
 			linear-gradient(180deg, #17161a, #121114);
@@ -161,16 +163,13 @@
 	}
 	.lobby-card {
 		text-align: center;
-		padding: 20px;
-		grid-row: 1;
+		padding: 20px 20px 0;
 	}
 	/* The open stage rides the lobby's own backdrop — same dead-stream
 	   room, the credentials resting at its foot. */
 	.stage-slot {
-		grid-row: 2;
-		justify-self: center;
 		width: min(792px, 100%);
-		padding: 0 16px 16px;
+		padding: 0 16px;
 	}
 	.z {
 		font-size: 12px;
