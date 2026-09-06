@@ -61,17 +61,18 @@ fi
 
 # The container runs as uid 101; a data folder it cannot write (copied
 # or created as root) makes it exit at startup and the site answers 502.
-if [ "$(id -u)" = 0 ] && [ -d data ] && ! su -s /bin/sh -c 'test -w data' '#101' 2>/dev/null; then
+if [ "$(id -u)" = 0 ] && [ -d data ] && [ "$(stat -c %u data)" != 101 ]; then
   run chown -R 101:101 data
   note "handed ./data to the container's user (uid 101)"
 fi
 
 # A live stream ends when the container restarts; say so before doing it.
 PORT="${STREAMINGESTARR_PORT:-8080}"
+# Live means the LAST ingest event was a connect, however long ago.
 if [ "$YES" = 0 ]; then
-  if docker compose logs --since 2m 2>/dev/null | grep -q 'Inbound .* stream connected' \
-     && ! docker compose logs --since 2m 2>/dev/null | grep -q 'stream .* disconnected'; then
-    die "A stream looks to be live right now. Updating restarts the receiver and ends it. Wait, or run with --yes."
+  LAST_EVENT="$(docker compose logs 2>/dev/null | grep -E 'Inbound .*stream connected|stream .*disconnected' | tail -1 || true)"
+  if printf '%s' "$LAST_EVENT" | grep -q 'stream connected'; then
+    die "A stream is live right now. Updating restarts the receiver and ends it. Stop it first, or run with --yes."
   fi
 fi
 
@@ -96,8 +97,15 @@ git log --format='  %h · %cs · %s' "$LOCAL..$REMOTE" | head -30
 # ── a backup of the database ─────────────────────────────────────────────
 STAMP="$(date +%Y%m%d-%H%M%S)"
 mkdir -p backups
+# The backup is the database and settings; HLS segments are transient and
+# change under tar while a stream runs, so they are left out and a file
+# changing mid-read is a warning, not a stop.
 if [ -d data ]; then
-  run tar -czf "backups/streamingestarr-data-$STAMP.tar.gz" data
+  if [ "$DRY" = 1 ]; then
+    note "would run: tar -czf backups/streamingestarr-data-$STAMP.tar.gz --exclude=data/hls data"
+  else
+    tar --warning=no-file-changed --ignore-failed-read -czf "backups/streamingestarr-data-$STAMP.tar.gz" --exclude=data/hls data || [ $? -eq 1 ]
+  fi
   note "backup: backups/streamingestarr-data-$STAMP.tar.gz"
   (ls -1t backups/streamingestarr-data-*.tar.gz 2>/dev/null || true) | tail -n +6 | while read -r old; do run rm -f "$old"; done
 fi
