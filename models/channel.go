@@ -45,6 +45,11 @@ type Channel struct {
 	// every link at once. Never serialised through the model — the admin
 	// and viewer surfaces decide who sees the links.
 	RelayToken string `json:"-"`
+	// ShareIngest is the "open stage" switch: when on, everyone inside
+	// the room (behind its locks) sees the ingest address and stream keys
+	// and may broadcast here. The admin's New key is the revocation lever.
+	ShareIngest bool `json:"shareIngest"`
+
 	// RoomPasswordHash is the room's own password, hashed; "" means none.
 	// LockTheater and LockRelay say what it guards. Both are off when no
 	// password is set.

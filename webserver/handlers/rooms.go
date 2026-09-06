@@ -46,3 +46,73 @@ func GetRooms(w http.ResponseWriter, r *http.Request) {
 	middleware.DisableCache(w)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{"rooms": rooms})
 }
+
+// The open stage: a room with ShareIngest on hands its ingest details to
+// everyone inside it — the Option-A public relay flow. The response gives
+// ports and keys; the client builds addresses from the host it reached us
+// on, exactly like the admin page does. Locked rooms keep the details
+// behind the same room password as the surface the viewer is on.
+type broadcastDetails struct {
+	Enabled  bool `json:"enabled"`
+	RTMPPort int  `json:"rtmpPort,omitempty"`
+	SRT      bool `json:"srt"`
+	SRTPort  int  `json:"srtPort,omitempty"`
+	TCP      bool `json:"tcp"`
+	TCPPort  int  `json:"tcpPort,omitempty"`
+	// The keys that open THIS room.
+	Keys []models.ChannelKey `json:"keys,omitempty"`
+	// Passphrase flag only — the phrase itself stays with the admin.
+	// (TCP has no passphrase; TLS is its lock.)
+	SRTPassphraseRequired bool `json:"srtPassphraseRequired"`
+}
+
+// GetRoomBroadcast returns a room's ingest details for viewers, or
+// {enabled:false} when the room keeps its stage closed.
+func GetRoomBroadcast(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	middleware.DisableCache(w)
+
+	ch := channelrepository.GetChannel(channelIDFromRequest(r))
+	closed := func() { _ = json.NewEncoder(w).Encode(broadcastDetails{Enabled: false}) }
+	if ch == nil || !ch.ShareIngest {
+		closed()
+		return
+	}
+	// The same lock that guards what the viewer is looking at guards the
+	// stage details: relay lock on relay surfaces, theater lock otherwise.
+	if ch.Relays() {
+		if core.RelayLocked(r, ch) {
+			closed()
+			return
+		}
+	} else if core.TheaterLocked(r, ch) {
+		closed()
+		return
+	}
+
+	cfg := configrepository.Get()
+	out := broadcastDetails{
+		Enabled:               true,
+		RTMPPort:              cfg.GetRTMPPortNumber(),
+		SRT:                   cfg.GetSRTServerEnabled(),
+		SRTPort:               cfg.GetSRTServerPort(),
+		TCP:                   cfg.GetTCPIngestEnabled(),
+		TCPPort:               cfg.GetTCPIngestPort(),
+		SRTPassphraseRequired: ch.Passphrase != "" || cfg.GetSRTPassphrase() != "",
+	}
+	if ch.ID == channelrepository.DefaultChannelID {
+		// The main room's keys are the global list.
+		for _, k := range cfg.GetStreamKeys() {
+			if k.Key != nil && *k.Key != "" {
+				entry := models.ChannelKey{Key: *k.Key}
+				if k.Comment != nil {
+					entry.Comment = *k.Comment
+				}
+				out.Keys = append(out.Keys, entry)
+			}
+		}
+	} else {
+		out.Keys = ch.Keys
+	}
+	_ = json.NewEncoder(w).Encode(out)
+}

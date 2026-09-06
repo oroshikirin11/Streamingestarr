@@ -79,6 +79,8 @@ func Setup(db *sql.DB) {
 		"room_password":   `ALTER TABLE channels ADD COLUMN room_password TEXT NOT NULL DEFAULT ''`,
 		"lock_theater":    `ALTER TABLE channels ADD COLUMN lock_theater INTEGER NOT NULL DEFAULT 0`,
 		"lock_relay":      `ALTER TABLE channels ADD COLUMN lock_relay INTEGER NOT NULL DEFAULT 0`,
+		// The open-stage switch (share ingest details with the room).
+		"share_ingest": `ALTER TABLE channels ADD COLUMN share_ingest INTEGER NOT NULL DEFAULT 0`,
 	} {
 		if !columnExists(db, "channels", col) {
 			if _, err := db.Exec(ddl); err != nil {
@@ -139,8 +141,8 @@ func GetChannel(id string) *models.Channel {
 	var c models.Channel
 	var variantsJSON string
 	var protocols string
-	row := _db.QueryRow("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants, passphrase, pause_vote_enabled, mode, relay_protocols, relay_token, room_password, lock_theater, lock_relay FROM channels WHERE id = ?", id)
-	if err := row.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON, &c.Passphrase, &c.PauseVoteEnabled, &c.Mode, &protocols, &c.RelayToken, &c.RoomPasswordHash, &c.LockTheater, &c.LockRelay); err != nil {
+	row := _db.QueryRow("SELECT id, name, title, welcome_message, latency_level, segment_format, output_variants, passphrase, pause_vote_enabled, mode, relay_protocols, relay_token, room_password, lock_theater, lock_relay, share_ingest FROM channels WHERE id = ?", id)
+	if err := row.Scan(&c.ID, &c.Name, &c.Title, &c.WelcomeMessage, &c.LatencyLevel, &c.SegmentFormat, &variantsJSON, &c.Passphrase, &c.PauseVoteEnabled, &c.Mode, &protocols, &c.RelayToken, &c.RoomPasswordHash, &c.LockTheater, &c.LockRelay, &c.ShareIngest); err != nil {
 		return nil
 	}
 	if variantsJSON != "" {
@@ -328,8 +330,8 @@ func SetChannelConfig(id string, c models.Channel) error {
 	default:
 		return errors.New("segment format must be auto, ts or fmp4 (or empty to inherit)")
 	}
-	_, err := _db.Exec(`UPDATE channels SET title = ?, welcome_message = ?, latency_level = ?, segment_format = ?, output_variants = ? WHERE id = ?`,
-		c.Title, c.WelcomeMessage, c.LatencyLevel, c.SegmentFormat, variantsJSON, id)
+	_, err := _db.Exec(`UPDATE channels SET title = ?, welcome_message = ?, latency_level = ?, segment_format = ?, output_variants = ?, share_ingest = ? WHERE id = ?`,
+		c.Title, c.WelcomeMessage, c.LatencyLevel, c.SegmentFormat, variantsJSON, c.ShareIngest, id)
 	return err
 }
 

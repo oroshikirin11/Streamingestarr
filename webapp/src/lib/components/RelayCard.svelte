@@ -2,8 +2,11 @@
 	// The relay: the room's links for an external player (VRChat's video
 	// players, VLC, anything that pulls a URL). Full-page in relay mode,
 	// a panel under the tray in "both". One link shown at a time, picked
-	// by where it goes, one button to copy it.
+	// by where it goes, one button to copy it. When the room's stage is
+	// open (admin: Rooms → Ingest → Open stage) the card also shows the
+	// ingest address and stream keys, so anyone here may broadcast.
 	import { dedupeSubtitle } from '../text.js';
+	import OpenStage from './OpenStage.svelte';
 	import RoomLock from './RoomLock.svelte';
 
 	let { status, roomName = 'this room', compact = false, onUnlocked } = $props();
@@ -41,37 +44,35 @@
 		} catch {}
 	}
 	const link = $derived(relay?.links?.[pick] ?? '');
-	// The token is the last path segment (before an extension): dimmed,
-	// so the eye lands on the host and room.
-	const linkParts = $derived.by(() => {
-		const m = link.match(/^(.*\/)([0-9a-f]{16,})(\.[a-z0-9]+)?$/i);
-		return m ? { head: m[1], token: m[2], tail: m[3] ?? '' } : { head: link, token: '', tail: '' };
-	});
 
+	// One copy state for the whole card, keyed by what was copied, so a
+	// second button does not inherit the first one's "Copied".
 	// '' | 'copied' | 'selected' — selected is the fallback when the
-	// clipboard is out of reach (plain http, an old browser): the link is
-	// highlighted for a manual copy.
+	// clipboard is out of reach (plain http, an old browser): the field is
+	// selected for a manual Ctrl+C.
 	let copied = $state('');
+	let copiedKey = $state('');
 	let copyTimer;
-	async function copy() {
-		if (!link) return;
+	async function copy(value, key, inputEl) {
+		if (!value) return;
 		clearTimeout(copyTimer);
+		copiedKey = key;
 		try {
-			await navigator.clipboard.writeText(link);
+			await navigator.clipboard.writeText(value);
 			copied = 'copied';
 		} catch {
-			const el = document.getElementById('relay-link');
-			if (el) {
-				const range = document.createRange();
-				range.selectNodeContents(el);
-				const sel = window.getSelection();
-				sel.removeAllRanges();
-				sel.addRange(range);
-			}
+			inputEl?.focus();
+			inputEl?.select();
 			copied = 'selected';
 		}
-		copyTimer = setTimeout(() => (copied = ''), 2200);
+		copyTimer = setTimeout(() => ((copied = ''), (copiedKey = '')), 2200);
 	}
+	function copyLabel(key, idle = 'Copy') {
+		if (copiedKey !== key || !copied) return idle;
+		return copied === 'copied' ? 'Copied' : 'Selected — press Ctrl+C';
+	}
+
+	let relayLinkEl = $state(null);
 </script>
 
 <section class="relay" class:compact>
@@ -105,11 +106,23 @@
 			</div>
 		{/if}
 		<div class="linkbox">
-			<code id="relay-link" class="link" title={link}>{linkParts.head}<span class="token">{linkParts.token}</span>{linkParts.tail}</code>
-			<button class="copy" class:done={Boolean(copied)} onclick={copy} aria-live="polite">{copied === 'copied' ? 'Copied' : copied === 'selected' ? 'Selected — press Ctrl+C' : 'Copy link'}</button>
+			<input
+				class="link"
+				readonly
+				value={link}
+				spellcheck="false"
+				aria-label="Relay link"
+				bind:this={relayLinkEl}
+				onfocus={(e) => e.target.select()}
+			/>
+			<button class="copy" class:done={copiedKey === 'link' && Boolean(copied)} onclick={() => copy(link, 'link', relayLinkEl)} aria-live="polite">{copyLabel('link', 'Copy link')}</button>
 		</div>
 		<p class="note">{KINDS[pick]?.note}. Paste it into the world's video player — everyone in the instance needs untrusted URLs allowed.</p>
 		<div class="players">{relay.players === 1 ? '1 player connected' : `${relay.players} players connected`}</div>
+	{/if}
+
+	{#if !locked}
+		<OpenStage />
 	{/if}
 </section>
 
@@ -212,20 +225,20 @@
 	.link {
 		flex: 1;
 		min-width: 0;
+		appearance: none;
 		font-family: ui-monospace, monospace;
 		font-size: 13.5px;
+		color: var(--text);
 		text-align: left;
 		padding: 12px 14px;
 		border: 1px solid var(--border);
 		border-radius: 10px;
 		background: var(--surface-2);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
 		line-height: 1.4;
 	}
-	.link .token {
-		color: var(--muted);
+	.link:focus {
+		outline: none;
+		border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
 	}
 	.copy {
 		appearance: none;

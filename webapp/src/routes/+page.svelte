@@ -10,6 +10,7 @@
 	import Lobby from '$lib/components/Lobby.svelte';
 	import RoomWall from '$lib/components/RoomWall.svelte';
 	import RelayCard from '$lib/components/RelayCard.svelte';
+	import OpenStage from '$lib/components/OpenStage.svelte';
 	import RoomLock from '$lib/components/RoomLock.svelte';
 
 	let chatHidden = $state(false);
@@ -174,6 +175,9 @@
 			<RelayCard status={st} roomName={theaterName} compact onUnlocked={refreshStatus} />
 		{/if}
 		<Lobby status={st} />
+		{#if !hybrid}
+			<OpenStage />
+		{/if}
 	{/if}
 </div>
 

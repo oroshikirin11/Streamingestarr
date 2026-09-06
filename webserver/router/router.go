@@ -90,6 +90,7 @@ func Start(enableVerboseLogging bool) error {
 	// Rooms: the viewer lobby list, and the admin CRUD (cap 5, key-routed —
 	// no per-room ports).
 	r.Get("/api/rooms", handlers.GetRooms)
+	r.Get("/api/rooms/broadcast", handlers.GetRoomBroadcast)
 	r.Get("/api/admin/rooms", middleware.RequireAdminAuth(admin.GetRooms))
 	r.Post("/api/admin/rooms", middleware.RequireAdminAuth(admin.CreateRoom))
 	r.Post("/api/admin/rooms/delete", middleware.RequireAdminAuth(admin.DeleteRoom))

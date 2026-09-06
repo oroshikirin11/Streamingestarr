@@ -30,6 +30,10 @@ export const getStatus = () => request(`/api/status?channel=${currentChannel()}`
 export const getConfig = () => request('/api/config');
 export const getRooms = () => request('/api/rooms');
 
+// The open stage: a room sharing its ingest details answers with ports and
+// keys; a closed one answers {enabled:false}. Same lock as the page itself.
+export const getRoomBroadcast = () => request(`/api/rooms/broadcast?channel=${currentChannel()}`);
+
 // A room's own password. The answer is {success, message}; a wrong
 // password is a 401 with the sentence to show, never a door redirect.
 export async function unlockRoom(password) {

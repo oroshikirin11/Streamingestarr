@@ -39,6 +39,9 @@ type roomResponse struct {
 	PassphraseSet bool `json:"passphraseSet"`
 	// PauseVoteEnabled is the room's "viewers may vote to pause" switch.
 	PauseVoteEnabled bool `json:"pauseVoteEnabled"`
+	// ShareIngest: the open-stage switch — the room shows its ingest
+	// address and keys to everyone inside.
+	ShareIngest bool `json:"shareIngest"`
 
 	// Mode, the relay's link kinds and links (as reached through this
 	// request's host), and the room's own password and what it guards.
@@ -65,6 +68,7 @@ func roomToResponse(ch models.Channel, r *http.Request) roomResponse {
 		OutputVariants:   ch.OutputVariants,
 		PassphraseSet:    ch.Passphrase != "",
 		PauseVoteEnabled: ch.PauseVoteEnabled,
+		ShareIngest:      ch.ShareIngest,
 		Mode:             ch.EffectiveMode(),
 		RelayProtocols:   ch.EffectiveRelayProtocols(),
 		RelayLinks:       core.RelayLinks(r, &ch),
@@ -244,12 +248,14 @@ func SetRoomConfig(w http.ResponseWriter, r *http.Request) {
 		LatencyLevel   *int                         `json:"latencyLevel"`
 		SegmentFormat  string                       `json:"segmentFormat"`
 		OutputVariants []models.StreamOutputVariant `json:"outputVariants"`
+		ShareIngest    *bool                        `json:"shareIngest"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == "" {
 		webutils.WriteSimpleResponse(w, false, "send {\"id\": \"...\", ...config}")
 		return
 	}
-	if channelrepository.GetChannel(req.ID) == nil {
+	existing := channelrepository.GetChannel(req.ID)
+	if existing == nil {
 		webutils.WriteSimpleResponse(w, false, "no such room")
 		return
 	}
@@ -257,12 +263,19 @@ func SetRoomConfig(w http.ResponseWriter, r *http.Request) {
 	if req.LatencyLevel != nil {
 		latency = *req.LatencyLevel
 	}
+	// Absent means unchanged, so an older client cannot silently close an
+	// open stage.
+	share := existing.ShareIngest
+	if req.ShareIngest != nil {
+		share = *req.ShareIngest
+	}
 	cfg := models.Channel{
 		Title:          strings.TrimSpace(req.Title),
 		WelcomeMessage: strings.TrimSpace(req.WelcomeMessage),
 		LatencyLevel:   latency,
 		SegmentFormat:  req.SegmentFormat,
 		OutputVariants: req.OutputVariants,
+		ShareIngest:    share,
 	}
 	if err := channelrepository.SetChannelConfig(req.ID, cfg); err != nil {
 		webutils.WriteSimpleResponse(w, false, err.Error())

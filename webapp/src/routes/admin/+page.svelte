@@ -142,6 +142,7 @@
 			passphraseSet: Boolean(r.passphraseSet),
 			passphrase: '',
 			pauseVoteEnabled: r.pauseVoteEnabled !== false,
+			shareIngest: Boolean(r.shareIngest),
 			mode: r.mode ?? 'theater',
 			relayProtocols: r.relayProtocols ?? ['rtsp'],
 			relayLinks: r.relayLinks ?? {},
@@ -163,13 +164,29 @@
 			const cf = await api.setRoomConfig(r.id, {
 				title: r.title,
 				welcomeMessage: r.welcomeMessage,
-				latencyLevel: Number(r.latencyLevel)
+				latencyLevel: Number(r.latencyLevel),
+				shareIngest: r.shareIngest
 			});
 			if (cf?.success === false) return cf;
 			r.legacyOutput = false;
 			if (!r.isDefault) return api.setRoomKeys(r.id, r.keys.filter((k) => k.key));
 			return cf;
 		}, 'Room saved');
+	}
+
+	// The open-stage switch saves on its own; the config endpoint replaces
+	// the whole config, so it rides with the card's current fields.
+	function saveShareIngest(r) {
+		run(async () => {
+			const res = await api.setRoomConfig(r.id, {
+				title: r.title,
+				welcomeMessage: r.welcomeMessage,
+				latencyLevel: Number(r.latencyLevel),
+				shareIngest: r.shareIngest
+			});
+			if (res?.success === false) r.shareIngest = !r.shareIngest;
+			return res;
+		}, r.shareIngest ? 'Stage opened — the room page now shows the ingest address and keys' : 'Stage closed — credentials are admin-only again');
 	}
 
 	// Mode and relay links save on their own — the switch is the action.
@@ -771,6 +788,13 @@
 									<button class="ghost tiny danger-text" onclick={() => (r.keys = r.keys.filter((_, j) => j !== i))}>Remove</button>
 								</div>
 							{/each}
+						{/if}
+						<label class="switch">
+							<input type="checkbox" bind:checked={r.shareIngest} onchange={() => saveShareIngest(r)} />
+							<span class="track"></span> Open stage — the room's page shows the ingest address and stream keys to everyone in it (behind the room's password, if set), so anyone may broadcast here
+						</label>
+						{#if r.shareIngest}
+							<p class="hint">To revoke access later: {#if r.isDefault}rotate the keys in <b>Stream</b>{:else}randomize or remove the keys above{/if}, or switch the stage off.</p>
 						{/if}
 						{#if !r.isDefault}
 							<footer>
