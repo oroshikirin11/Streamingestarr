@@ -27,12 +27,20 @@ func setStreamAsConnected(rtmpOut *io.PipeReader, streamKey string) {
 // setStreamAsConnected sets the stream as connected.
 func (c *ChannelRuntime) setStreamAsConnected(rtmpOut *io.PipeReader) {
 	now := utils.NullTime{Time: time.Now(), Valid: true}
+	lastDisconnect := c.stats.LastDisconnectTime
 	c.stats.StreamConnected = true
 	c.stats.LastDisconnectTime = nil
 	c.stats.LastConnectTime = &now
 	c.stats.SessionMaxViewerCount = 0
-	// A session replacing one that just ended keeps its metadata.
+	// A session replacing one that just ended keeps its metadata — the
+	// frame-size reconnect the grace exists for. Anything arriving later
+	// (or after a receiver restart, where no drop timer survives but the
+	// disk mirror restored the old now-playing) starts clean: the last
+	// sender's metadata is not this broadcast's word.
 	c.cancelNowPlayingDrop()
+	if lastDisconnect == nil || !lastDisconnect.Valid || time.Since(lastDisconnect.Time) > nowPlayingGrace {
+		c.dropNowPlaying()
+	}
 
 	configRepository := configrepository.Get()
 	_ = configRepository
