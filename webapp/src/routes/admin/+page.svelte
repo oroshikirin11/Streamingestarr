@@ -744,6 +744,11 @@
 								<option value={4}>Highest buffer</option>
 							</select>
 						</div>
+						{#if r.mode !== 'theater' && Number(r.latencyLevel) === 0}
+							<p class="hint danger-text">Lowest latency starves the relay: the feed that serves the relay links comes from the same process, and at this level external players stutter. Default is the right setting for a relay room.</p>
+						{:else if r.mode !== 'theater'}
+							<p class="hint">Relay rooms do best at Default. Lowest starves the relay feed and external players stutter.</p>
+						{/if}
 						{#if r.legacyOutput}
 							<p class="hint danger-text">This room still carries a transcode ladder or a forced segment container from an earlier version. Saving resets it to passthrough and the Auto container.</p>
 						{/if}
@@ -1213,9 +1218,12 @@
 	input:focus, select:focus { outline: 0; border-color: var(--accent); }
 
 	/* ---------- switches ---------- */
-	.switch { display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 13px; cursor: pointer; padding: 4px 0; }
+	/* The real checkbox stays inside its label (position: relative) — an
+	   absolutely placed input with no positioned ancestor lands at the top
+	   of the document, and focusing it on click scrolled the page there. */
+	.switch { position: relative; display: flex; align-items: center; gap: 9px; color: var(--text); font-size: 13px; cursor: pointer; padding: 4px 0; }
 	.card > .switch { margin: 12px 0 10px; }
-	.switch input { position: absolute; opacity: 0; pointer-events: none; }
+	.switch input { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 	.switch .track {
 		width: 32px; height: 18px; border-radius: 99px; flex: none;
 		background: var(--surface-2); border: 1px solid var(--border);

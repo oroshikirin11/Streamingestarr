@@ -68,7 +68,9 @@ ufw allow 8554/tcp   # the relay's RTSP port (admin → Stream → Relay)
 ```
 
 Publish it in `docker-compose.yml` (`"8554:8554"`) — the shipped file
-carries the line. The token is per room; **New links** on the room's
+carries the line. Keep the room's latency at **Default**: the relay feed
+comes from the same ffmpeg as the HLS output, and at Lowest it starves,
+which an external player shows as stutter with clean sound. The token is per room; **New links** on the room's
 page rotates it and drops every connected player. VRChat only plays
 domains on its trusted list by default: everyone in the instance needs
 "Allow Untrusted URLs" on for your domain.
