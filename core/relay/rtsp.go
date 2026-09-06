@@ -42,6 +42,11 @@ func StartRTSP(port int, resolve Resolver) (*RTSPServer, error) {
 	s.srv = &gortsplib.Server{
 		Handler:     s,
 		RTSPAddress: fmt.Sprintf(":%d", port),
+		// A 1080p keyframe is a burst of a few hundred RTP packets; the
+		// default queue of 256 drops the tail on a link that hiccups, and
+		// dropped video with intact audio is exactly what a player shows
+		// as stutter. Power of two, per the library.
+		WriteQueueSize: 4096,
 	}
 	if err := s.srv.Start(); err != nil {
 		return nil, err
@@ -409,11 +414,14 @@ func (p *Publisher) run() {
 	}
 }
 
-// writeAll stamps and sends one access unit's packets. The encoder's own
-// timestamps are relative; the stream's are absolute per track.
+// writeAll stamps and sends one access unit's packets. The packetizers
+// leave RELATIVE timestamps — zero on every packet of a video access
+// unit, rising offsets when audio units share a call — so the track's
+// absolute time is added, never assigned: assigning stamped every audio
+// unit of a call with the same time and the player saw time step back.
 func writeAll(stream *gortsplib.ServerStream, media *description.Media, pkts []*rtp.Packet, ts uint32) error {
 	for _, pkt := range pkts {
-		pkt.Timestamp = ts
+		pkt.Timestamp += ts
 		if err := stream.WritePacketRTP(media, pkt); err != nil {
 			return err
 		}
