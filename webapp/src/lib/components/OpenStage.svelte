@@ -5,11 +5,13 @@
 	// its stage closed — the server answers {enabled:false}.
 	import { getRoomBroadcast } from '../api.js';
 
-	let { locked = false } = $props();
+	// online mirrors the room's live state: the moment a broadcast runs,
+	// the panel folds away — the server hides the details too.
+	let { locked = false, online = false } = $props();
 
 	let stage = $state(null);
 	$effect(() => {
-		if (locked) {
+		if (locked || online) {
 			stage = null;
 			return;
 		}
@@ -78,8 +80,7 @@
 			<p class="empty">the stage is open but this room has no stream keys yet — ask the admin to add one</p>
 		{/if}
 		<p class="note">
-			The key is the RTMP path (<span class="mono">rtmp://…/&lt;key&gt;</span>) and the SRT streamid.{#if stage.srtPassphraseRequired}
-				SRT needs the room's passphrase — ask whoever gave you the key.{/if}
+			The key is the RTMP path (<span class="mono">rtmp://…/&lt;key&gt;</span>) and the SRT streamid.{#if stage.srtPassphraseRequired}{' '}SRT needs the room's passphrase — ask whoever gave you the key.{/if}
 		</p>
 	</div>
 {/if}

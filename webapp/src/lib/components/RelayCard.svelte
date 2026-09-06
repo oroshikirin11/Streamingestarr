@@ -122,7 +122,7 @@
 	{/if}
 
 	{#if !locked}
-		<OpenStage />
+		<OpenStage online={Boolean(status?.online)} />
 	{/if}
 </section>
 

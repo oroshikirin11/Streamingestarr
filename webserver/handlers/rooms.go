@@ -90,6 +90,14 @@ func GetRoomBroadcast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// While a broadcast runs the stage details disappear: nobody gets
+	// handed the keys to a show already in progress. (The ingest refuses
+	// a second sender on a busy key anyway — this hides the invitation.)
+	if core.IsChannelBusy(ch.ID) {
+		closed()
+		return
+	}
+
 	cfg := configrepository.Get()
 	out := broadcastDetails{
 		Enabled:               true,

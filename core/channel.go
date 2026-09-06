@@ -114,6 +114,14 @@ func AnyChannelOnline() bool {
 	return false
 }
 
+// IsChannelBusy reports whether a channel currently holds a live inbound
+// stream — raw connection state, no HLS warm-up grace, so the answer
+// flips the moment a sender connects or drops.
+func IsChannelBusy(id string) bool {
+	c := GetChannelRuntime(id)
+	return c != nil && c.stats != nil && c.stats.StreamConnected
+}
+
 // isStreamKeyBusy reports whether the channel a stream key feeds already
 // has a live inbound stream — shared by the RTMP and SRT listeners so the
 // two protocols cannot overtake each other.
